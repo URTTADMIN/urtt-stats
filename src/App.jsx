@@ -967,7 +967,7 @@ function buildCumulativeStats(statsBySeason) {
         map.set(item.id, { ...current, ...item, wins: current.wins + item.wins, podiums: current.podiums + item.podiums, poles: current.poles + item.poles, fastestLaps: current.fastestLaps + item.fastestLaps, points: current.points + item.points });
       });
     });
-    cumulative[selectedSeason.id] = Array.from(map.values()).sort((a, b) => b.points - a.points);
+    cumulative[selectedSeason.id] = Array.from(map.values()).sort(sortByTitlesAndResults);
   });
   return cumulative;
 }
