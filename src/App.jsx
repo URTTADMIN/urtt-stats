@@ -357,6 +357,9 @@ export default function URTTAdminPanel() {
   const [popup, setPopup] = useState(null);
   const [search, setSearch] = useState("");
   const [adminGlobalSearch, setAdminGlobalSearch] = useState("");
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [supabaseErrors, setSupabaseErrors] = useState([]);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -372,6 +375,8 @@ export default function URTTAdminPanel() {
 
   useEffect(() => {
     async function loadInitialDataFromSupabase() {
+      setIsLoadingData(true);
+      setSupabaseErrors([]);
       const [
         { data: teamsData, error: teamsError },
         { data: driversData, error: driversError },
@@ -390,13 +395,20 @@ export default function URTTAdminPanel() {
         supabase.from("race_result_entries").select("*").order("id", { ascending: true }),
       ]);
 
-      if (teamsError) console.error("Erreur chargement teams:", teamsError);
-      if (driversError) console.error("Erreur chargement drivers:", driversError);
-      if (participationsError) console.error("Erreur chargement participations:", participationsError);
-      if (raceLibraryError) console.error("Erreur chargement race_library:", raceLibraryError);
-      if (calendarError) console.error("Erreur chargement season_calendar:", calendarError);
-      if (resultsError) console.error("Erreur chargement race_results:", resultsError);
-      if (resultEntriesError) console.error("Erreur chargement race_result_entries:", resultEntriesError);
+      const loadErrors = [
+        teamsError && `teams: ${teamsError.message}`,
+        driversError && `drivers: ${driversError.message}`,
+        participationsError && `driver_participations: ${participationsError.message}`,
+        raceLibraryError && `race_library: ${raceLibraryError.message}`,
+        calendarError && `season_calendar: ${calendarError.message}`,
+        resultsError && `race_results: ${resultsError.message}`,
+        resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
+      ].filter(Boolean);
+
+      if (loadErrors.length) {
+        console.error("Erreurs chargement Supabase:", loadErrors);
+        setSupabaseErrors(loadErrors);
+      }
 
       setTeams((teamsData || []).map(mapTeamFromDb));
       setDrivers((driversData || []).map((driver) => mapDriverFromDb(driver, participationsData || [])));
@@ -405,9 +417,15 @@ export default function URTTAdminPanel() {
       setAllCalendarRaces(mappedCalendar);
       setRacesBySeason(createSeasonMapFromCalendar(mappedCalendar, selectedCategoryId));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
+      setLastSyncAt(new Date());
+      setIsLoadingData(false);
     }
 
-    loadInitialDataFromSupabase();
+    loadInitialDataFromSupabase().catch((error) => {
+      console.error("Erreur globale Supabase:", error);
+      setSupabaseErrors([error.message || "Erreur inconnue pendant le chargement Supabase"]);
+      setIsLoadingData(false);
+    });
   }, []);
 
   const racesBySelectedCategory = useMemo(() => createSeasonMapFromCalendar(allCalendarRaces, selectedCategoryId), [allCalendarRaces, selectedCategoryId]);
@@ -830,6 +848,7 @@ export default function URTTAdminPanel() {
           }}
         >
           {adminPage === "dashboard" && <Dashboard drivers={computed.globalDriverStats} teams={computed.globalTeamStats} races={currentSeasonRaces} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
+          {adminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} raceResults={raceResults} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
           {adminPage === "search" && <AdminSearch search={adminGlobalSearch} setSearch={setAdminGlobalSearch} drivers={drivers} teams={teams} onEditDriver={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); setAdminPage("drivers"); }} onEditTeam={(team) => { setEditingTeamId(team.id); setTeamForm(team); setAdminPage("teams"); }} />}
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
@@ -921,7 +940,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <header style={styles.publicHeader}>
         <div>
           <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <div style={styles.headerLogoRow}><h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1></div>
+          <h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
           <p style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
@@ -963,12 +982,19 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
 }
 
 function AdminLayout({ active, setActive, adminUser, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["search", "🔎", "Recherche"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
+  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
   return <div style={styles.page}><aside style={styles.sidebar}><div style={styles.logoRow}><div style={styles.logo}>UR</div><div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div></div><nav style={styles.nav}>{items.map(([key, icon, label]) => <button key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}</nav></aside><main style={styles.main}><header style={styles.header}><div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email}</p>}</div><div style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div></header>{children}</main></div>;
 }
 
 function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId }) {
   return <div style={styles.section}><div style={styles.statsGrid}><Stat label="Catégorie" value={selectedCategoryId} /><Stat label="Saison" value={seasonName(selectedSeasonId)} /><Stat label="Pilotes" value={drivers.length} /><Stat label="Écuries" value={teams.length} /><Stat label="GP" value={races.length} /></div><div style={styles.twoColumns}><Card title="Top pilotes global" icon="🏆"><DriverTable drivers={drivers} teams={[]} /></Card><Card title="Top écuries global" icon="🏎️"><TeamTable teams={teams} /></Card></div></div>;
+}
+
+function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, raceResults, selectedCategoryId, selectedSeasonId }) {
+  const visibleCalendar = allCalendarRaces.filter((race) => race.categoryId === selectedCategoryId && race.seasonId === selectedSeasonId);
+  const visibleResults = raceResults.filter((result) => result.categoryId === selectedCategoryId && result.seasonId === selectedSeasonId);
+
+  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
 }
 
 function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTeam }) {
@@ -1136,8 +1162,7 @@ const styles = {
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicMain: { maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
-  headerLogoRow: { display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" },
-  headerLogo: { height: 72, maxWidth: 180, objectFit: "contain", display: "block" },
+  
   publicSubtitle: { color: "#d4d4d8", fontSize: 18, margin: 0, maxWidth: 680 },
   publicNav: { maxWidth: 1280, margin: "0 auto", padding: "0 28px 18px", display: "flex", gap: 10, flexWrap: "wrap" },
   publicNavButton: { background: "#18181b", border: "1px solid #27272a", color: "#d4d4d8", padding: "12px 16px", borderRadius: 999, fontWeight: 900, cursor: "pointer" },
@@ -1235,4 +1260,5 @@ const styles = {
   checkboxPill: { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 999, padding: "9px 12px", fontWeight: 900 },
   fileInput: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 13, cursor: "pointer" },
   logoPreviewBox: { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 18, padding: 14 },
+  errorBox: { background: "rgba(127,29,29,.35)", border: "1px solid #7f1d1d", borderRadius: 18, padding: 14, marginTop: 16 },
 };
