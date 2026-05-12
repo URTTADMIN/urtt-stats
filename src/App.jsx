@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
 
 const POINTS_SYSTEM = [30, 25, 22, 20, 18, 16, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+const RACES_NEEDED_FOR_TITLES = 10;
 const SEASON_OPTIONS = Array.from({ length: 16 }, (_, index) => ({ id: `S${index + 1}`, name: `Saison ${index + 1}` }));
 const CATEGORY_OPTIONS = [
   { id: "F1", name: "F1", color: "#7c3aed" },
@@ -863,8 +864,27 @@ export default function URTTAdminPanel() {
 }
 
 function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
-  const blankDriverStats = (driver) => ({ ...driver, teamName: teams.find((team) => team.id === driver.teamId)?.name || "Sans écurie", wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0 });
-  const blankTeamStats = (team) => ({ ...team, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0 });
+  const blankDriverStats = (driver) => ({
+  ...driver,
+  teamName: teams.find((team) => team.id === driver.teamId)?.name || "Sans écurie",
+  driverTitles: Number(driver.driverTitles) || 0,
+  teamTitles: Number(driver.teamTitles) || 0,
+  wins: 0,
+  podiums: 0,
+  poles: 0,
+  fastestLaps: 0,
+  points: 0,
+});
+  const blankTeamStats = (team) => ({
+  ...team,
+  driverTitles: Number(team.driverTitles) || 0,
+  teamTitles: Number(team.teamTitles) || 0,
+  wins: 0,
+  podiums: 0,
+  poles: 0,
+  fastestLaps: 0,
+  points: 0,
+});
   const driverStatsBySeason = {};
   const teamStatsBySeason = {};
   SEASON_OPTIONS.forEach((season) => {
@@ -911,6 +931,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
     globalTeamStats: buildCumulativeStats(teamStatsBySeason).S16 || [],
   };
 }
+
 
 function buildCumulativeStats(statsBySeason) {
   const cumulative = {};
@@ -1069,7 +1090,9 @@ function SettingsPanel() {
 }
 
 function DriverTable({ drivers, detailed = false, raceDetails = false, races = [], raceResults = [], showExtendedStats = false, onDriverClick, teams = [], selectedSeasonId }) {
-  return <div style={styles.tableWrap}><table style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}><thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titres</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead><tbody>{drivers.map((driver, index) => <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={getDriverSeasonTeam(driver, selectedSeasonId, teams)?.color} /></button> : <DriverIdentity driver={driver} teamColor={getDriverSeasonTeam(driver, selectedSeasonId, teams)?.color} />}</td><td style={styles.td}>{driver.teamName || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} /></td>)}{showExtendedStats && <><td style={styles.td}>{driver.driverTitles}</td><td style={styles.td}>{driver.wins}</td><td style={styles.td}>{driver.podiums}</td><td style={styles.td}>{driver.poles}</td><td style={styles.td}>{driver.fastestLaps}</td></>}<td style={{ ...styles.td, ...styles.points }}>{driver.points}</td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>)}</tbody></table>{drivers.length === 0 && <Empty text="Aucun pilote à afficher." />}</div>;
+  return <div style={styles.tableWrap}><table style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}><thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titres pilote</th>
+<th style={styles.th}>Titres écurie</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead><tbody>{drivers.map((driver, index) => <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={getDriverSeasonTeam(driver, selectedSeasonId, teams)?.color} /></button> : <DriverIdentity driver={driver} teamColor={getDriverSeasonTeam(driver, selectedSeasonId, teams)?.color} />}</td><td style={styles.td}>{driver.teamName || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} /></td>)}{showExtendedStats && <><td style={styles.td}>{driver.driverTitles || 0}</td>
+<td style={styles.td}>{driver.teamTitles || 0}</td><td style={styles.td}>{driver.wins}</td><td style={styles.td}>{driver.podiums}</td><td style={styles.td}>{driver.poles}</td><td style={styles.td}>{driver.fastestLaps}</td></>}<td style={{ ...styles.td, ...styles.points }}>{driver.points}</td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>)}</tbody></table>{drivers.length === 0 && <Empty text="Aucun pilote à afficher." />}</div>;
 }
 
 function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, onTeamClick }) {
