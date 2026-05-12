@@ -851,11 +851,24 @@ export default function URTTAdminPanel() {
           {adminPage === "dashboard" && <Dashboard drivers={computed.globalDriverStats} teams={computed.globalTeamStats} races={currentSeasonRaces} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
           {adminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} raceResults={raceResults} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
           {adminPage === "search" && <AdminSearch search={adminGlobalSearch} setSearch={setAdminGlobalSearch} drivers={drivers} teams={teams} onEditDriver={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); setAdminPage("drivers"); }} onEditTeam={(team) => { setEditingTeamId(team.id); setTeamForm(team); setAdminPage("teams"); }} />}
+          {adminPage === "titles" && (
+  <TitlesPanel
+    drivers={drivers}
+    teams={teams}
+    titleDriverId={titleDriverId}
+    setTitleDriverId={setTitleDriverId}
+    titleTeamId={titleTeamId}
+    setTitleTeamId={setTitleTeamId}
+    onAward={awardManualTitles}
+    isSaving={isSaving}
+  />
+)}
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} isSavingRace={isSavingRace} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).includes(selectedCategoryId))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel />}
+          
         </AdminLayout>
       )}
       {popup && <Popup popup={popup} onClose={() => setPopup(null)} />}
@@ -1003,7 +1016,7 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
 }
 
 function AdminLayout({ active, setActive, adminUser, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
+  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
   return <div style={styles.page}><aside style={styles.sidebar}><div style={styles.logoRow}><div style={styles.logo}>UR</div><div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div></div><nav style={styles.nav}>{items.map(([key, icon, label]) => <button key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}</nav></aside><main style={styles.main}><header style={styles.header}><div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email}</p>}</div><div style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div></header>{children}</main></div>;
 }
 
@@ -1172,6 +1185,139 @@ function DriverIdentity({ driver, teamColor }) { return <div style={styles.ident
 function TeamIdentity({ team }) { return <div style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={styles.logoSmall} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<strong>{team.name || "Écurie"}</strong></div>; }
 function TripleCrown({ crown }) { const safe = crown || { monaco: false, indy500: false, lemans: false }; const count = [safe.monaco, safe.indy500, safe.lemans].filter(Boolean).length; return <div style={styles.crownBox}><span style={safe.monaco ? styles.badgeGreen : styles.badgeDark}>Monaco</span><span style={safe.indy500 ? styles.badgeGreen : styles.badgeDark}>Indy 500</span><span style={safe.lemans ? styles.badgeGreen : styles.badgeDark}>Le Mans</span><strong>{count}/3</strong></div>; }
 function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes à créer dans Supabase Auth.</p></form></div>; }
+function TitlesPanel({
+  drivers,
+  teams,
+  titleDriverId,
+  setTitleDriverId,
+  titleTeamId,
+  setTitleTeamId,
+  onAward,
+  isSaving,
+}) {
+  return (
+    <div style={{ display: "grid", gap: 24 }}>
+      <div className="urtt-card">
+        <h2 className="urtt-card-title">Gestion des titres</h2>
+
+        <p style={{ color: "#a1a1aa", marginTop: 6 }}>
+          Ajoute manuellement un titre pilote et constructeur.
+        </p>
+
+        <div
+          className="urtt-form-grid"
+          style={{ marginTop: 24 }}
+        >
+          <div>
+            <label className="urtt-label">
+              Pilote champion
+            </label>
+
+            <select
+              className="urtt-input"
+              value={titleDriverId}
+              onChange={(e) => setTitleDriverId(e.target.value)}
+            >
+              <option value="">Choisir un pilote</option>
+
+              {drivers.map((driver) => (
+                <option key={driver.id} value={driver.id}>
+                  {driver.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="urtt-label">
+              Écurie championne
+            </label>
+
+            <select
+              className="urtt-input"
+              value={titleTeamId}
+              onChange={(e) => setTitleTeamId(e.target.value)}
+            >
+              <option value="">Choisir une écurie</option>
+
+              {teams.map((team) => (
+                <option key={team.id} value={team.id}>
+                  {team.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <button
+          className="urtt-button"
+          onClick={onAward}
+          disabled={isSaving}
+          style={{ marginTop: 24 }}
+        >
+          {isSaving ? "Ajout..." : "Ajouter les titres"}
+        </button>
+      </div>
+
+      <div className="urtt-card">
+        <h2 className="urtt-card-title">
+          Aperçu des titres
+        </h2>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 1fr",
+            gap: 20,
+            marginTop: 20,
+          }}
+        >
+          <div>
+            <h3 style={{ marginBottom: 12 }}>
+              Pilotes
+            </h3>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {drivers.map((driver) => (
+                <div
+                  key={driver.id}
+                  className="urtt-item-box"
+                >
+                  <span>{driver.name}</span>
+
+                  <strong>
+                    🏆 {driver.driverTitles || 0}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <h3 style={{ marginBottom: 12 }}>
+              Écuries
+            </h3>
+
+            <div style={{ display: "grid", gap: 10 }}>
+              {teams.map((team) => (
+                <div
+                  key={team.id}
+                  className="urtt-item-box"
+                >
+                  <span>{team.name}</span>
+
+                  <strong>
+                    👑 {team.teamTitles || 0}
+                  </strong>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 function Popup({ popup, onClose }) { return <div style={styles.popupOverlay}><div style={styles.popupCard}><div style={styles.popupIcon}>{popup.type === "error" ? "⚠️" : "✅"}</div><h3 style={styles.popupTitle}>{popup.title}</h3><p style={styles.muted}>{popup.message}</p><button onClick={onClose} style={styles.fullButton}>OK</button></div></div>; }
 function Card({ title, icon, children }) { return <div style={styles.card}><div style={styles.cardHeader}><div style={styles.cardIcon}>{icon}</div><h3 style={styles.cardTitle}>{title}</h3></div>{children}</div>; }
 function Stat({ label, value }) { return <div style={styles.statCard}><p style={styles.muted}>{label}</p><p style={styles.statValue}>{value}</p></div>; }
