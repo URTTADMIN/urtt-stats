@@ -308,6 +308,20 @@ function runTests() {
 runTests();
 
 export default function URTTAdminPanel() {
+  useEffect(() => {
+    const style = document.createElement("style");
+    style.innerHTML = `
+      html, body, #root {
+        margin: 0;
+        padding: 0;
+        min-height: 100%;
+        background: #09090b;
+      }
+      * { box-sizing: border-box; }
+    `;
+    document.head.appendChild(style);
+    return () => document.head.removeChild(style);
+  }, []);
   const [view, setView] = useState("front");
   const [publicPage, setPublicPage] = useState("home");
   const [adminPage, setAdminPage] = useState("dashboard");
@@ -317,8 +331,8 @@ export default function URTTAdminPanel() {
   const [adminPassword, setAdminPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [adminUser, setAdminUser] = useState(null);
-  const [drivers, setDrivers] = useState(demoDrivers);
-  const [teams, setTeams] = useState(demoTeams);
+  const [drivers, setDrivers] = useState([]);
+  const [teams, setTeams] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingRace, setIsSavingRace] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
@@ -378,15 +392,13 @@ export default function URTTAdminPanel() {
       if (resultsError) console.error("Erreur chargement race_results:", resultsError);
       if (resultEntriesError) console.error("Erreur chargement race_result_entries:", resultEntriesError);
 
-      if (teamsData && teamsData.length > 0) setTeams(teamsData.map(mapTeamFromDb));
-      if (driversData && driversData.length > 0) setDrivers(driversData.map((driver) => mapDriverFromDb(driver, participationsData || [])));
-      if (raceLibraryData && raceLibraryData.length > 0) setRaceLibrary(raceLibraryData.map(mapRaceLibraryFromDb));
-      if (calendarData && calendarData.length > 0) {
-        const mappedCalendar = calendarData.map(mapCalendarRaceFromDb);
-        setAllCalendarRaces(mappedCalendar);
-        setRacesBySeason(createSeasonMapFromCalendar(mappedCalendar, selectedCategoryId));
-      }
-      if (resultsData && resultsData.length > 0) setRaceResults(resultsData.map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
+      setTeams((teamsData || []).map(mapTeamFromDb));
+      setDrivers((driversData || []).map((driver) => mapDriverFromDb(driver, participationsData || [])));
+      setRaceLibrary((raceLibraryData || []).map(mapRaceLibraryFromDb));
+      const mappedCalendar = (calendarData || []).map(mapCalendarRaceFromDb);
+      setAllCalendarRaces(mappedCalendar);
+      setRacesBySeason(createSeasonMapFromCalendar(mappedCalendar, selectedCategoryId));
+      setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
     }
 
     loadInitialDataFromSupabase();
@@ -903,7 +915,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <header style={styles.publicHeader}>
         <div>
           <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
+          <div style={styles.headerLogoRow}><img src="/urtt_logo.png" alt="URTT" style={styles.headerLogo} /><h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1></div>
           <p style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
@@ -1118,6 +1130,8 @@ const styles = {
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicMain: { maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
+  headerLogoRow: { display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" },
+  headerLogo: { height: 72, maxWidth: 180, objectFit: "contain", display: "block" },
   publicSubtitle: { color: "#d4d4d8", fontSize: 18, margin: 0, maxWidth: 680 },
   publicNav: { maxWidth: 1280, margin: "0 auto", padding: "0 28px 18px", display: "flex", gap: 10, flexWrap: "wrap" },
   publicNavButton: { background: "#18181b", border: "1px solid #27272a", color: "#d4d4d8", padding: "12px 16px", borderRadius: 999, fontWeight: 900, cursor: "pointer" },
