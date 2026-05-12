@@ -921,7 +921,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <header style={styles.publicHeader}>
         <div>
           <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <div style={styles.headerLogoRow}><img src="/urtt_logo.png" alt="URTT" style={styles.headerLogo} /><h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1></div>
+          <div style={styles.headerLogoRow}><h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1></div>
           <p style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
