@@ -945,7 +945,17 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   };
 }
 
-
+function sortByTitlesAndResults(a, b) {
+  return (
+    (Number(b.driverTitles) || 0) - (Number(a.driverTitles) || 0) ||
+    (Number(b.teamTitles) || 0) - (Number(a.teamTitles) || 0) ||
+    (Number(b.wins) || 0) - (Number(a.wins) || 0) ||
+    (Number(b.podiums) || 0) - (Number(a.podiums) || 0) ||
+    (Number(b.poles) || 0) - (Number(a.poles) || 0) ||
+    (Number(b.fastestLaps) || 0) - (Number(a.fastestLaps) || 0) ||
+    (Number(b.points) || 0) - (Number(a.points) || 0)
+  );
+}
 function buildCumulativeStats(statsBySeason) {
   const cumulative = {};
   SEASON_OPTIONS.forEach((selectedSeason) => {
