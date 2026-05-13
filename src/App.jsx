@@ -446,6 +446,20 @@ export default function URTTAdminPanel() {
           font-size: 28px !important;
         }
       }
+      @media (min-width: 761px) {
+        .urtt-public-main table {
+          min-width: 100% !important;
+          table-layout: fixed;
+        }
+        .urtt-public-main th,
+        .urtt-public-main td {
+          white-space: normal !important;
+          overflow-wrap: anywhere;
+        }
+        .urtt-public-main .urtt-card {
+          width: 100%;
+        }
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
