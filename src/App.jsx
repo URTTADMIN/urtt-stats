@@ -167,7 +167,7 @@ function mapDriverFromDb(driver, participations = []) {
 function mapDriverToDb(driverForm) {
   return {
     name: driverForm.name,
-    default_team_id: driverForm.teamId || null,
+    default_team_id: getLatestDriverTeamId(driverForm) || null,
     number: Number(driverForm.number) || 0,
     color: driverForm.color || "#dc2626",
     avatar: driverForm.avatar || "",
@@ -236,6 +236,13 @@ function countByName(names) {
 }
 function getDriverSeasonCategories(driver, seasonId) {
   return driver?.participations?.[seasonId] || [];
+}
+function getLatestDriverTeamId(driver) {
+  const teamHistory = driver?.teamHistory || {};
+  const latestSeasonWithTeam = Object.entries(teamHistory)
+    .filter(([, teamId]) => teamId)
+    .sort((a, b) => getSeasonNumber(b[0]) - getSeasonNumber(a[0]))[0];
+  return latestSeasonWithTeam?.[1] || driver?.teamId || "";
 }
 function toggleParticipation(form, seasonId, categoryId) {
   const current = form.participations?.[seasonId] || [];
@@ -314,6 +321,7 @@ function runTests() {
   console.assert(toggleParticipation(emptyDriver, "S1", "F1").participations.S1.includes("F1"), "La participation F1 S1 doit pouvoir être ajoutée");
   console.assert(demoDrivers.some((driver) => driver.participations.S2?.includes("FE")), "Il doit y avoir au moins un pilote FE de démo");
   console.assert(demoDrivers.some((driver) => driver.participations.S1?.includes("F2")), "Il doit y avoir au moins un pilote F2 de démo");
+  console.assert(getLatestDriverTeamId({ teamId: 101, teamHistory: { S1: 101, S4: 104, S3: 103 } }) === 104, "L'écurie par défaut doit suivre la saison la plus récente");
   const f1Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F1" });
   const feStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "FE" });
   console.assert(f1Stats.driverStatsBySeason.S2.length !== feStats.driverStatsBySeason.S2.length, "Les catégories doivent afficher des stats différentes");
@@ -1167,7 +1175,7 @@ function AdminDrivers({ drivers, teams, selectedSeasonId, form, setForm, editing
 function DriverForm({ form, setForm, teams, selectedSeasonId, onSave, onCancel, editingId, isSaving }) {
   const update = (key, value) => setForm({ ...form, [key]: value });
   const updateCrown = (key, value) => setForm({ ...form, tripleCrown: { ...form.tripleCrown, [key]: value } });
-  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><label style={styles.label}><span style={styles.labelText}>Écurie</span><select value={form.teamId} onChange={(event) => update("teamId", event.target.value ? Number(event.target.value) : "")} style={styles.input}><option value="">Sans écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label><Input label="Numéro" type="number" value={form.number} onChange={(value) => update("number", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Avatar URL" value={form.avatar} onChange={(value) => update("avatar", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraité</label><div style={styles.formGrid}><Input label="Titres pilote" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Monaco</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 500</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> Le Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><Input label="Numéro" type="number" value={form.number} onChange={(value) => update("number", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Avatar URL" value={form.avatar} onChange={(value) => update("avatar", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraité</label><div style={styles.formGrid}><Input label="Titres pilote" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Monaco</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 500</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> Le Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
 function AdminTeams({ teams, form, setForm, editingId, isSaving, onSave, onEdit, onDelete, onCancel }) {
