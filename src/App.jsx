@@ -3,7 +3,6 @@ import { supabase } from "./supabaseClient";
 
 const POINTS_SYSTEM = [30, 25, 22, 20, 18, 16, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const F2_SEASONS_3_AND_4_POINTS_SYSTEM = [20, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-const RACES_NEEDED_FOR_TITLES = 10;
 const SEASON_OPTIONS = Array.from({ length: 16 }, (_, index) => ({ id: `S${index + 1}`, name: `Saison ${index + 1}` }));
 const CATEGORY_OPTIONS = [
   { id: "F1", name: "F1", color: "#7c3aed" },
@@ -318,20 +317,6 @@ function runTests() {
   const f1Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F1" });
   const feStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "FE" });
   console.assert(f1Stats.driverStatsBySeason.S2.length !== feStats.driverStatsBySeason.S2.length, "Les catégories doivent afficher des stats différentes");
-  const completeSeasonResults = Array.from({ length: RACES_NEEDED_FOR_TITLES }, (_, index) => ({
-    raceId: 900 + index,
-    seasonId: "S1",
-    categoryId: "F2",
-    raceName: `Test ${index + 1}`,
-    entries: [
-      { driverId: 201, position: 1, pole: false, fastestLap: false },
-      { driverId: 202, position: 2, pole: false, fastestLap: false },
-    ],
-  }));
-  const completeStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: completeSeasonResults, selectedCategoryId: "F2" });
-  console.assert(completeStats.driverStatsBySeason.S1[0].driverTitles === 3, "Le champion pilote doit recevoir un titre automatique");
-  console.assert(completeStats.driverStatsBySeason.S1[0].teamTitles === 4, "Le champion pilote doit recevoir un titre écurie automatique");
-  console.assert(completeStats.teamStatsBySeason.S1[0].teamTitles === 4, "L'écurie championne doit recevoir un titre constructeur automatique");
 }
 runTests();
 
@@ -990,12 +975,8 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   const blankDriverStats = (driver) => ({
   ...driver,
   teamName: teams.find((team) => team.id === driver.teamId)?.name || "Sans écurie",
-  baseDriverTitles: Number(driver.driverTitles) || 0,
-  baseTeamTitles: Number(driver.teamTitles) || 0,
   driverTitles: Number(driver.driverTitles) || 0,
   teamTitles: Number(driver.teamTitles) || 0,
-  autoDriverTitles: 0,
-  autoTeamTitles: 0,
   wins: 0,
   podiums: 0,
   poles: 0,
@@ -1004,12 +985,8 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
 });
   const blankTeamStats = (team) => ({
   ...team,
-  baseDriverTitles: Number(team.driverTitles) || 0,
-  baseTeamTitles: Number(team.teamTitles) || 0,
   driverTitles: Number(team.driverTitles) || 0,
   teamTitles: Number(team.teamTitles) || 0,
-  autoDriverTitles: 0,
-  autoTeamTitles: 0,
   wins: 0,
   podiums: 0,
   poles: 0,
@@ -1054,23 +1031,6 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
       return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId));
     }).sort((a, b) => b.points - a.points);
 
-    if (seasonCategoryResults.length === RACES_NEEDED_FOR_TITLES) {
-      const championDriver = seasonDriverStats[0];
-      const championTeam = seasonTeamStats[0];
-
-      if (championDriver) {
-        championDriver.autoDriverTitles += 1;
-        championDriver.autoTeamTitles += 1;
-        championDriver.driverTitles = championDriver.baseDriverTitles + championDriver.autoDriverTitles;
-        championDriver.teamTitles = championDriver.baseTeamTitles + championDriver.autoTeamTitles;
-      }
-
-      if (championTeam) {
-        championTeam.autoTeamTitles += 1;
-        championTeam.teamTitles = championTeam.baseTeamTitles + championTeam.autoTeamTitles;
-      }
-    }
-
     driverStatsBySeason[season.id] = seasonDriverStats;
     teamStatsBySeason[season.id] = seasonTeamStats;
   });
@@ -1102,11 +1062,7 @@ function buildCumulativeStats(statsBySeason) {
     SEASON_OPTIONS.forEach((season) => {
       if (!isSeasonIncluded(season.id, selectedSeason.id)) return;
       (statsBySeason[season.id] || []).forEach((item) => {
-        const current = map.get(item.id) || { ...item, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0, autoDriverTitles: 0, autoTeamTitles: 0 };
-        const autoDriverTitles = (Number(current.autoDriverTitles) || 0) + (Number(item.autoDriverTitles) || 0);
-        const autoTeamTitles = (Number(current.autoTeamTitles) || 0) + (Number(item.autoTeamTitles) || 0);
-        const baseDriverTitles = Number(item.baseDriverTitles ?? item.driverTitles) || 0;
-        const baseTeamTitles = Number(item.baseTeamTitles ?? item.teamTitles) || 0;
+        const current = map.get(item.id) || { ...item, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0 };
         map.set(item.id, {
           ...current,
           ...item,
@@ -1115,10 +1071,6 @@ function buildCumulativeStats(statsBySeason) {
           poles: current.poles + item.poles,
           fastestLaps: current.fastestLaps + item.fastestLaps,
           points: current.points + item.points,
-          autoDriverTitles,
-          autoTeamTitles,
-          driverTitles: baseDriverTitles + autoDriverTitles,
-          teamTitles: baseTeamTitles + autoTeamTitles,
         });
       });
     });
