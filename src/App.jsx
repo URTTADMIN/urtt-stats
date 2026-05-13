@@ -348,6 +348,99 @@ export default function URTTAdminPanel() {
         background: #09090b;
       }
       * { box-sizing: border-box; }
+      button, select, input { font: inherit; }
+      .urtt-card, .urtt-stat-card { min-width: 0; }
+      @media (max-width: 760px) {
+        .urtt-public-header {
+          padding: 24px 14px 12px !important;
+          flex-direction: column !important;
+          align-items: stretch !important;
+          gap: 14px !important;
+        }
+        .urtt-public-title {
+          font-size: 32px !important;
+          line-height: 1.08 !important;
+        }
+        .urtt-public-subtitle {
+          font-size: 15px !important;
+        }
+        .urtt-public-nav {
+          padding: 0 14px 12px !important;
+          overflow-x: auto !important;
+          flex-wrap: nowrap !important;
+          -webkit-overflow-scrolling: touch;
+        }
+        .urtt-public-nav > * {
+          flex: 0 0 auto !important;
+        }
+        .urtt-public-main {
+          padding: 14px 14px 32px !important;
+          gap: 14px !important;
+        }
+        .urtt-admin-page {
+          display: block !important;
+        }
+        .urtt-admin-sidebar {
+          position: sticky !important;
+          top: 0 !important;
+          z-index: 20 !important;
+          border-right: 0 !important;
+          border-bottom: 1px solid #27272a !important;
+          padding: 12px 14px !important;
+        }
+        .urtt-admin-logo {
+          margin-bottom: 12px !important;
+        }
+        .urtt-admin-nav {
+          display: flex !important;
+          gap: 8px !important;
+          overflow-x: auto !important;
+          padding-bottom: 4px !important;
+          -webkit-overflow-scrolling: touch;
+        }
+        .urtt-admin-nav-button {
+          flex: 0 0 auto !important;
+          padding: 10px 12px !important;
+          border-radius: 12px !important;
+        }
+        .urtt-admin-main {
+          padding: 18px 14px 32px !important;
+        }
+        .urtt-admin-header {
+          display: grid !important;
+          align-items: start !important;
+          gap: 14px !important;
+          margin-bottom: 18px !important;
+        }
+        .urtt-admin-actions {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          width: 100% !important;
+        }
+        .urtt-admin-actions button {
+          width: 100% !important;
+          padding: 12px 10px !important;
+        }
+        .urtt-card {
+          padding: 16px !important;
+          border-radius: 18px !important;
+        }
+        .urtt-stat-card {
+          padding: 16px !important;
+          border-radius: 18px !important;
+        }
+        th, td {
+          padding: 10px !important;
+        }
+      }
+      @media (max-width: 420px) {
+        .urtt-admin-actions {
+          grid-template-columns: 1fr !important;
+        }
+        .urtt-public-title {
+          font-size: 28px !important;
+        }
+      }
     `;
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
@@ -1103,16 +1196,16 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
   return (
-    <div style={styles.publicPage}>
-      <header style={styles.publicHeader}>
+    <div className="urtt-public-page" style={styles.publicPage}>
+      <header className="urtt-public-header" style={styles.publicHeader}>
         <div>
           <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <h1 style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
-          <p style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
+          <h1 className="urtt-public-title" style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
+          <p className="urtt-public-subtitle" style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
       </header>
-      <nav style={styles.publicNav}>
+      <nav className="urtt-public-nav" style={styles.publicNav}>
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.seasonSelect}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
         {["home", "drivers", "teams", "seasons"].map((key) => {
@@ -1120,7 +1213,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(publicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
         })}
       </nav>
-      <main style={styles.publicMain}>
+      <main className="urtt-public-main" style={styles.publicMain}>
         {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -1150,7 +1243,26 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
 
 function AdminLayout({ active, setActive, adminUser, onPublic, onLogout, children }) {
   const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
-  return <div style={styles.page}><aside style={styles.sidebar}><div style={styles.logoRow}><div style={styles.logo}>UR</div><div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div></div><nav style={styles.nav}>{items.map(([key, icon, label]) => <button key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}</nav></aside><main style={styles.main}><header style={styles.header}><div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email}</p>}</div><div style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div></header>{children}</main></div>;
+  return (
+    <div className="urtt-admin-page" style={styles.page}>
+      <aside className="urtt-admin-sidebar" style={styles.sidebar}>
+        <div className="urtt-admin-logo" style={styles.logoRow}>
+          <div style={styles.logo}>UR</div>
+          <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div>
+        </div>
+        <nav className="urtt-admin-nav" style={styles.nav}>
+          {items.map(([key, icon, label]) => <button className="urtt-admin-nav-button" key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
+        </nav>
+      </aside>
+      <main className="urtt-admin-main" style={styles.main}>
+        <header className="urtt-admin-header" style={styles.header}>
+          <div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email}</p>}</div>
+          <div className="urtt-admin-actions" style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div>
+        </header>
+        {children}
+      </main>
+    </div>
+  );
 }
 
 function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId }) {
@@ -1457,8 +1569,8 @@ function TitlesPanel({
   );
 }
 function Popup({ popup, onClose }) { return <div style={styles.popupOverlay}><div style={styles.popupCard}><div style={styles.popupIcon}>{popup.type === "error" ? "⚠️" : "✅"}</div><h3 style={styles.popupTitle}>{popup.title}</h3><p style={styles.muted}>{popup.message}</p><button onClick={onClose} style={styles.fullButton}>OK</button></div></div>; }
-function Card({ title, icon, children }) { return <div style={styles.card}><div style={styles.cardHeader}><div style={styles.cardIcon}>{icon}</div><h3 style={styles.cardTitle}>{title}</h3></div>{children}</div>; }
-function Stat({ label, value }) { return <div style={styles.statCard}><p style={styles.muted}>{label}</p><p style={styles.statValue}>{value}</p></div>; }
+function Card({ title, icon, children }) { return <div className="urtt-card" style={styles.card}><div style={styles.cardHeader}><div style={styles.cardIcon}>{icon}</div><h3 style={styles.cardTitle}>{title}</h3></div>{children}</div>; }
+function Stat({ label, value }) { return <div className="urtt-stat-card" style={styles.statCard}><p style={styles.muted}>{label}</p><p style={styles.statValue}>{value}</p></div>; }
 function Input({ label, value, onChange, type = "text" }) { return <label style={styles.label}><span style={styles.labelText}>{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} style={styles.input} /></label>; }
 function ColorInput({ label, value, onChange }) { return <label style={styles.label}><span style={styles.labelText}>{label}</span><div style={styles.colorInputRow}><input type="color" value={value} onChange={(event) => onChange(event.target.value)} style={styles.colorInput} /><input value={value} onChange={(event) => onChange(event.target.value)} style={styles.input} /></div></label>; }
 function Empty({ text }) { return <div style={styles.emptyBox}>{text}</div>; }
@@ -1498,24 +1610,24 @@ const styles = {
   secondaryButton: { background: "#27272a", color: "white", border: 0, padding: "14px 18px", borderRadius: 16, fontWeight: 900, cursor: "pointer" },
   dangerButton: { background: "#7f1d1d", color: "white", border: 0, padding: "10px 12px", borderRadius: 12, fontWeight: 900, cursor: "pointer" },
   section: { display: "grid", gap: 22 },
-  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 16 },
+  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: 16 },
   statCard: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 22 },
   statValue: { fontSize: 30, fontWeight: 900, margin: "6px 0 0" },
-  twoColumns: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 22 },
-  twoColumnsSmallLeft: { display: "grid", gridTemplateColumns: "minmax(310px, .75fr) minmax(0, 1.25fr)", gap: 22 },
+  twoColumns: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 22 },
+  twoColumnsSmallLeft: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 22 },
   card: { background: "#18181b", border: "1px solid #27272a", borderRadius: 26, padding: 22, boxShadow: "0 18px 50px rgba(0,0,0,.25)" },
   cardHeader: { display: "flex", gap: 12, alignItems: "center", marginBottom: 18 },
   cardIcon: { background: "#27272a", borderRadius: 14, padding: 10, fontSize: 20 },
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
-  cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 },
+  cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
-  itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
   actions: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 },
   editButton: { background: "#3f3f46", color: "white", border: 0, borderRadius: 12, padding: "10px 12px", fontWeight: 900, cursor: "pointer" },
   muted: { color: "#a1a1aa", margin: 0 },
   mutedSmall: { color: "#a1a1aa", margin: "4px 0 0", fontSize: 13 },
-  tableWrap: { overflowX: "auto", border: "1px solid #27272a", borderRadius: 18 },
+  tableWrap: { overflowX: "auto", maxWidth: "100%", WebkitOverflowScrolling: "touch", border: "1px solid #27272a", borderRadius: 18 },
   table: { width: "100%", borderCollapse: "collapse", minWidth: 850 },
   tableHead: { background: "#27272a" },
   th: { padding: 14, textAlign: "left", color: "#d4d4d8", whiteSpace: "nowrap" },
@@ -1530,7 +1642,7 @@ const styles = {
   searchInput: { flex: 1, background: "transparent", border: 0, color: "white", outline: "none" },
   colorInputRow: { display: "grid", gridTemplateColumns: "56px 1fr", gap: 10, alignItems: "center" },
   colorInput: { width: 56, height: 46, border: "1px solid #3f3f46", borderRadius: 14, background: "#09090b", padding: 4, cursor: "pointer" },
-  formGrid: { display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 12 },
+  formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 },
   identity: { display: "flex", alignItems: "center", gap: 10 },
   logoSmall: {
   width: 44,
