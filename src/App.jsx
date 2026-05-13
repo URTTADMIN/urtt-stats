@@ -279,8 +279,8 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = []) {
   }).filter((row) => row.categories.length || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
 function getTeamSeasonBreakdown(team, drivers, raceResults) {
-  const teamDrivers = drivers.filter((driver) => driver.teamId === team.id);
   return SEASON_OPTIONS.map((season) => {
+    const teamDrivers = drivers.filter((driver) => (driver.teamHistory?.[season.id] || driver.teamId) === team.id);
     const categories = Array.from(new Set(teamDrivers.flatMap((driver) => getDriverSeasonCategories(driver, season.id))));
     let points = 0;
     let wins = 0;
@@ -324,7 +324,10 @@ function runTests() {
   console.assert(getLatestDriverTeamId({ teamId: 101, teamHistory: { S1: 101, S4: 104, S3: 103 } }) === 104, "L'écurie par défaut doit suivre la saison la plus récente");
   const f1Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F1" });
   const feStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "FE" });
+  const f2Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F2" });
   console.assert(f1Stats.driverStatsBySeason.S2.length !== feStats.driverStatsBySeason.S2.length, "Les catégories doivent afficher des stats différentes");
+  console.assert(f2Stats.driverStatsBySeason.S4.find((driver) => driver.id === 203)?.teamName === "Thunder Junior", "Le classement pilote doit utiliser l'écurie de la saison");
+  console.assert(f2Stats.teamStatsBySeason.S4.some((team) => team.id === 104 && team.points > 0), "Le classement écurie doit utiliser les pilotes de la saison");
 }
 runTests();
 
@@ -980,17 +983,21 @@ export default function URTTAdminPanel() {
 }
 
 function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
-  const blankDriverStats = (driver) => ({
-  ...driver,
-  teamName: teams.find((team) => team.id === driver.teamId)?.name || "Sans écurie",
-  driverTitles: Number(driver.driverTitles) || 0,
-  teamTitles: Number(driver.teamTitles) || 0,
-  wins: 0,
-  podiums: 0,
-  poles: 0,
-  fastestLaps: 0,
-  points: 0,
-});
+  const blankDriverStats = (driver, seasonId) => {
+    const seasonTeamId = driver.teamHistory?.[seasonId] || driver.teamId;
+    return {
+      ...driver,
+      teamId: seasonTeamId,
+      teamName: teams.find((team) => team.id === seasonTeamId)?.name || "Sans écurie",
+      driverTitles: Number(driver.driverTitles) || 0,
+      teamTitles: Number(driver.teamTitles) || 0,
+      wins: 0,
+      podiums: 0,
+      poles: 0,
+      fastestLaps: 0,
+      points: 0,
+    };
+  };
   const blankTeamStats = (team) => ({
   ...team,
   driverTitles: Number(team.driverTitles) || 0,
@@ -1004,7 +1011,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   const driverStatsBySeason = {};
   const teamStatsBySeason = {};
   SEASON_OPTIONS.forEach((season) => {
-    const driverMap = new Map(drivers.map((driver) => [driver.id, blankDriverStats(driver)]));
+    const driverMap = new Map(drivers.map((driver) => [driver.id, blankDriverStats(driver, season.id)]));
     const teamMap = new Map(teams.map((team) => [team.id, blankTeamStats(team)]));
     const seasonCategoryResults = raceResults.filter((result) => result.seasonId === season.id && (result.categoryId || "F1") === selectedCategoryId);
     seasonCategoryResults.forEach((raceResult) => {
@@ -1035,7 +1042,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
     });
     const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId)).sort((a, b) => b.points - a.points);
     const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
-      const relatedDrivers = drivers.filter((driver) => driver.teamId === team.id);
+      const relatedDrivers = drivers.filter((driver) => (driver.teamHistory?.[season.id] || driver.teamId) === team.id);
       return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId));
     }).sort((a, b) => b.points - a.points);
 
@@ -1224,7 +1231,7 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
 }
 
 function ResultTable({ drivers, teams, selectedCategoryId, selectedSeasonId, getResultEntry, updateResultEntry }) {
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th><th style={styles.th}>Position</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Points</th></tr></thead><tbody>{drivers.map((driver, index) => { const entry = getResultEntry(driver.id); const team = teams.find((item) => item.id === driver.teamId); return <tr key={driver.id} style={styles.tr}><td style={styles.td}><DriverIdentity driver={driver} /></td><td style={styles.td}>{team?.name || "—"}</td><td style={styles.td}><input type="number" min="1" max="30" value={entry.position || index + 1} onChange={(event) => updateResultEntry(driver.id, "position", Number(event.target.value))} style={styles.positionInput} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.pole)} onChange={(event) => updateResultEntry(driver.id, "pole", event.target.checked)} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.fastestLap)} onChange={(event) => updateResultEntry(driver.id, "fastestLap", event.target.checked)} /></td><td style={{ ...styles.td, ...styles.points }}>{getPointsForPosition(Number(entry.position || index + 1), selectedCategoryId, selectedSeasonId)}</td></tr>; })}</tbody></table></div>;
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th><th style={styles.th}>Position</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Points</th></tr></thead><tbody>{drivers.map((driver, index) => { const entry = getResultEntry(driver.id); const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}><DriverIdentity driver={driver} teamColor={team?.color} /></td><td style={styles.td}>{team?.name || "—"}</td><td style={styles.td}><input type="number" min="1" max="30" value={entry.position || index + 1} onChange={(event) => updateResultEntry(driver.id, "position", Number(event.target.value))} style={styles.positionInput} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.pole)} onChange={(event) => updateResultEntry(driver.id, "pole", event.target.checked)} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.fastestLap)} onChange={(event) => updateResultEntry(driver.id, "fastestLap", event.target.checked)} /></td><td style={{ ...styles.td, ...styles.points }}>{getPointsForPosition(Number(entry.position || index + 1), selectedCategoryId, selectedSeasonId)}</td></tr>; })}</tbody></table></div>;
 }
 
 function SettingsPanel() {
@@ -1257,7 +1264,7 @@ function DriverRaceCell({ driverId, race, raceResults }) {
 function TeamRaceCell({ teamId, race, raceResults, drivers }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
   if (!result) return <span style={styles.mutedSmall}>—</span>;
-  const teamDriverIds = drivers.filter((driver) => driver.teamId === teamId).map((driver) => driver.id);
+  const teamDriverIds = drivers.filter((driver) => (driver.teamHistory?.[race.seasonId] || driver.teamId) === teamId).map((driver) => driver.id);
   const entries = result.entries.filter((entry) => teamDriverIds.includes(entry.driverId));
   if (!entries.length) return <span style={styles.mutedSmall}>—</span>;
   const points = entries.reduce((sum, entry) => sum + getPointsForPosition(Number(entry.position), race.categoryId, race.seasonId), 0);
