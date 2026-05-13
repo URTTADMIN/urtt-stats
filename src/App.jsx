@@ -425,6 +425,11 @@ export default function URTTAdminPanel() {
           padding: 16px !important;
           border-radius: 18px !important;
         }
+        .urtt-public-main [style*="minmax(0px, 1.2fr)"],
+        .urtt-admin-main [style*="minmax(0px, 1.2fr)"],
+        .urtt-admin-main [style*="minmax(310px"] {
+          grid-template-columns: 1fr !important;
+        }
         .urtt-stat-card {
           padding: 16px !important;
           border-radius: 18px !important;
@@ -1579,7 +1584,7 @@ function Setting({ title, description, active }) { return <div style={styles.tea
 const styles = {
   publicPage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 45%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
-  publicMain: { maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
+  publicMain: { width: "100%", maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
   
   publicSubtitle: { color: "#d4d4d8", fontSize: 18, margin: 0, maxWidth: 680 },
@@ -1613,8 +1618,8 @@ const styles = {
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: 16 },
   statCard: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 22 },
   statValue: { fontSize: 30, fontWeight: 900, margin: "6px 0 0" },
-  twoColumns: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 22 },
-  twoColumnsSmallLeft: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 22 },
+  twoColumns: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 22 },
+  twoColumnsSmallLeft: { display: "grid", gridTemplateColumns: "minmax(310px, .75fr) minmax(0, 1.25fr)", gap: 22 },
   card: { background: "#18181b", border: "1px solid #27272a", borderRadius: 26, padding: 22, boxShadow: "0 18px 50px rgba(0,0,0,.25)" },
   cardHeader: { display: "flex", gap: 12, alignItems: "center", marginBottom: 18 },
   cardIcon: { background: "#27272a", borderRadius: 14, padding: 10, fontSize: 20 },
