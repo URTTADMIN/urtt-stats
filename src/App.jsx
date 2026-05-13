@@ -702,6 +702,44 @@ export default function URTTAdminPanel() {
     if (String(selectedRaceId) === String(raceId)) setSelectedRaceId("");
   }
 
+  async function moveRace(raceId, direction) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier le calendrier." });
+      return;
+    }
+
+    const categoryRaces = [...(racesBySelectedCategory[selectedSeasonId] || [])].sort((a, b) => Number(a.round) - Number(b.round));
+    const currentIndex = categoryRaces.findIndex((race) => String(race.id) === String(raceId));
+    const nextIndex = currentIndex + direction;
+
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= categoryRaces.length) return;
+
+    const reorderedRaces = [...categoryRaces];
+    [reorderedRaces[currentIndex], reorderedRaces[nextIndex]] = [reorderedRaces[nextIndex], reorderedRaces[currentIndex]];
+    const updatedRaces = reorderedRaces.map((race, index) => ({ ...race, round: index + 1 }));
+
+    setIsSavingRace(true);
+
+    const updates = updatedRaces.map((race) => (
+      supabase
+        .from("season_calendar")
+        .update({ round: race.round })
+        .eq("id", race.id)
+    ));
+    const results = await Promise.all(updates);
+    const updateError = results.find((result) => result.error)?.error;
+
+    setIsSavingRace(false);
+
+    if (updateError) {
+      console.error("Erreur ordre calendrier:", updateError);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier l'ordre des courses." });
+      return;
+    }
+
+    setAllCalendarRaces((current) => current.map((race) => updatedRaces.find((updatedRace) => updatedRace.id === race.id) || race));
+  }
+
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
     const draftEntry = draft.find((entry) => entry.driverId === driverId);
@@ -937,7 +975,7 @@ export default function URTTAdminPanel() {
 )}
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
-          {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} isSavingRace={isSavingRace} />}
+          {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onMoveRace={moveRace} isSavingRace={isSavingRace} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).includes(selectedCategoryId))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel />}
           
@@ -1213,9 +1251,9 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
   return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titres pilote" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
-function AdminRaces({ raceForm, setRaceForm, raceLibrary, calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, isSavingRace }) {
+function AdminRaces({ raceForm, setRaceForm, raceLibrary, calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, onMoveRace, isSavingRace }) {
   const races = racesBySeason[selectedSeasonId] || [];
-  return <div style={styles.twoColumnsSmallLeft}><Card title="Bibliothèque des GP" icon="🏁"><div style={styles.stack}><Input label="Nom du Grand Prix" value={raceForm.name} onChange={(value) => setRaceForm({ ...raceForm, name: value })} /><button onClick={onSave} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Créer le GP"}</button><div style={styles.stack}>{raceLibrary.map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP dans la bibliothèque." />}</div></div></Card><Card title="Calendrier par catégorie" icon="📅"><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.input}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setCalendarRaceForm({ ...calendarRaceForm, seasonId: event.target.value }); }} style={styles.input}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Ajouter un GP au calendrier</span><select value={calendarRaceForm.raceId} onChange={(event) => setCalendarRaceForm({ ...calendarRaceForm, raceId: event.target.value, seasonId: selectedSeasonId })} style={styles.input}><option value="">Choisir un GP</option>{raceLibrary.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}</select></label><button onClick={onAddToSeason} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Ajouter au calendrier"}</button><RaceTable races={races} onDelete={(raceId) => onDelete(selectedSeasonId, raceId)} /></Card></div>;
+  return <div style={styles.twoColumnsSmallLeft}><Card title="Bibliothèque des GP" icon="🏁"><div style={styles.stack}><Input label="Nom du Grand Prix" value={raceForm.name} onChange={(value) => setRaceForm({ ...raceForm, name: value })} /><button onClick={onSave} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Créer le GP"}</button><div style={styles.stack}>{raceLibrary.map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP dans la bibliothèque." />}</div></div></Card><Card title="Calendrier par catégorie" icon="📅"><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.input}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setCalendarRaceForm({ ...calendarRaceForm, seasonId: event.target.value }); }} style={styles.input}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Ajouter un GP au calendrier</span><select value={calendarRaceForm.raceId} onChange={(event) => setCalendarRaceForm({ ...calendarRaceForm, raceId: event.target.value, seasonId: selectedSeasonId })} style={styles.input}><option value="">Choisir un GP</option>{raceLibrary.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}</select></label><button onClick={onAddToSeason} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Ajouter au calendrier"}</button><RaceTable races={races} onDelete={(raceId) => onDelete(selectedSeasonId, raceId)} onMoveRace={onMoveRace} isSavingRace={isSavingRace} /></Card></div>;
 }
 
 function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategoryId, races, selectedSeasonId, setSelectedSeasonId, selectedRaceId, setSelectedRaceId, getResultEntry, updateResultEntry, onValidate, isSavingResult }) {
@@ -1309,7 +1347,9 @@ function MiniCountList({ counts, empty }) {
   return <div style={styles.stack}>{entries.map(([name, count]) => <div key={name} style={styles.itemBox}><strong>{name}</strong><span style={styles.badgeGreen}>{count}</span></div>)}</div>;
 }
 function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "—"}</strong></div>; }
-function RaceTable({ races, onDelete }) { return <div style={styles.stack}>{races.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)}</p></div>{onDelete && <button onClick={() => onDelete(race.id)} style={styles.dangerButton}>Supprimer</button>}</div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>; }
+function RaceTable({ races, onDelete, onMoveRace, isSavingRace = false }) {
+  return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)}</p></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>↑</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>↓</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
+}
 function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Écurie : {team?.name || "—"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Titres écurie : {team.teamTitles}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function DriverIdentity({ driver, teamColor }) { return <div style={styles.identity}>{driver.avatar ? <img src={driver.avatar} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${teamColor || driver.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: teamColor || driver.color || "#dc2626" }}>{(driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div><strong>{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>N° {driver.number || "—"}{driver.retired ? " · Retraité" : ""}</p></div></div>; }
