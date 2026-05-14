@@ -113,8 +113,11 @@ function seasonName(id) {
 function shortRaceName(name) {
   return String(name).replace("GP de ", "").replace("GP d'", "");
 }
+function idsEqual(left, right) {
+  return String(left ?? "") === String(right ?? "");
+}
 function driverName(drivers, driverId) {
-  return drivers.find((driver) => driver.id === driverId)?.name || "—";
+  return drivers.find((driver) => idsEqual(driver.id, driverId))?.name || "—";
 }
 function mapTeamFromDb(team) {
   return {
@@ -154,7 +157,7 @@ function mapDriverFromDb(driver, participations = []) {
   const teamHistory = {};
 
   participations
-    .filter((item) => item.driver_id === driver.id)
+    .filter((item) => idsEqual(item.driver_id, driver.id))
     .forEach((item) => {
       if (!participationMap[item.season_id]) participationMap[item.season_id] = [];
       if (!participationMap[item.season_id].includes(item.category_id)) participationMap[item.season_id].push(item.category_id);
@@ -210,7 +213,7 @@ function mapRaceResultFromDb(result, entries = []) {
     categoryId: result.category_id || "F1",
     raceName: result.race_name,
     entries: entries
-      .filter((entry) => entry.result_id === result.id)
+      .filter((entry) => idsEqual(entry.result_id, result.id))
       .map((entry) => ({
         id: entry.id,
         driverId: entry.driver_id,
@@ -262,11 +265,11 @@ function toggleParticipation(form, seasonId, categoryId) {
   return { ...form, participations: { ...(form.participations || {}), [seasonId]: next } };
 }
 function getTeamNameById(teams, teamId) {
-  return teams.find((team) => team.id === teamId)?.name || "Sans écurie";
+  return teams.find((team) => idsEqual(team.id, teamId))?.name || "Sans écurie";
 }
 function getDriverSeasonTeam(driver, seasonId, teams) {
   const teamId = driver?.teamHistory?.[seasonId] || driver?.teamId;
-  return teams.find((team) => team.id === teamId) || null;
+  return teams.find((team) => idsEqual(team.id, teamId)) || null;
 }
 function updateDriverSeasonTeam(form, seasonId, teamId) {
   return { ...form, teamHistory: { ...(form.teamHistory || {}), [seasonId]: teamId ? Number(teamId) : "" } };
@@ -299,7 +302,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     let poles = 0;
     let fastestLaps = 0;
     seasonResults.forEach((result) => {
-      const entry = result.entries.find((item) => item.driverId === driver.id);
+      const entry = result.entries.find((item) => idsEqual(item.driverId, driver.id));
       if (!entry) return;
       points += getPointsForPosition(Number(entry.position), result.categoryId, result.seasonId);
       wins += Number(entry.position) === 1 ? 1 : 0;
@@ -314,13 +317,13 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
       });
       return map;
     }, new Map()).entries()).sort((a, b) => b[1] - a[1]);
-    const positionIndex = standings.findIndex(([driverId]) => driverId === driver.id);
+    const positionIndex = standings.findIndex(([driverId]) => idsEqual(driverId, driver.id));
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: getDriverSeasonTeam(driver, season.id, teams), teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, points, wins, podiums, poles, fastestLaps };
   }).filter((row) => row.categories.length || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
 function getTeamSeasonBreakdown(team, drivers, raceResults) {
   return SEASON_OPTIONS.map((season) => {
-    const teamDrivers = drivers.filter((driver) => (driver.teamHistory?.[season.id] || driver.teamId) === team.id);
+    const teamDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
     const categories = Array.from(new Set(teamDrivers.flatMap((driver) => getDriverSeasonCategories(driver, season.id))));
     let points = 0;
     let wins = 0;
@@ -329,7 +332,7 @@ function getTeamSeasonBreakdown(team, drivers, raceResults) {
     let fastestLaps = 0;
     raceResults.filter((result) => result.seasonId === season.id).forEach((result) => {
       result.entries.forEach((entry) => {
-        const driver = teamDrivers.find((item) => item.id === entry.driverId);
+        const driver = teamDrivers.find((item) => idsEqual(item.id, entry.driverId));
         if (!driver) return;
         points += getPointsForPosition(Number(entry.position), result.categoryId, result.seasonId);
         wins += Number(entry.position) === 1 ? 1 : 0;
@@ -916,20 +919,20 @@ export default function URTTAdminPanel() {
 
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
-    const draftEntry = draft.find((entry) => entry.driverId === driverId);
+    const draftEntry = draft.find((entry) => idsEqual(entry.driverId, driverId));
     if (draftEntry) return draftEntry;
 
     const raceResult = raceResults.find((result) => String(result.raceId) === String(selectedRaceId));
-    return raceResult?.entries.find((entry) => entry.driverId === driverId) || { driverId, position: 1, pole: false, fastestLap: false };
+    return raceResult?.entries.find((entry) => idsEqual(entry.driverId, driverId)) || { driverId, position: 1, pole: false, fastestLap: false };
   }
 
   function updateResultEntry(driverId, key, value) {
     if (!selectedRaceId) return;
     setLiveRaceDrafts((current) => {
       const currentDraft = current[selectedRaceId] || [];
-      const hasEntry = currentDraft.some((entry) => entry.driverId === driverId);
+      const hasEntry = currentDraft.some((entry) => idsEqual(entry.driverId, driverId));
       const nextDraft = hasEntry
-        ? currentDraft.map((entry) => entry.driverId === driverId ? { ...entry, [key]: value } : entry)
+        ? currentDraft.map((entry) => idsEqual(entry.driverId, driverId) ? { ...entry, [key]: value } : entry)
         : [...currentDraft, { driverId, position: 1, pole: false, fastestLap: false, [key]: value }];
       return { ...current, [selectedRaceId]: nextDraft };
     });
@@ -1046,7 +1049,7 @@ export default function URTTAdminPanel() {
     } else {
       const { data: resultData, error: insertResultError } = await supabase
         .from("race_results")
-        .insert({ race_id: Number(selectedRaceId), season_id: resultSeasonId, category_id: resultCategoryId, race_name: selectedRace.name || "GP" })
+        .insert({ race_id: selectedRace.id, season_id: resultSeasonId, category_id: resultCategoryId, race_name: selectedRace.name || "GP" })
         .select()
         .single();
 
@@ -1083,7 +1086,7 @@ export default function URTTAdminPanel() {
 
     const payload = {
       id: resultId,
-      raceId: Number(selectedRaceId),
+      raceId: selectedRace.id,
       seasonId: resultSeasonId,
       raceName: selectedRace.name || "GP",
       categoryId: resultCategoryId,
@@ -1175,7 +1178,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
     return {
       ...driver,
       teamId: seasonTeamId,
-      teamName: teams.find((team) => team.id === seasonTeamId)?.name || "Sans écurie",
+      teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
       driverTitles: Number(driver.driverTitles) || 0,
       teamTitles: Number(driver.teamTitles) || 0,
       wins: 0,
@@ -1204,16 +1207,16 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   const driverStatsBySeason = {};
   const teamStatsBySeason = {};
   SEASON_OPTIONS.forEach((season) => {
-    const driverMap = new Map(drivers.map((driver) => [driver.id, blankDriverStats(driver, season.id)]));
-    const teamMap = new Map(teams.map((team) => [team.id, blankTeamStats(team)]));
+    const driverMap = new Map(drivers.map((driver) => [String(driver.id), blankDriverStats(driver, season.id)]));
+    const teamMap = new Map(teams.map((team) => [String(team.id), blankTeamStats(team)]));
     const seasonCategoryResults = raceResults.filter((result) => result.seasonId === season.id && (result.categoryId || "F1") === selectedCategoryId);
     seasonCategoryResults.forEach((raceResult) => {
       raceResult.entries.forEach((entry) => {
-        const driver = driverMap.get(entry.driverId);
+        const driver = driverMap.get(String(entry.driverId));
         if (!driver) return;
         const participatesInCategory = (driver.participations?.[season.id] || []).includes(selectedCategoryId);
         if (!participatesInCategory) return;
-        const team = teamMap.get(driver.teamId);
+        const team = teamMap.get(String(driver.teamId));
         const points = getPointsForPosition(Number(entry.position), raceResult.categoryId || selectedCategoryId, raceResult.seasonId || season.id);
         const win = Number(entry.position) === 1 ? 1 : 0;
         const podium = Number(entry.position) <= 3 ? 1 : 0;
@@ -1235,7 +1238,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
     });
     const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId)).sort((a, b) => b.points - a.points);
     const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
-      const relatedDrivers = drivers.filter((driver) => (driver.teamHistory?.[season.id] || driver.teamId) === team.id);
+      const relatedDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
       return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId));
     }).sort((a, b) => b.points - a.points);
 
@@ -1508,7 +1511,7 @@ function TeamTable({ teams, detailed = false, raceDetails = false, races = [], r
 
 function DriverRaceCell({ driverId, race, raceResults }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
-  const driverResult = result?.entries.find((entry) => entry.driverId === driverId);
+  const driverResult = result?.entries.find((entry) => idsEqual(entry.driverId, driverId));
   if (!driverResult) return <span style={styles.mutedSmall}>—</span>;
   const position = Number(driverResult.position);
   const points = getPointsForPosition(position, race.categoryId, race.seasonId);
@@ -1522,8 +1525,8 @@ function DriverRaceCell({ driverId, race, raceResults }) {
 function TeamRaceCell({ teamId, race, raceResults, drivers }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
   if (!result) return <span style={styles.mutedSmall}>—</span>;
-  const teamDriverIds = drivers.filter((driver) => (driver.teamHistory?.[race.seasonId] || driver.teamId) === teamId).map((driver) => driver.id);
-  const entries = result.entries.filter((entry) => teamDriverIds.includes(entry.driverId));
+  const teamDriverIds = drivers.filter((driver) => idsEqual(driver.teamHistory?.[race.seasonId] || driver.teamId, teamId)).map((driver) => String(driver.id));
+  const entries = result.entries.filter((entry) => teamDriverIds.includes(String(entry.driverId)));
   if (!entries.length) return <span style={styles.mutedSmall}>—</span>;
   const points = entries.reduce((sum, entry) => sum + getPointsForPosition(Number(entry.position), race.categoryId, race.seasonId), 0);
   const bestPosition = Math.min(...entries.map((entry) => Number(entry.position)));
