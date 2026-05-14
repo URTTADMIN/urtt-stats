@@ -1506,7 +1506,14 @@ function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
 
 function DriverDetails({ driver, raceResults, teams, onClose }) {
   const rows = getDriverSeasonBreakdown(driver, raceResults, teams);
-  return <div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><Card title="Stats par saison et catégorie" icon="👤"><SeasonBreakdownTable rows={rows} /></Card></div>;
+  return (
+    <div style={styles.detailOverlay} onClick={onClose}>
+      <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
+        <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
+        <Card title="Stats par saison et catégorie" icon="👤"><SeasonBreakdownTable rows={rows} /></Card>
+      </div>
+    </div>
+  );
 }
 
 function TeamDetails({ team, drivers, raceResults, onClose }) {
@@ -1772,6 +1779,8 @@ const styles = {
   popupCard: { width: "100%", maxWidth: 430, background: "#18181b", border: "1px solid #3f3f46", borderRadius: 28, padding: 28, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.45)" },
   popupIcon: { fontSize: 44, marginBottom: 10 },
   popupTitle: { margin: "0 0 10px", fontSize: 28 },
+  detailOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,.72)", zIndex: 60, padding: 24, display: "grid", placeItems: "center" },
+  detailModal: { width: "min(1040px, 100%)", maxHeight: "90vh", overflow: "auto", display: "grid", gap: 18 },
   publicRaceCard: { background: "#27272a", borderRadius: 22, padding: 18, display: "grid", gap: 16 },
   publicRaceHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 },
   raceTitle: { margin: "4px 0 0", fontSize: 22 },
