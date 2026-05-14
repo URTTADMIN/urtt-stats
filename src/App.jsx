@@ -271,6 +271,10 @@ function getDriverSeasonTeam(driver, seasonId, teams) {
 function updateDriverSeasonTeam(form, seasonId, teamId) {
   return { ...form, teamHistory: { ...(form.teamHistory || {}), [seasonId]: teamId ? Number(teamId) : "" } };
 }
+function getCategoryStatField(base, categoryId) {
+  const suffix = categoryId === "F2" ? "F2" : categoryId === "FE" ? "FE" : "F1";
+  return `${base}${suffix}`;
+}
 function buildRecordMap(rows, keys) {
   return keys.reduce((acc, key) => {
     acc[key] = Math.max(0, ...rows.map((row) => Number(row[key]) || 0));
@@ -1146,6 +1150,8 @@ export default function URTTAdminPanel() {
 }
 
 function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
+  const driverTitleField = getCategoryStatField("driverTitles", selectedCategoryId);
+  const teamTitleField = getCategoryStatField("teamTitles", selectedCategoryId);
   const blankDriverStats = (driver, seasonId) => {
     const seasonTeamId = driver.teamHistory?.[seasonId] || driver.teamId;
     return {
@@ -1163,11 +1169,11 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   };
   const blankTeamStats = (team) => ({
   ...team,
-  driverTitles: Number(team.driverTitlesF1 ?? team.driverTitles) || 0,
+  driverTitles: Number(team[driverTitleField] ?? team.driverTitles) || 0,
   driverTitlesF1: Number(team.driverTitlesF1) || 0,
   driverTitlesF2: Number(team.driverTitlesF2) || 0,
   driverTitlesFE: Number(team.driverTitlesFE) || 0,
-  teamTitles: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
+  teamTitles: Number(team[teamTitleField] ?? team.teamTitles) || 0,
   teamTitlesF1: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
   teamTitlesF2: Number(team.teamTitlesF2) || 0,
   teamTitlesFE: Number(team.teamTitlesFE) || 0,
@@ -1294,7 +1300,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} onClose={() => setSelectedDriver(null)} />}</>}
-        {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
+        {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
       </main>
     </div>
@@ -1313,7 +1319,7 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
       </div>
       <div style={styles.section}>
         <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
-        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} /></Card>
+        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
       </div>
     </>
   );
@@ -1443,13 +1449,14 @@ function DriverTable({ drivers, detailed = false, raceDetails = false, races = [
   );
 }
 
-function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, onTeamClick }) {
-  const records = buildRecordMap(teams, ["driverTitlesF1", "driverTitlesF2", "driverTitlesFE", "teamTitlesF1", "teamTitlesF2", "teamTitlesFE", "wins", "podiums", "poles", "fastestLaps", "points"]);
+function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, selectedCategoryId = "F1", onTeamClick }) {
+  const records = buildRecordMap(teams, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
+  const titleSuffix = selectedCategoryId === "F2" ? "F2" : selectedCategoryId === "FE" ? "FE" : "F1";
   return (
     <div style={styles.tableWrap}>
       <table className="urtt-standings-table urtt-team-standings" style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>P. F1</th><th style={styles.th}>P. F2</th><th style={styles.th}>P. FE</th><th style={styles.th}>C. F1</th><th style={styles.th}>C. F2</th><th style={styles.th}>C. FE</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
-        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitlesF1 || 0} record={isRecordValue(records, "driverTitlesF1", team.driverTitlesF1)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesF2 || 0} record={isRecordValue(records, "driverTitlesF2", team.driverTitlesF2)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesFE || 0} record={isRecordValue(records, "driverTitlesFE", team.driverTitlesFE)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesF1 || 0} record={isRecordValue(records, "teamTitlesF1", team.teamTitlesF1)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesF2 || 0} record={isRecordValue(records, "teamTitlesF2", team.teamTitlesF2)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesFE || 0} record={isRecordValue(records, "teamTitlesFE", team.teamTitlesFE)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titre P. {titleSuffix}</th><th style={styles.th}>Titre C. {titleSuffix}</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
+        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitles || 0} record={isRecordValue(records, "driverTitles", team.driverTitles)} /></td><td style={styles.td}><RecordValue value={team.teamTitles || 0} record={isRecordValue(records, "teamTitles", team.teamTitles)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
       </table>
       {teams.length === 0 && <Empty text="Aucune écurie à afficher." />}
     </div>
