@@ -10,6 +10,23 @@ const CATEGORY_OPTIONS = [
   { id: "FE", name: "FE", color: "#16a34a" },
 ];
 
+async function fetchAllSupabaseRows(tableName, orderBy = "id") {
+  const pageSize = 1000;
+  const rows = [];
+
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select("*")
+      .order(orderBy, { ascending: true })
+      .range(from, from + pageSize - 1);
+
+    if (error) return { data: rows, error };
+    rows.push(...(data || []));
+    if (!data || data.length < pageSize) return { data: rows, error: null };
+  }
+}
+
 const emptyDriver = { name: "", teamId: "", number: 1, color: "#dc2626", avatar: "", retired: false, driverTitles: 0, teamTitles: 0, participations: {}, teamHistory: {}, tripleCrown: { monaco: false, indy500: false, lemans: false } };
 const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 };
 const emptyRace = { name: "" };
@@ -609,7 +626,7 @@ export default function URTTAdminPanel() {
         supabase.from("race_library").select("*").order("id", { ascending: true }),
         supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
-        supabase.from("race_result_entries").select("*").order("id", { ascending: true }),
+        fetchAllSupabaseRows("race_result_entries"),
       ]);
 
       const loadErrors = [
