@@ -999,7 +999,14 @@ export default function URTTAdminPanel() {
     }
 
     const selectedRace = currentSeasonRaces.find((race) => String(race.id) === String(selectedRaceId));
-    const eligibleDrivers = drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).includes(selectedCategoryId));
+    if (!selectedRace) {
+      setPopup({ type: "error", title: "Course introuvable", message: "Selectionne une course du calendrier actif avant de valider les resultats." });
+      return;
+    }
+
+    const resultSeasonId = selectedRace.seasonId || selectedSeasonId;
+    const resultCategoryId = selectedRace.categoryId || selectedCategoryId;
+    const eligibleDrivers = drivers.filter((driver) => (driver.participations?.[resultSeasonId] || []).includes(resultCategoryId));
     const entries = eligibleDrivers.map((driver, index) => ({
       driverId: driver.id,
       position: getResultEntry(driver.id).position || index + 1,
@@ -1015,7 +1022,7 @@ export default function URTTAdminPanel() {
     if (existingResult?.id) {
       const { error: updateError } = await supabase
         .from("race_results")
-        .update({ season_id: selectedSeasonId, category_id: selectedCategoryId, race_name: selectedRace?.name || "GP" })
+        .update({ season_id: resultSeasonId, category_id: resultCategoryId, race_name: selectedRace.name || "GP" })
         .eq("id", existingResult.id);
 
       if (updateError) {
@@ -1039,7 +1046,7 @@ export default function URTTAdminPanel() {
     } else {
       const { data: resultData, error: insertResultError } = await supabase
         .from("race_results")
-        .insert({ race_id: Number(selectedRaceId), season_id: selectedSeasonId, category_id: selectedCategoryId, race_name: selectedRace?.name || "GP" })
+        .insert({ race_id: Number(selectedRaceId), season_id: resultSeasonId, category_id: resultCategoryId, race_name: selectedRace.name || "GP" })
         .select()
         .single();
 
@@ -1077,9 +1084,9 @@ export default function URTTAdminPanel() {
     const payload = {
       id: resultId,
       raceId: Number(selectedRaceId),
-      seasonId: selectedSeasonId,
-      raceName: selectedRace?.name || "GP",
-      categoryId: selectedCategoryId,
+      seasonId: resultSeasonId,
+      raceName: selectedRace.name || "GP",
+      categoryId: resultCategoryId,
       entries: (insertedEntries || []).map((entry) => ({
         id: entry.id,
         driverId: entry.driver_id,
@@ -1527,8 +1534,9 @@ function TeamRaceCell({ teamId, race, raceResults, drivers }) {
   return <div style={styles.raceResultCell}><strong>{points} pts</strong><span style={styles.mutedSmall}>Meilleur P{bestPosition}</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
-function PublicSeasonResults({ races, raceResults, drivers, selectedSeasonId, onOpenGp }) {
-  const seasonResults = raceResults.filter((result) => result.seasonId === selectedSeasonId);
+function PublicSeasonResults({ races, raceResults, drivers, selectedSeasonId, selectedCategoryId, onOpenGp }) {
+  const categoryId = selectedCategoryId || races[0]?.categoryId || "F1";
+  const seasonResults = raceResults.filter((result) => result.seasonId === selectedSeasonId && (result.categoryId || "F1") === categoryId);
   return <div style={styles.stack}>{races.map((race) => { const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; const winner = sortedEntries.find((entry) => Number(entry.position) === 1); const poleman = sortedEntries.find((entry) => entry.pole); const fastest = sortedEntries.find((entry) => entry.fastestLap); const podium = sortedEntries.slice(0, 3); return <div key={race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>Course #{race.round}</p><button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button></div><span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} /><RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>; })}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
 
