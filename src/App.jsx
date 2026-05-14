@@ -98,17 +98,23 @@ function getPointsSystem(categoryId, seasonId) {
 function getPointsForPosition(position, categoryId, seasonId) {
   return getPointsSystem(categoryId, seasonId)[position - 1] || 0;
 }
+function normalizeSeasonId(seasonId) {
+  return String(seasonId ?? "").trim();
+}
+function normalizeCategoryId(categoryId) {
+  return String(categoryId ?? "F1").trim().toUpperCase() || "F1";
+}
 function getSeasonNumber(seasonId) {
-  return Number(String(seasonId).replace("S", "")) || 0;
+  return Number(normalizeSeasonId(seasonId).replace("S", "")) || 0;
 }
 function isSeasonIncluded(targetSeasonId, selectedSeasonId) {
   return getSeasonNumber(targetSeasonId) <= getSeasonNumber(selectedSeasonId);
 }
 function getCategoryColor(categoryId) {
-  return CATEGORY_OPTIONS.find((category) => category.id === categoryId)?.color || "#3f3f46";
+  return CATEGORY_OPTIONS.find((category) => category.id === normalizeCategoryId(categoryId))?.color || "#3f3f46";
 }
 function seasonName(id) {
-  return SEASON_OPTIONS.find((season) => season.id === id)?.name || id;
+  return SEASON_OPTIONS.find((season) => season.id === normalizeSeasonId(id))?.name || id;
 }
 function shortRaceName(name) {
   return String(name).replace("GP de ", "").replace("GP d'", "");
@@ -159,9 +165,11 @@ function mapDriverFromDb(driver, participations = []) {
   participations
     .filter((item) => idsEqual(item.driver_id, driver.id))
     .forEach((item) => {
-      if (!participationMap[item.season_id]) participationMap[item.season_id] = [];
-      if (!participationMap[item.season_id].includes(item.category_id)) participationMap[item.season_id].push(item.category_id);
-      if (item.team_id) teamHistory[item.season_id] = item.team_id;
+      const seasonId = normalizeSeasonId(item.season_id);
+      const categoryId = normalizeCategoryId(item.category_id);
+      if (!participationMap[seasonId]) participationMap[seasonId] = [];
+      if (!participationMap[seasonId].includes(categoryId)) participationMap[seasonId].push(categoryId);
+      if (item.team_id) teamHistory[seasonId] = item.team_id;
     });
 
   return {
@@ -201,16 +209,16 @@ function mapCalendarRaceFromDb(race) {
     libraryRaceId: race.race_library_id,
     round: race.round,
     name: race.name,
-    seasonId: race.season_id,
-    categoryId: race.category_id || "F1",
+    seasonId: normalizeSeasonId(race.season_id),
+    categoryId: normalizeCategoryId(race.category_id),
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
   return {
     id: result.id,
     raceId: result.race_id,
-    seasonId: result.season_id,
-    categoryId: result.category_id || "F1",
+    seasonId: normalizeSeasonId(result.season_id),
+    categoryId: normalizeCategoryId(result.category_id),
     raceName: result.race_name,
     entries: entries
       .filter((entry) => idsEqual(entry.result_id, result.id))
@@ -225,8 +233,9 @@ function mapRaceResultFromDb(result, entries = []) {
 }
 function createSeasonMapFromCalendar(calendarRaces, selectedCategoryId = "F1") {
   const map = createEmptySeasonMap();
+  const activeCategoryId = normalizeCategoryId(selectedCategoryId);
   calendarRaces
-    .filter((race) => race.categoryId === selectedCategoryId)
+    .filter((race) => normalizeCategoryId(race.categoryId) === activeCategoryId)
     .forEach((race) => {
       if (!map[race.seasonId]) map[race.seasonId] = [];
       map[race.seasonId].push(race);
@@ -250,7 +259,7 @@ function countByName(names) {
   return names.reduce((acc, name) => ({ ...acc, [name]: (acc[name] || 0) + 1 }), {});
 }
 function getDriverSeasonCategories(driver, seasonId) {
-  return driver?.participations?.[seasonId] || [];
+  return driver?.participations?.[normalizeSeasonId(seasonId)] || [];
 }
 function getLatestDriverTeamId(driver) {
   const teamHistory = driver?.teamHistory || {};
@@ -275,7 +284,8 @@ function updateDriverSeasonTeam(form, seasonId, teamId) {
   return { ...form, teamHistory: { ...(form.teamHistory || {}), [seasonId]: teamId ? Number(teamId) : "" } };
 }
 function getCategoryStatField(base, categoryId) {
-  const suffix = categoryId === "F2" ? "F2" : categoryId === "FE" ? "FE" : "F1";
+  const normalizedCategoryId = normalizeCategoryId(categoryId);
+  const suffix = normalizedCategoryId === "F2" ? "F2" : normalizedCategoryId === "FE" ? "FE" : "F1";
   return `${base}${suffix}`;
 }
 function buildRecordMap(rows, keys) {
@@ -292,10 +302,11 @@ function RecordValue({ value, record }) {
   return <span style={record ? styles.recordValue : undefined}>{value}</span>;
 }
 function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "") {
+  const activeCategoryId = selectedCategoryId ? normalizeCategoryId(selectedCategoryId) : "";
   return SEASON_OPTIONS.map((season) => {
     const seasonCategories = getDriverSeasonCategories(driver, season.id);
-    const categories = selectedCategoryId ? seasonCategories.filter((category) => category === selectedCategoryId) : seasonCategories;
-    const seasonResults = raceResults.filter((result) => result.seasonId === season.id && (!selectedCategoryId || (result.categoryId || "F1") === selectedCategoryId));
+    const categories = activeCategoryId ? seasonCategories.filter((category) => normalizeCategoryId(category) === activeCategoryId) : seasonCategories;
+    const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(result.categoryId) === activeCategoryId));
     let points = 0;
     let wins = 0;
     let podiums = 0;
@@ -330,7 +341,7 @@ function getTeamSeasonBreakdown(team, drivers, raceResults) {
     let podiums = 0;
     let poles = 0;
     let fastestLaps = 0;
-    raceResults.filter((result) => result.seasonId === season.id).forEach((result) => {
+    raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id).forEach((result) => {
       result.entries.forEach((entry) => {
         const driver = teamDrivers.find((item) => idsEqual(item.id, entry.driverId));
         if (!driver) return;
@@ -1104,7 +1115,7 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
   }
 
-  const allRaces = allCalendarRaces.filter((race) => race.categoryId === selectedCategoryId);
+  const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
 
   return (
     <>
@@ -1160,7 +1171,7 @@ export default function URTTAdminPanel() {
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onMoveRace={moveRace} isSavingRace={isSavingRace} />}
-          {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).includes(selectedCategoryId))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
+          {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel />}
           
         </AdminLayout>
@@ -1171,8 +1182,9 @@ export default function URTTAdminPanel() {
 }
 
 function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
-  const driverTitleField = getCategoryStatField("driverTitles", selectedCategoryId);
-  const teamTitleField = getCategoryStatField("teamTitles", selectedCategoryId);
+  const activeCategoryId = normalizeCategoryId(selectedCategoryId);
+  const driverTitleField = getCategoryStatField("driverTitles", activeCategoryId);
+  const teamTitleField = getCategoryStatField("teamTitles", activeCategoryId);
   const blankDriverStats = (driver, seasonId) => {
     const seasonTeamId = driver.teamHistory?.[seasonId] || driver.teamId;
     return {
@@ -1209,15 +1221,15 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   SEASON_OPTIONS.forEach((season) => {
     const driverMap = new Map(drivers.map((driver) => [String(driver.id), blankDriverStats(driver, season.id)]));
     const teamMap = new Map(teams.map((team) => [String(team.id), blankTeamStats(team)]));
-    const seasonCategoryResults = raceResults.filter((result) => result.seasonId === season.id && (result.categoryId || "F1") === selectedCategoryId);
+    const seasonCategoryResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && normalizeCategoryId(result.categoryId) === activeCategoryId);
     seasonCategoryResults.forEach((raceResult) => {
       raceResult.entries.forEach((entry) => {
         const driver = driverMap.get(String(entry.driverId));
         if (!driver) return;
-        const participatesInCategory = (driver.participations?.[season.id] || []).includes(selectedCategoryId);
+        const participatesInCategory = (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId);
         if (!participatesInCategory) return;
         const team = teamMap.get(String(driver.teamId));
-        const points = getPointsForPosition(Number(entry.position), raceResult.categoryId || selectedCategoryId, raceResult.seasonId || season.id);
+        const points = getPointsForPosition(Number(entry.position), raceResult.categoryId || activeCategoryId, raceResult.seasonId || season.id);
         const win = Number(entry.position) === 1 ? 1 : 0;
         const podium = Number(entry.position) <= 3 ? 1 : 0;
         const pole = entry.pole ? 1 : 0;
@@ -1236,10 +1248,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
         }
       });
     });
-    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId)).sort((a, b) => b.points - a.points);
+    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort((a, b) => b.points - a.points);
     const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
       const relatedDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
-      return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).includes(selectedCategoryId));
+      return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId));
     }).sort((a, b) => b.points - a.points);
 
     driverStatsBySeason[season.id] = seasonDriverStats;
@@ -1375,8 +1387,8 @@ function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId
 }
 
 function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, raceResults, selectedCategoryId, selectedSeasonId }) {
-  const visibleCalendar = allCalendarRaces.filter((race) => race.categoryId === selectedCategoryId && race.seasonId === selectedSeasonId);
-  const visibleResults = raceResults.filter((result) => result.categoryId === selectedCategoryId && result.seasonId === selectedSeasonId);
+  const visibleCalendar = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(race.seasonId) === normalizeSeasonId(selectedSeasonId));
+  const visibleResults = raceResults.filter((result) => normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(result.seasonId) === normalizeSeasonId(selectedSeasonId));
 
   return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
 }
@@ -1538,8 +1550,9 @@ function TeamRaceCell({ teamId, race, raceResults, drivers }) {
 }
 
 function PublicSeasonResults({ races, raceResults, drivers, selectedSeasonId, selectedCategoryId, onOpenGp }) {
-  const categoryId = selectedCategoryId || races[0]?.categoryId || "F1";
-  const seasonResults = raceResults.filter((result) => result.seasonId === selectedSeasonId && (result.categoryId || "F1") === categoryId);
+  const categoryId = normalizeCategoryId(selectedCategoryId || races[0]?.categoryId || "F1");
+  const seasonId = normalizeSeasonId(selectedSeasonId);
+  const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === seasonId && normalizeCategoryId(result.categoryId) === categoryId);
   return <div style={styles.stack}>{races.map((race) => { const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; const winner = sortedEntries.find((entry) => Number(entry.position) === 1); const poleman = sortedEntries.find((entry) => entry.pole); const fastest = sortedEntries.find((entry) => entry.fastestLap); const podium = sortedEntries.slice(0, 3); return <div key={race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>Course #{race.round}</p><button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button></div><span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} /><RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>; })}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
 
