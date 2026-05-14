@@ -288,14 +288,16 @@ function isRecordValue(records, key, value) {
 function RecordValue({ value, record }) {
   return <span style={record ? styles.recordValue : undefined}>{value}</span>;
 }
-function getDriverSeasonBreakdown(driver, raceResults, teams = []) {
+function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "") {
   return SEASON_OPTIONS.map((season) => {
+    const categories = selectedCategoryId ? [selectedCategoryId] : getDriverSeasonCategories(driver, season.id);
+    const seasonResults = raceResults.filter((result) => result.seasonId === season.id && (!selectedCategoryId || (result.categoryId || "F1") === selectedCategoryId));
     let points = 0;
     let wins = 0;
     let podiums = 0;
     let poles = 0;
     let fastestLaps = 0;
-    raceResults.filter((result) => result.seasonId === season.id).forEach((result) => {
+    seasonResults.forEach((result) => {
       const entry = result.entries.find((item) => item.driverId === driver.id);
       if (!entry) return;
       points += getPointsForPosition(Number(entry.position), result.categoryId, result.seasonId);
@@ -304,7 +306,15 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = []) {
       poles += entry.pole ? 1 : 0;
       fastestLaps += entry.fastestLap ? 1 : 0;
     });
-    return { seasonId: season.id, team: getDriverSeasonTeam(driver, season.id, teams), teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories: getDriverSeasonCategories(driver, season.id), points, wins, podiums, poles, fastestLaps };
+    const standings = Array.from(seasonResults.reduce((map, result) => {
+      result.entries.forEach((entry) => {
+        const current = map.get(entry.driverId) || 0;
+        map.set(entry.driverId, current + getPointsForPosition(Number(entry.position), result.categoryId, result.seasonId));
+      });
+      return map;
+    }, new Map()).entries()).sort((a, b) => b[1] - a[1]);
+    const positionIndex = standings.findIndex(([driverId]) => driverId === driver.id);
+    return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: getDriverSeasonTeam(driver, season.id, teams), teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, points, wins, podiums, poles, fastestLaps };
   }).filter((row) => row.categories.length || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
 function getTeamSeasonBreakdown(team, drivers, raceResults) {
@@ -1299,7 +1309,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
         {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
-        {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} onClose={() => setSelectedDriver(null)} />}</>}
+        {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
       </main>
@@ -1504,8 +1514,8 @@ function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
   return <div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE GRAND PRIX</p><h2 style={styles.gpDetailTitle}>{gp.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><div style={styles.statsGrid}><Stat label="Présences au calendrier" value={gpRaces.length} /><Stat label="Résultats validés" value={gpResults.filter((item) => item.result).length} /><Stat label="Dernier vainqueur" value={driverName(drivers, [...gpResults].reverse().find((item) => item.winner)?.winner?.driverId)} /><Stat label="Dernier poleman" value={driverName(drivers, [...gpResults].reverse().find((item) => item.poleman)?.poleman?.driverId)} /></div><div style={styles.twoColumns}><Card title="Vainqueurs" icon="🏆"><MiniCountList counts={winnerCounts} empty="Aucun vainqueur enregistré." /></Card><Card title="Polemen" icon="⚡"><MiniCountList counts={poleCounts} empty="Aucun poleman enregistré." /></Card></div><Card title="Historique du GP" icon="📜"><div style={styles.stack}>{gpResults.map((item) => <div key={item.race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>{seasonName(item.race.seasonId)} · Course #{item.race.round}</p><h3 style={styles.raceTitle}>{item.race.name}</h3></div><span style={item.result ? styles.badgeGreen : styles.badgeDark}>{item.result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, item.winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, item.poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, item.fastest?.driverId)} /><RaceStat label="Podium" value={item.podium.length ? item.podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>)}{gpResults.length === 0 && <Empty text="Aucun historique pour ce GP." />}</div></Card></div>;
 }
 
-function DriverDetails({ driver, raceResults, teams, onClose }) {
-  const rows = getDriverSeasonBreakdown(driver, raceResults, teams);
+function DriverDetails({ driver, raceResults, teams, selectedCategoryId, onClose }) {
+  const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId);
   return (
     <div style={styles.detailOverlay} onClick={onClose}>
       <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
@@ -1522,7 +1532,8 @@ function TeamDetails({ team, drivers, raceResults, onClose }) {
 }
 
 function SeasonBreakdownTable({ rows }) {
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Saison</th><th style={styles.th}>Écurie</th><th style={styles.th}>Catégories</th><th style={styles.th}>Points</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></tr></thead><tbody>{rows.map((row) => <tr key={row.seasonId} style={styles.tr}><td style={styles.td}>{seasonName(row.seasonId)}</td><td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans écurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "—"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée." />}</div>;
+  const showPosition = rows.some((row) => row.position);
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Saison</th>{showPosition && <th style={styles.th}>Position</th>}<th style={styles.th}>Écurie</th><th style={styles.th}>Catégories</th><th style={styles.th}>Points</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></tr></thead><tbody>{rows.map((row) => <tr key={row.seasonId} style={styles.tr}><td style={styles.td}>{seasonName(row.seasonId)}</td>{showPosition && <td style={{ ...styles.td, ...styles.points }}>{row.position ? `#${row.position}` : "—"}</td>}<td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans écurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "—"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée." />}</div>;
 }
 
 function ParticipationEditor({ form, setForm, teams = [], selectedSeasonId = "S1" }) {
