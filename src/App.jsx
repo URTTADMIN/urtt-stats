@@ -11,17 +11,17 @@ const CATEGORY_OPTIONS = [
 ];
 
 const emptyDriver = { name: "", teamId: "", number: 1, color: "#dc2626", avatar: "", retired: false, driverTitles: 0, teamTitles: 0, participations: {}, teamHistory: {}, tripleCrown: { monaco: false, indy500: false, lemans: false } };
-const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 0, tripleCrowns: 0 };
+const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 };
 const emptyRace = { name: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 
 const demoTeams = [
-  { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesFE: 0, teamTitles: 3, tripleCrowns: 0 },
-  { id: 102, name: "Nova Motorsport", color: "#2563eb", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, tripleCrowns: 1 },
-  { id: 103, name: "Velocity Academy", color: "#ef4444", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, tripleCrowns: 0 },
-  { id: 104, name: "Thunder Junior", color: "#f97316", logo: "", driverTitles: 1, driverTitlesF1: 0, driverTitlesF2: 1, driverTitlesFE: 0, teamTitles: 0, tripleCrowns: 0 },
-  { id: 105, name: "E-Volt Racing", color: "#16a34a", logo: "", driverTitles: 1, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 1, teamTitles: 2, tripleCrowns: 0 },
-  { id: 106, name: "Spark Formula", color: "#22c55e", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, tripleCrowns: 0 },
+  { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 },
+  { id: 102, name: "Nova Motorsport", color: "#2563eb", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, teamTitlesF1: 1, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 1 },
+  { id: 103, name: "Velocity Academy", color: "#ef4444", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, teamTitlesF1: 0, teamTitlesF2: 1, teamTitlesFE: 0, tripleCrowns: 0 },
+  { id: 104, name: "Thunder Junior", color: "#f97316", logo: "", driverTitles: 1, driverTitlesF1: 0, driverTitlesF2: 1, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 },
+  { id: 105, name: "E-Volt Racing", color: "#16a34a", logo: "", driverTitles: 1, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 1, teamTitles: 2, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 2, tripleCrowns: 0 },
+  { id: 106, name: "Spark Formula", color: "#22c55e", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 1, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 1, tripleCrowns: 0 },
 ];
 
 const demoDrivers = [
@@ -126,7 +126,10 @@ function mapTeamFromDb(team) {
     driverTitlesF1: team.driver_titles_f1 ?? team.driver_titles ?? 0,
     driverTitlesF2: team.driver_titles_f2 || 0,
     driverTitlesFE: team.driver_titles_fe || 0,
-    teamTitles: team.team_titles || 0,
+    teamTitles: team.team_titles_f1 ?? team.team_titles ?? 0,
+    teamTitlesF1: team.team_titles_f1 ?? team.team_titles ?? 0,
+    teamTitlesF2: team.team_titles_f2 || 0,
+    teamTitlesFE: team.team_titles_fe || 0,
     tripleCrowns: team.triple_crowns || 0,
   };
 }
@@ -139,7 +142,10 @@ function mapTeamToDb(teamForm) {
     driver_titles_f1: Number(teamForm.driverTitlesF1) || 0,
     driver_titles_f2: Number(teamForm.driverTitlesF2) || 0,
     driver_titles_fe: Number(teamForm.driverTitlesFE) || 0,
-    team_titles: Number(teamForm.teamTitles) || 0,
+    team_titles: Number(teamForm.teamTitlesF1) || 0,
+    team_titles_f1: Number(teamForm.teamTitlesF1) || 0,
+    team_titles_f2: Number(teamForm.teamTitlesF2) || 0,
+    team_titles_fe: Number(teamForm.teamTitlesFE) || 0,
     triple_crowns: Number(teamForm.tripleCrowns) || 0,
   };
 }
@@ -1161,7 +1167,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   driverTitlesF1: Number(team.driverTitlesF1) || 0,
   driverTitlesF2: Number(team.driverTitlesF2) || 0,
   driverTitlesFE: Number(team.driverTitlesFE) || 0,
-  teamTitles: Number(team.teamTitles) || 0,
+  teamTitles: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
+  teamTitlesF1: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
+  teamTitlesF2: Number(team.teamTitlesF2) || 0,
+  teamTitlesFE: Number(team.teamTitlesFE) || 0,
   wins: 0,
   podiums: 0,
   poles: 0,
@@ -1223,6 +1232,8 @@ function sortByTitlesAndResults(a, b) {
   return (
     (Number(b.driverTitles) || 0) - (Number(a.driverTitles) || 0) ||
     (Number(b.teamTitles) || 0) - (Number(a.teamTitles) || 0) ||
+    (Number(b.teamTitlesF2) || 0) - (Number(a.teamTitlesF2) || 0) ||
+    (Number(b.teamTitlesFE) || 0) - (Number(a.teamTitlesFE) || 0) ||
     (Number(b.wins) || 0) - (Number(a.wins) || 0) ||
     (Number(b.podiums) || 0) - (Number(a.podiums) || 0) ||
     (Number(b.poles) || 0) - (Number(a.poles) || 0) ||
@@ -1371,6 +1382,7 @@ function AdminTeams({ teams, form, setForm, editingId, isSaving, onSave, onEdit,
 function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
   const update = (key, value) => setForm({ ...form, [key]: value });
   const updateDriverTitleF1 = (value) => setForm({ ...form, driverTitles: value, driverTitlesF1: value });
+  const updateTeamTitleF1 = (value) => setForm({ ...form, teamTitles: value, teamTitlesF1: value });
 
   async function uploadTeamLogo(file) {
     if (!file) return;
@@ -1395,7 +1407,7 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
 
     update("logo", data.publicUrl);
   }
-  return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titres écurie" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+  return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titre constructeur F1" type="number" value={form.teamTitlesF1 ?? form.teamTitles ?? 0} onChange={updateTeamTitleF1} /><Input label="Titre constructeur F2" type="number" value={form.teamTitlesF2 ?? 0} onChange={(value) => update("teamTitlesF2", value)} /><Input label="Titre constructeur FE" type="number" value={form.teamTitlesFE ?? 0} onChange={(value) => update("teamTitlesFE", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
 function AdminRaces({ raceForm, setRaceForm, raceLibrary, calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, onMoveRace, isSavingRace }) {
@@ -1432,12 +1444,12 @@ function DriverTable({ drivers, detailed = false, raceDetails = false, races = [
 }
 
 function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, onTeamClick }) {
-  const records = buildRecordMap(teams, ["driverTitlesF1", "driverTitlesF2", "driverTitlesFE", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
+  const records = buildRecordMap(teams, ["driverTitlesF1", "driverTitlesF2", "driverTitlesFE", "teamTitlesF1", "teamTitlesF2", "teamTitlesFE", "wins", "podiums", "poles", "fastestLaps", "points"]);
   return (
     <div style={styles.tableWrap}>
       <table className="urtt-standings-table urtt-team-standings" style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>F1</th><th style={styles.th}>F2</th><th style={styles.th}>FE</th><th style={styles.th}>Titre C.</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
-        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitlesF1 || 0} record={isRecordValue(records, "driverTitlesF1", team.driverTitlesF1)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesF2 || 0} record={isRecordValue(records, "driverTitlesF2", team.driverTitlesF2)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesFE || 0} record={isRecordValue(records, "driverTitlesFE", team.driverTitlesFE)} /></td><td style={styles.td}><RecordValue value={team.teamTitles} record={isRecordValue(records, "teamTitles", team.teamTitles)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>P. F1</th><th style={styles.th}>P. F2</th><th style={styles.th}>P. FE</th><th style={styles.th}>C. F1</th><th style={styles.th}>C. F2</th><th style={styles.th}>C. FE</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
+        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitlesF1 || 0} record={isRecordValue(records, "driverTitlesF1", team.driverTitlesF1)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesF2 || 0} record={isRecordValue(records, "driverTitlesF2", team.driverTitlesF2)} /></td><td style={styles.td}><RecordValue value={team.driverTitlesFE || 0} record={isRecordValue(records, "driverTitlesFE", team.driverTitlesFE)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesF1 || 0} record={isRecordValue(records, "teamTitlesF1", team.teamTitlesF1)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesF2 || 0} record={isRecordValue(records, "teamTitlesF2", team.teamTitlesF2)} /></td><td style={styles.td}><RecordValue value={team.teamTitlesFE || 0} record={isRecordValue(records, "teamTitlesFE", team.teamTitlesFE)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
       </table>
       {teams.length === 0 && <Empty text="Aucune écurie à afficher." />}
     </div>
@@ -1514,7 +1526,7 @@ function RaceTable({ races, onDelete, onMoveRace, isSavingRace = false }) {
   return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)}</p></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>↑</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>↓</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
 function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Écurie : {team?.name || "—"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
-function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Titres écurie : {team.teamTitles}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
+function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} · F2 {team.teamTitlesF2 || 0} · FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function DriverIdentity({ driver, teamColor }) { return <div className="urtt-identity" style={styles.identity}>{driver.avatar ? <img src={driver.avatar} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${teamColor || driver.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: teamColor || driver.color || "#dc2626" }}>{(driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>N° {driver.number || "—"}{driver.retired ? " · Retraité" : ""}</p></div></div>; }
 function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={styles.logoSmall} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<strong className="urtt-team-name">{team.name || "Écurie"}</strong></div>; }
 function TripleCrown({ crown }) { const safe = crown || { monaco: false, indy500: false, lemans: false }; const count = [safe.monaco, safe.indy500, safe.lemans].filter(Boolean).length; return <div style={styles.crownBox}><span style={safe.monaco ? styles.badgeGreen : styles.badgeDark}>Titre F1</span><span style={safe.indy500 ? styles.badgeGreen : styles.badgeDark}>Indy 300</span><span style={safe.lemans ? styles.badgeGreen : styles.badgeDark}>24h du Mans</span><strong>{count}/3</strong></div>; }
