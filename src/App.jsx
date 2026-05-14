@@ -76,17 +76,17 @@ function createDemoSeasonMap() {
 }
 
 const demoRaceResults = [
-  { raceId: 401, seasonId: "S1", raceName: "GP de Monaco", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: false }, { driverId: 202, position: 2, pole: false, fastestLap: true }] },
-  { raceId: 402, seasonId: "S1", raceName: "GP de Spa", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: true }, { driverId: 201, position: 2, pole: false, fastestLap: false }, { driverId: 203, position: 3, pole: false, fastestLap: false }, { driverId: 204, position: 4, pole: false, fastestLap: false }] },
-  { raceId: 403, seasonId: "S2", raceName: "GP de Monza", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: true }, { driverId: 202, position: 2, pole: true, fastestLap: false }] },
-  { raceId: 404, seasonId: "S2", raceName: "GP de Suzuka", entries: [{ driverId: 201, position: 2, pole: true, fastestLap: false }, { driverId: 202, position: 1, pole: false, fastestLap: true }, { driverId: 205, position: 3, pole: false, fastestLap: false }, { driverId: 206, position: 4, pole: false, fastestLap: false }, { driverId: 203, position: 5, pole: false, fastestLap: false }] },
-  { raceId: 405, seasonId: "S3", raceName: "GP de Monaco", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: false }, { driverId: 201, position: 2, pole: false, fastestLap: true }] },
-  { raceId: 406, seasonId: "S3", raceName: "GP de Silverstone", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: true }, { driverId: 202, position: 2, pole: false, fastestLap: false }, { driverId: 205, position: 3, pole: false, fastestLap: false }, { driverId: 206, position: 4, pole: false, fastestLap: false }] },
-  { raceId: 407, seasonId: "S4", raceName: "GP de Spa", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: false }, { driverId: 202, position: 2, pole: true, fastestLap: true }] },
-  { raceId: 408, seasonId: "S4", raceName: "GP d'Abu Dhabi", entries: [{ driverId: 202, position: 1, pole: false, fastestLap: true }, { driverId: 201, position: 2, pole: true, fastestLap: false }, { driverId: 203, position: 3, pole: false, fastestLap: false }, { driverId: 204, position: 4, pole: false, fastestLap: false }, { driverId: 205, position: 5, pole: false, fastestLap: false }, { driverId: 206, position: 6, pole: false, fastestLap: false }] },
-  { raceId: 409, seasonId: "S16", raceName: "GP de Monaco", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: true }, { driverId: 202, position: 2, pole: false, fastestLap: false }] },
-  { raceId: 410, seasonId: "S16", raceName: "GP de Monza", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: false }, { driverId: 201, position: 2, pole: false, fastestLap: true }] },
-  { raceId: 411, seasonId: "S16", raceName: "GP d'Abu Dhabi", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: false }, { driverId: 202, position: 2, pole: true, fastestLap: true }] },
+  { raceId: 401, seasonId: "S1", categoryId: "F2", raceName: "GP de Monaco", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: false }, { driverId: 202, position: 2, pole: false, fastestLap: true }] },
+  { raceId: 402, seasonId: "S1", categoryId: "F2", raceName: "GP de Spa", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: true }, { driverId: 201, position: 2, pole: false, fastestLap: false }, { driverId: 203, position: 3, pole: false, fastestLap: false }, { driverId: 204, position: 4, pole: false, fastestLap: false }] },
+  { raceId: 403, seasonId: "S2", categoryId: "F1", raceName: "GP de Monza", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: true }, { driverId: 202, position: 2, pole: true, fastestLap: false }] },
+  { raceId: 404, seasonId: "S2", categoryId: "FE", raceName: "GP de Suzuka", entries: [{ driverId: 201, position: 2, pole: true, fastestLap: false }, { driverId: 202, position: 1, pole: false, fastestLap: true }, { driverId: 205, position: 3, pole: false, fastestLap: false }, { driverId: 206, position: 4, pole: false, fastestLap: false }, { driverId: 203, position: 5, pole: false, fastestLap: false }] },
+  { raceId: 405, seasonId: "S3", categoryId: "FE", raceName: "GP de Monaco", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: false }, { driverId: 201, position: 2, pole: false, fastestLap: true }] },
+  { raceId: 406, seasonId: "S3", categoryId: "FE", raceName: "GP de Silverstone", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: true }, { driverId: 202, position: 2, pole: false, fastestLap: false }, { driverId: 205, position: 3, pole: false, fastestLap: false }, { driverId: 206, position: 4, pole: false, fastestLap: false }] },
+  { raceId: 407, seasonId: "S4", categoryId: "F2", raceName: "GP de Spa", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: false }, { driverId: 202, position: 2, pole: true, fastestLap: true }] },
+  { raceId: 408, seasonId: "S4", categoryId: "F2", raceName: "GP d'Abu Dhabi", entries: [{ driverId: 202, position: 1, pole: false, fastestLap: true }, { driverId: 201, position: 2, pole: true, fastestLap: false }, { driverId: 203, position: 3, pole: false, fastestLap: false }, { driverId: 204, position: 4, pole: false, fastestLap: false }, { driverId: 205, position: 5, pole: false, fastestLap: false }, { driverId: 206, position: 6, pole: false, fastestLap: false }] },
+  { raceId: 409, seasonId: "S16", categoryId: "F1", raceName: "GP de Monaco", entries: [{ driverId: 201, position: 1, pole: true, fastestLap: true }, { driverId: 202, position: 2, pole: false, fastestLap: false }] },
+  { raceId: 410, seasonId: "S16", categoryId: "F1", raceName: "GP de Monza", entries: [{ driverId: 202, position: 1, pole: true, fastestLap: false }, { driverId: 201, position: 2, pole: false, fastestLap: true }] },
+  { raceId: 411, seasonId: "S16", categoryId: "F1", raceName: "GP d'Abu Dhabi", entries: [{ driverId: 201, position: 1, pole: false, fastestLap: false }, { driverId: 202, position: 2, pole: true, fastestLap: true }] },
 ];
 
 function usesSpecialF2Points(categoryId, seasonId) {
@@ -369,7 +369,7 @@ function runTests() {
   console.assert(f2Stats.driverStatsBySeason.S4.find((driver) => driver.id === 203)?.teamName === "Thunder Junior", "Le classement pilote doit utiliser l'écurie de la saison");
   console.assert(f2Stats.teamStatsBySeason.S4.some((team) => team.id === 104 && team.points > 0), "Le classement écurie doit utiliser les pilotes de la saison");
 }
-runTests();
+if (import.meta.env.DEV) runTests();
 
 export default function URTTAdminPanel() {
   useEffect(() => {
