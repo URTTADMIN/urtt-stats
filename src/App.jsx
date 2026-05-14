@@ -1226,8 +1226,6 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
       raceResult.entries.forEach((entry) => {
         const driver = driverMap.get(String(entry.driverId));
         if (!driver) return;
-        const participatesInCategory = (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId);
-        if (!participatesInCategory) return;
         const team = teamMap.get(String(driver.teamId));
         const points = getPointsForPosition(Number(entry.position), raceResult.categoryId || activeCategoryId, raceResult.seasonId || season.id);
         const win = Number(entry.position) === 1 ? 1 : 0;
@@ -1248,10 +1246,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
         }
       });
     });
-    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort((a, b) => b.points - a.points);
+    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => driver.points > 0 || (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort((a, b) => b.points - a.points);
     const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
       const relatedDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
-      return relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId));
+      return team.points > 0 || relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId));
     }).sort((a, b) => b.points - a.points);
 
     driverStatsBySeason[season.id] = seasonDriverStats;
@@ -1389,8 +1387,9 @@ function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId
 function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, raceResults, selectedCategoryId, selectedSeasonId }) {
   const visibleCalendar = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(race.seasonId) === normalizeSeasonId(selectedSeasonId));
   const visibleResults = raceResults.filter((result) => normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(result.seasonId) === normalizeSeasonId(selectedSeasonId));
+  const visibleEntriesCount = visibleResults.reduce((sum, result) => sum + result.entries.length, 0);
 
-  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
+  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /><Stat label="Entrées résultats" value={visibleEntriesCount} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
 }
 
 function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTeam }) {
