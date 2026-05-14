@@ -290,7 +290,8 @@ function RecordValue({ value, record }) {
 }
 function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "") {
   return SEASON_OPTIONS.map((season) => {
-    const categories = selectedCategoryId ? [selectedCategoryId] : getDriverSeasonCategories(driver, season.id);
+    const seasonCategories = getDriverSeasonCategories(driver, season.id);
+    const categories = selectedCategoryId ? seasonCategories.filter((category) => category === selectedCategoryId) : seasonCategories;
     const seasonResults = raceResults.filter((result) => result.seasonId === season.id && (!selectedCategoryId || (result.categoryId || "F1") === selectedCategoryId));
     let points = 0;
     let wins = 0;
