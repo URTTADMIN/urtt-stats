@@ -1685,9 +1685,10 @@ function RaceCountdown({ races }) {
     return () => window.clearInterval(timer);
   }, []);
 
-  const nextRace = [...races]
+  const upcomingRaces = [...races]
     .filter((race) => race.startAt && new Date(race.startAt).getTime() > now)
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
+  const nextRace = upcomingRaces[0];
 
   if (!nextRace) {
     return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course programmee</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses.</span></div></Card>;
@@ -1700,7 +1701,7 @@ function RaceCountdown({ races }) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><div><p style={styles.mutedSmall}>Course #{nextRace.round}</p><strong style={styles.countdownRace}>{nextRace.name}</strong><p style={styles.mutedSmall}><span style={{ ...styles.categoryBadge, background: getCategoryColor(nextRace.categoryId) }}>{nextRace.categoryId}</span> {seasonName(nextRace.seasonId)} · {formatRaceDate(nextRace.startAt)}</p></div><div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div></div></Card>;
+  return <Card title="Prochaines courses" icon="⏱️"><div style={styles.countdownBox}><div><p style={styles.mutedSmall}>Course #{nextRace.round}</p><strong style={styles.countdownRace}>{nextRace.name}</strong><p style={styles.mutedSmall}><span style={{ ...styles.categoryBadge, background: getCategoryColor(nextRace.categoryId) }}>{nextRace.categoryId}</span> {seasonName(nextRace.seasonId)} · {formatRaceDate(nextRace.startAt)}</p></div><div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div></div>{upcomingRaces.length > 1 && <div style={styles.upcomingList}>{upcomingRaces.slice(1, 6).map((race) => <div key={race.id} style={styles.upcomingItem}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)} · Course #{race.round}</p></div><div style={styles.upcomingMeta}><span style={{ ...styles.categoryBadge, background: getCategoryColor(race.categoryId) }}>{race.categoryId}</span><span style={styles.mutedSmall}>{formatRaceDate(race.startAt)}</span></div></div>)}</div>}</Card>;
 }
 function CountdownUnit({ label, value }) {
   return <div style={styles.countdownUnit}><strong>{String(value).padStart(2, "0")}</strong><span>{label}</span></div>;
@@ -1965,6 +1966,9 @@ const styles = {
   countdownRace: { display: "block", fontSize: 24, lineHeight: 1.1 },
   countdownGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(64px, 1fr))", gap: 10, minWidth: "min(100%, 340px)" },
   countdownUnit: { background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "12px 10px", textAlign: "center", display: "grid", gap: 4 },
+  upcomingList: { display: "grid", gap: 8, marginTop: 16, borderTop: "1px solid #27272a", paddingTop: 14 },
+  upcomingItem: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "10px 12px", flexWrap: "wrap" },
+  upcomingMeta: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" },
   emptyBox: { textAlign: "center", border: "1px dashed #3f3f46", borderRadius: 24, padding: 24, color: "#a1a1aa" },
   popupOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", display: "grid", placeItems: "center", zIndex: 50, padding: 24 },
   popupCard: { width: "100%", maxWidth: 430, background: "#18181b", border: "1px solid #3f3f46", borderRadius: 28, padding: 28, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.45)" },
