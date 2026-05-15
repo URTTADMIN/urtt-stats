@@ -121,6 +121,24 @@ function normalizeSeasonId(seasonId) {
 function normalizeCategoryId(categoryId) {
   return String(categoryId ?? "F1").trim().toUpperCase() || "F1";
 }
+function toDateTimeInputValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const offsetDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+  return offsetDate.toISOString().slice(0, 16);
+}
+function toStoredDateTime(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+function formatRaceDate(value) {
+  if (!value) return "Date non definie";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Date non definie";
+  return date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+}
 function getSeasonNumber(seasonId) {
   return Number(normalizeSeasonId(seasonId).replace("S", "")) || 0;
 }
@@ -228,6 +246,7 @@ function mapCalendarRaceFromDb(race) {
     name: race.name,
     seasonId: normalizeSeasonId(race.season_id),
     categoryId: normalizeCategoryId(race.category_id),
+    startAt: race.start_at || "",
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
@@ -1365,6 +1384,7 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
         <Stat label="Leader écurie" value={leaderTeam} />
         <Stat label="GP" value={races.length} />
       </div>
+      <RaceCountdown races={races} />
       <div style={styles.section}>
         <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
         <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
@@ -1613,8 +1633,52 @@ function MiniCountList({ counts, empty }) {
   return <div style={styles.stack}>{entries.map(([name, count]) => <div key={name} style={styles.itemBox}><strong>{name}</strong><span style={styles.badgeGreen}>{count}</span></div>)}</div>;
 }
 function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "—"}</strong></div>; }
+function RaceCountdown({ races }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const nextRace = [...races]
+    .filter((race) => race.startAt && new Date(race.startAt).getTime() > now)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())[0];
+
+  if (!nextRace) {
+    return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course programmee</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses.</span></div></Card>;
+  }
+
+  const remaining = Math.max(0, new Date(nextRace.startAt).getTime() - now);
+  const totalSeconds = Math.floor(remaining / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><div><p style={styles.mutedSmall}>Course #{nextRace.round}</p><strong style={styles.countdownRace}>{nextRace.name}</strong><p style={styles.mutedSmall}>{formatRaceDate(nextRace.startAt)}</p></div><div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div></div></Card>;
+}
+function CountdownUnit({ label, value }) {
+  return <div style={styles.countdownUnit}><strong>{String(value).padStart(2, "0")}</strong><span>{label}</span></div>;
+}
+function RaceDateInput({ race }) {
+  const [value, setValue] = useState(toDateTimeInputValue(race.startAt));
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function save(nextValue) {
+    setValue(nextValue);
+    setIsSaving(true);
+    const { error } = await supabase.from("season_calendar").update({ start_at: toStoredDateTime(nextValue) }).eq("id", race.id);
+    setIsSaving(false);
+    if (error) {
+      console.error("Erreur date course:", error);
+      alert("Impossible d'enregistrer la date. Ajoute la colonne start_at dans season_calendar.");
+    }
+  }
+
+  return <label style={styles.dateField}><span style={styles.mutedSmall}>{isSaving ? "Sauvegarde..." : "Depart"}</span><input type="datetime-local" value={value} onChange={(event) => save(event.target.value)} style={styles.dateInput} /></label>;
+}
 function RaceTable({ races, onDelete, onMoveRace, isSavingRace = false }) {
-  return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)}</p></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>↑</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>↓</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
+  return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p><RaceDateInput race={race} /></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>↑</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>↓</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
 function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Écurie : {team?.name || "—"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} · F2 {team.teamTitlesF2 || 0} · FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
@@ -1851,6 +1915,12 @@ const styles = {
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
   resultsSelect: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 14, outline: "none", fontWeight: 700 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
+  dateField: { display: "grid", gap: 4, marginTop: 8, maxWidth: 260 },
+  dateInput: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
+  countdownBox: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" },
+  countdownRace: { display: "block", fontSize: 24, lineHeight: 1.1 },
+  countdownGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(64px, 1fr))", gap: 10, minWidth: "min(100%, 340px)" },
+  countdownUnit: { background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "12px 10px", textAlign: "center", display: "grid", gap: 4 },
   emptyBox: { textAlign: "center", border: "1px dashed #3f3f46", borderRadius: 24, padding: 24, color: "#a1a1aa" },
   popupOverlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,.65)", display: "grid", placeItems: "center", zIndex: 50, padding: 24 },
   popupCard: { width: "100%", maxWidth: 430, background: "#18181b", border: "1px solid #3f3f46", borderRadius: 28, padding: 28, textAlign: "center", boxShadow: "0 30px 80px rgba(0,0,0,.45)" },
