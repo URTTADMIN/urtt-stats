@@ -1400,6 +1400,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
       </main>
+      <FeedbackWidget />
     </div>
   );
 }
@@ -1678,6 +1679,61 @@ function MiniCountList({ counts, empty }) {
   return <div style={styles.stack}>{entries.map(([name, count]) => <div key={name} style={styles.itemBox}><strong>{name}</strong><span style={styles.badgeGreen}>{count}</span></div>)}</div>;
 }
 function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "—"}</strong></div>; }
+function FeedbackWidget() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [type, setType] = useState("Suggestion");
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [status, setStatus] = useState("");
+  const [isSending, setIsSending] = useState(false);
+
+  async function sendFeedback(event) {
+    event.preventDefault();
+    setStatus("");
+
+    if (!title.trim() || !content.trim()) {
+      setStatus("Ajoute un titre et un contenu.");
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const response = await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type, title, content, pageUrl: window.location.href }),
+      });
+
+      if (!response.ok) throw new Error("Feedback failed");
+      setStatus("Envoyé sur Discord, merci !");
+      setTitle("");
+      setContent("");
+    } catch (error) {
+      console.error("Erreur feedback:", error);
+      setStatus("Impossible d'envoyer pour le moment.");
+    } finally {
+      setIsSending(false);
+    }
+  }
+
+  return (
+    <>
+      <button type="button" onClick={() => setIsOpen(true)} style={styles.feedbackButton}>?</button>
+      {isOpen && (
+        <div style={styles.detailOverlay} onClick={() => setIsOpen(false)}>
+          <form onSubmit={sendFeedback} style={styles.feedbackModal} onClick={(event) => event.stopPropagation()}>
+            <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>RETOUR SITE</p><h2 style={styles.gpDetailTitle}>Suggestion ou bug</h2></div><button type="button" onClick={() => setIsOpen(false)} style={styles.secondaryButton}>Fermer</button></div>
+            <div style={styles.feedbackChoice}>{["Suggestion", "Bug"].map((item) => <button key={item} type="button" onClick={() => setType(item)} style={{ ...styles.feedbackChoiceButton, ...(type === item ? styles.feedbackChoiceActive : {}) }}>{item}</button>)}</div>
+            <Input label="Titre" value={title} onChange={setTitle} />
+            <label style={styles.label}><span style={styles.labelText}>Contenu</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} style={styles.textarea} /></label>
+            {status && <p style={styles.mutedSmall}>{status}</p>}
+            <button type="submit" disabled={isSending} style={styles.fullButton}>{isSending ? "Envoi..." : "Envoyer"}</button>
+          </form>
+        </div>
+      )}
+    </>
+  );
+}
 function RaceCountdown({ races }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -1960,6 +2016,12 @@ const styles = {
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
   resultsSelect: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 14, outline: "none", fontWeight: 700 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
+  feedbackButton: { position: "fixed", right: 22, bottom: 22, width: 58, height: 58, borderRadius: "50%", border: "2px solid rgba(255,255,255,.28)", background: "#2563eb", color: "white", fontSize: 24, fontWeight: 950, cursor: "pointer", zIndex: 45, boxShadow: "0 18px 42px rgba(37,99,235,.35)" },
+  feedbackModal: { width: "min(620px, 100%)", maxHeight: "90vh", overflow: "auto", background: "#18181b", border: "1px solid #3f3f46", borderRadius: 26, padding: 20, display: "grid", gap: 14 },
+  feedbackChoice: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
+  feedbackChoiceButton: { background: "#27272a", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 12, fontWeight: 900, cursor: "pointer" },
+  feedbackChoiceActive: { background: "#2563eb", borderColor: "#60a5fa" },
+  textarea: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 13, outline: "none", width: "100%", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" },
   dateField: { display: "grid", gap: 4, marginTop: 8, maxWidth: 260 },
   dateInput: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
   countdownBox: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap" },
