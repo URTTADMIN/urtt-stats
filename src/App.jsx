@@ -412,6 +412,11 @@ function runTests() {
   console.assert(demoDrivers.some((driver) => driver.participations.S2?.includes("FE")), "Il doit y avoir au moins un pilote FE de démo");
   console.assert(demoDrivers.some((driver) => driver.participations.S1?.includes("F2")), "Il doit y avoir au moins un pilote F2 de démo");
   console.assert(getLatestDriverTeamId({ teamId: 101, teamHistory: { S1: 101, S4: 104, S3: 103 } }) === 104, "L'écurie par défaut doit suivre la saison la plus récente");
+  const tiedStandings = [
+    { name: "Pilote P3", points: 100, resultCounts: { 3: 1 } },
+    { name: "Pilote P1", points: 100, resultCounts: { 1: 1 } },
+  ].sort(sortSeasonStandings);
+  console.assert(tiedStandings[0].name === "Pilote P1", "Une egalite de points doit etre departagee par la meilleure position");
   const f1Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F1" });
   const feStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "FE" });
   const f2Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F2" });
@@ -1264,6 +1269,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
       poles: 0,
       fastestLaps: 0,
       points: 0,
+      resultCounts: {},
     };
   };
   const blankTeamStats = (team) => ({
@@ -1281,6 +1287,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   poles: 0,
   fastestLaps: 0,
   points: 0,
+  resultCounts: {},
 });
   const driverStatsBySeason = {};
   const teamStatsBySeason = {};
@@ -1293,9 +1300,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
         const driver = driverMap.get(String(entry.driverId));
         if (!driver) return;
         const team = teamMap.get(String(driver.teamId));
-        const points = getPointsForPosition(Number(entry.position), raceResult.categoryId || activeCategoryId, raceResult.seasonId || season.id);
-        const win = Number(entry.position) === 1 ? 1 : 0;
-        const podium = Number(entry.position) <= 3 ? 1 : 0;
+        const position = Number(entry.position);
+        const points = getPointsForPosition(position, raceResult.categoryId || activeCategoryId, raceResult.seasonId || season.id);
+        const win = position === 1 ? 1 : 0;
+        const podium = position <= 3 ? 1 : 0;
         const pole = entry.pole ? 1 : 0;
         const fastest = entry.fastestLap ? 1 : 0;
         driver.points += points;
@@ -1303,20 +1311,26 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
         driver.podiums += podium;
         driver.poles += pole;
         driver.fastestLaps += fastest;
+        if (Number.isFinite(position) && position > 0) {
+          driver.resultCounts[position] = (driver.resultCounts[position] || 0) + 1;
+        }
         if (team) {
           team.points += points;
           team.wins += win;
           team.podiums += podium;
           team.poles += pole;
           team.fastestLaps += fastest;
+          if (Number.isFinite(position) && position > 0) {
+            team.resultCounts[position] = (team.resultCounts[position] || 0) + 1;
+          }
         }
       });
     });
-    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => driver.points > 0 || (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort((a, b) => b.points - a.points);
+    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => driver.points > 0 || (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort(sortSeasonStandings);
     const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
       const relatedDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
       return team.points > 0 || relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId));
-    }).sort((a, b) => b.points - a.points);
+    }).sort(sortSeasonStandings);
 
     driverStatsBySeason[season.id] = seasonDriverStats;
     teamStatsBySeason[season.id] = seasonTeamStats;
@@ -1331,6 +1345,24 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   };
 }
 
+function compareResultCounts(a, b) {
+  const aCounts = a.resultCounts || {};
+  const bCounts = b.resultCounts || {};
+  for (let position = 1; position <= 99; position += 1) {
+    const diff = (Number(bCounts[position]) || 0) - (Number(aCounts[position]) || 0);
+    if (diff) return diff;
+  }
+  return 0;
+}
+
+function sortSeasonStandings(a, b) {
+  return (
+    (Number(b.points) || 0) - (Number(a.points) || 0) ||
+    compareResultCounts(a, b) ||
+    String(a.name || "").localeCompare(String(b.name || ""))
+  );
+}
+
 function sortByTitlesAndResults(a, b) {
   return (
     (Number(b.driverTitles) || 0) - (Number(a.driverTitles) || 0) ||
@@ -1341,9 +1373,19 @@ function sortByTitlesAndResults(a, b) {
     (Number(b.podiums) || 0) - (Number(a.podiums) || 0) ||
     (Number(b.poles) || 0) - (Number(a.poles) || 0) ||
     (Number(b.fastestLaps) || 0) - (Number(a.fastestLaps) || 0) ||
-    (Number(b.points) || 0) - (Number(a.points) || 0)
+    (Number(b.points) || 0) - (Number(a.points) || 0) ||
+    compareResultCounts(a, b)
   );
 }
+
+function mergeResultCounts(currentCounts = {}, nextCounts = {}) {
+  const merged = { ...currentCounts };
+  Object.entries(nextCounts).forEach(([position, count]) => {
+    merged[position] = (Number(merged[position]) || 0) + (Number(count) || 0);
+  });
+  return merged;
+}
+
 function buildCumulativeStats(statsBySeason) {
   const cumulative = {};
   SEASON_OPTIONS.forEach((selectedSeason) => {
@@ -1351,7 +1393,7 @@ function buildCumulativeStats(statsBySeason) {
     SEASON_OPTIONS.forEach((season) => {
       if (!isSeasonIncluded(season.id, selectedSeason.id)) return;
       (statsBySeason[season.id] || []).forEach((item) => {
-        const current = map.get(item.id) || { ...item, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0 };
+        const current = map.get(item.id) || { ...item, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0, resultCounts: {} };
         map.set(item.id, {
           ...current,
           ...item,
@@ -1360,6 +1402,7 @@ function buildCumulativeStats(statsBySeason) {
           poles: current.poles + item.poles,
           fastestLaps: current.fastestLaps + item.fastestLaps,
           points: current.points + item.points,
+          resultCounts: mergeResultCounts(current.resultCounts, item.resultCounts),
         });
       });
     });
