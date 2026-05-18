@@ -139,6 +139,41 @@ function formatRaceDate(value) {
   if (Number.isNaN(date.getTime())) return "Date non definie";
   return date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
 }
+function formatCalendarDate(date) {
+  return date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+}
+function escapeCalendarText(value) {
+  return String(value || "").replace(/\\/g, "\\\\").replace(/,/g, "\\,").replace(/;/g, "\\;").replace(/\n/g, "\\n");
+}
+function getRaceCalendarEvent(race) {
+  const start = new Date(race.startAt);
+  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  const title = `URTT ${race.categoryId} - ${race.name}`;
+  const details = `${seasonName(race.seasonId)} - Course #${race.round}`;
+  const dates = `${formatCalendarDate(start)}/${formatCalendarDate(end)}`;
+  const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dates}&details=${encodeURIComponent(details)}`;
+  const ics = [
+    "BEGIN:VCALENDAR",
+    "VERSION:2.0",
+    "PRODID:-//URTT Stats//Race Calendar//FR",
+    "CALSCALE:GREGORIAN",
+    "METHOD:PUBLISH",
+    "BEGIN:VEVENT",
+    `UID:urtt-race-${race.id}@urtt-stats`,
+    `DTSTAMP:${formatCalendarDate(new Date())}`,
+    `DTSTART:${formatCalendarDate(start)}`,
+    `DTEND:${formatCalendarDate(end)}`,
+    `SUMMARY:${escapeCalendarText(title)}`,
+    `DESCRIPTION:${escapeCalendarText(details)}`,
+    "END:VEVENT",
+    "END:VCALENDAR",
+  ].join("\r\n");
+  return {
+    googleUrl,
+    icsUrl: `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`,
+    fileName: `urtt-${race.categoryId}-${String(race.name || "course").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`,
+  };
+}
 function getSeasonNumber(seasonId) {
   return Number(normalizeSeasonId(seasonId).replace("S", "")) || 0;
 }
@@ -1945,7 +1980,42 @@ function RaceCountdown({ races }) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
 
-  return <Card title="Prochaines courses" icon="⏱️"><div style={styles.countdownBox}><div><p style={styles.mutedSmall}>Course #{nextRace.round}</p><strong style={styles.countdownRace}>{nextRace.name}</strong><p style={styles.mutedSmall}><span style={{ ...styles.categoryBadge, background: getCategoryColor(nextRace.categoryId) }}>{nextRace.categoryId}</span> {seasonName(nextRace.seasonId)} · {formatRaceDate(nextRace.startAt)}</p></div><div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div></div>{upcomingRaces.length > 1 && <div style={styles.upcomingList}>{upcomingRaces.slice(1, 6).map((race) => <div key={race.id} style={styles.upcomingItem}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)} · Course #{race.round}</p></div><div style={styles.upcomingMeta}><span style={{ ...styles.categoryBadge, background: getCategoryColor(race.categoryId) }}>{race.categoryId}</span><span style={styles.mutedSmall}>{formatRaceDate(race.startAt)}</span></div></div>)}</div>}</Card>;
+  return (
+    <Card title="Prochaines courses" icon="⏱️">
+      <div style={styles.countdownBox}>
+        <div>
+          <p style={styles.mutedSmall}>Course #{nextRace.round}</p>
+          <strong style={styles.countdownRace}>{nextRace.name}</strong>
+          <p style={styles.mutedSmall}><span style={{ ...styles.categoryBadge, background: getCategoryColor(nextRace.categoryId) }}>{nextRace.categoryId}</span> {seasonName(nextRace.seasonId)} · {formatRaceDate(nextRace.startAt)}</p>
+          <AddToCalendarLinks race={nextRace} />
+        </div>
+        <div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div>
+      </div>
+      {upcomingRaces.length > 1 && (
+        <div style={styles.upcomingList}>
+          {upcomingRaces.slice(1, 6).map((race) => (
+            <div key={race.id} style={styles.upcomingItem}>
+              <div>
+                <strong>{race.name}</strong>
+                <p style={styles.mutedSmall}>{seasonName(race.seasonId)} · Course #{race.round}</p>
+                <AddToCalendarLinks race={race} compact />
+              </div>
+              <div style={styles.upcomingMeta}><span style={{ ...styles.categoryBadge, background: getCategoryColor(race.categoryId) }}>{race.categoryId}</span><span style={styles.mutedSmall}>{formatRaceDate(race.startAt)}</span></div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+}
+function AddToCalendarLinks({ race, compact = false }) {
+  const event = getRaceCalendarEvent(race);
+  return (
+    <div style={{ ...styles.calendarLinks, ...(compact ? styles.calendarLinksCompact : {}) }}>
+      <a href={event.googleUrl} target="_blank" rel="noreferrer" style={styles.calendarLink}>Google Calendar</a>
+      <a href={event.icsUrl} download={event.fileName} style={styles.calendarLink}>Apple / Outlook</a>
+    </div>
+  );
 }
 function CountdownUnit({ label, value }) {
   return <div style={styles.countdownUnit}><strong>{String(value).padStart(2, "0")}</strong><span>{label}</span></div>;
@@ -2216,6 +2286,9 @@ const styles = {
   countdownRace: { display: "block", fontSize: 24, lineHeight: 1.1 },
   countdownGrid: { display: "grid", gridTemplateColumns: "repeat(4, minmax(64px, 1fr))", gap: 10, minWidth: "min(100%, 340px)" },
   countdownUnit: { background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "12px 10px", textAlign: "center", display: "grid", gap: 4 },
+  calendarLinks: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 },
+  calendarLinksCompact: { marginTop: 8 },
+  calendarLink: { background: "#2563eb", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "8px 10px", fontSize: 12, fontWeight: 900, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" },
   upcomingList: { display: "grid", gap: 8, marginTop: 16, borderTop: "1px solid #27272a", paddingTop: 14 },
   upcomingItem: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "10px 12px", flexWrap: "wrap" },
   upcomingMeta: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" },
