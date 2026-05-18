@@ -174,6 +174,16 @@ function getRaceCalendarEvent(race) {
     fileName: `urtt-${race.categoryId}-${String(race.name || "course").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`,
   };
 }
+function getCalendarFeedLinks() {
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
+  const feedUrl = `${origin}/api/calendar.ics`;
+  const webcalUrl = feedUrl.replace(/^https?:\/\//, "webcal://");
+  return {
+    googleUrl: `https://calendar.google.com/calendar/render?cid=${encodeURIComponent(webcalUrl)}`,
+    appleUrl: webcalUrl,
+    downloadUrl: feedUrl,
+  };
+}
 function getSeasonNumber(seasonId) {
   return Number(normalizeSeasonId(seasonId).replace("S", "")) || 0;
 }
@@ -1970,7 +1980,7 @@ function RaceCountdown({ races }) {
   const nextRace = upcomingRaces[0];
 
   if (!nextRace) {
-    return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course programmee</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses.</span></div></Card>;
+    return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course programmee</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses.</span></div><CalendarFeedLinks /></Card>;
   }
 
   const remaining = Math.max(0, new Date(nextRace.startAt).getTime() - now);
@@ -2005,6 +2015,7 @@ function RaceCountdown({ races }) {
           ))}
         </div>
       )}
+      <CalendarFeedLinks />
     </Card>
   );
 }
@@ -2014,6 +2025,22 @@ function AddToCalendarLinks({ race, compact = false }) {
     <div style={{ ...styles.calendarLinks, ...(compact ? styles.calendarLinksCompact : {}) }}>
       <a href={event.googleUrl} target="_blank" rel="noreferrer" style={styles.calendarLink}>Google Calendar</a>
       <a href={event.icsUrl} download={event.fileName} style={styles.calendarLink}>Apple / Outlook</a>
+    </div>
+  );
+}
+function CalendarFeedLinks() {
+  const links = getCalendarFeedLinks();
+  return (
+    <div style={styles.calendarFeedBox}>
+      <div>
+        <strong>S'abonner au calendrier URTT</strong>
+        <p style={styles.mutedSmall}>Les nouvelles courses planifiees se mettent a jour automatiquement.</p>
+      </div>
+      <div style={styles.calendarLinks}>
+        <a href={links.googleUrl} target="_blank" rel="noreferrer" style={styles.calendarLink}>Google Calendar</a>
+        <a href={links.appleUrl} style={styles.calendarLink}>Apple Calendar</a>
+        <a href={links.downloadUrl} style={styles.calendarLink}>Lien .ics</a>
+      </div>
     </div>
   );
 }
@@ -2289,6 +2316,7 @@ const styles = {
   calendarLinks: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 },
   calendarLinksCompact: { marginTop: 8 },
   calendarLink: { background: "#2563eb", color: "white", border: "1px solid rgba(255,255,255,.18)", borderRadius: 999, padding: "8px 10px", fontSize: 12, fontWeight: 900, textDecoration: "none", display: "inline-flex", alignItems: "center", justifyContent: "center" },
+  calendarFeedBox: { marginTop: 16, borderTop: "1px solid #27272a", paddingTop: 14, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
   upcomingList: { display: "grid", gap: 8, marginTop: 16, borderTop: "1px solid #27272a", paddingTop: 14 },
   upcomingItem: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 12, padding: "10px 12px", flexWrap: "wrap" },
   upcomingMeta: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" },
