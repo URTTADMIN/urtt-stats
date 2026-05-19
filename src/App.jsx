@@ -31,6 +31,7 @@ const emptyDriver = { name: "", teamId: "", number: 1, color: "#dc2626", avatar:
 const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 };
 const emptyRace = { name: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
+const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
 
 const demoTeams = [
   { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 },
@@ -295,6 +296,15 @@ function mapCalendarRaceFromDb(race) {
     seasonId: normalizeSeasonId(race.season_id),
     categoryId: normalizeCategoryId(race.category_id),
     startAt: race.start_at || "",
+  };
+}
+function mapCalendarEventFromDb(event) {
+  return {
+    id: event.id,
+    title: event.title,
+    description: event.description || "",
+    startAt: event.start_at || "",
+    endAt: event.end_at || "",
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
@@ -647,8 +657,10 @@ export default function URTTAdminPanel() {
   const [isSaving, setIsSaving] = useState(false);
   const [isSavingRace, setIsSavingRace] = useState(false);
   const [isSavingResult, setIsSavingResult] = useState(false);
+  const [isSavingEvent, setIsSavingEvent] = useState(false);
   const [raceLibrary, setRaceLibrary] = useState([]);
   const [allCalendarRaces, setAllCalendarRaces] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [raceResults, setRaceResults] = useState([]);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
   const [driverForm, setDriverForm] = useState(emptyDriver);
@@ -657,6 +669,7 @@ export default function URTTAdminPanel() {
   const [editingTeamId, setEditingTeamId] = useState(null);
   const [raceForm, setRaceForm] = useState(emptyRace);
   const [calendarRaceForm, setCalendarRaceForm] = useState(emptyCalendarRace);
+  const [calendarEventForm, setCalendarEventForm] = useState(emptyCalendarEvent);
   const [selectedRaceId, setSelectedRaceId] = useState("");
   const [popup, setPopup] = useState(null);
   const [search, setSearch] = useState("");
@@ -689,6 +702,7 @@ export default function URTTAdminPanel() {
         { data: participationsData, error: participationsError },
         { data: raceLibraryData, error: raceLibraryError },
         { data: calendarData, error: calendarError },
+        { data: calendarEventsData, error: calendarEventsError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
       ] = await Promise.all([
@@ -697,6 +711,7 @@ export default function URTTAdminPanel() {
         supabase.from("driver_participations").select("*").order("id", { ascending: true }),
         supabase.from("race_library").select("*").order("id", { ascending: true }),
         supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
+        supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
       ]);
@@ -707,6 +722,7 @@ export default function URTTAdminPanel() {
         participationsError && `driver_participations: ${participationsError.message}`,
         raceLibraryError && `race_library: ${raceLibraryError.message}`,
         calendarError && `season_calendar: ${calendarError.message}`,
+        calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
       ].filter(Boolean);
@@ -721,6 +737,7 @@ export default function URTTAdminPanel() {
       setRaceLibrary(sortRacesByName((raceLibraryData || []).map(mapRaceLibraryFromDb)));
       const mappedCalendar = (calendarData || []).map(mapCalendarRaceFromDb);
       setAllCalendarRaces(mappedCalendar);
+      setCalendarEvents((calendarEventsData || []).map(mapCalendarEventFromDb));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
       setIsLoadingData(false);
@@ -1142,6 +1159,70 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function saveCalendarEvent() {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les donnees." });
+      return;
+    }
+
+    if (!calendarEventForm.title.trim() || !calendarEventForm.startAt) {
+      setPopup({ type: "error", title: "Evenement incomplet", message: "Ajoute un titre et une date de debut." });
+      return;
+    }
+
+    setIsSavingEvent(true);
+
+    const payload = {
+      title: calendarEventForm.title.trim(),
+      description: calendarEventForm.description.trim(),
+      start_at: toStoredDateTime(calendarEventForm.startAt),
+      end_at: toStoredDateTime(calendarEventForm.endAt),
+    };
+
+    const { data, error } = await supabase
+      .from("calendar_events")
+      .insert(payload)
+      .select()
+      .single();
+
+    setIsSavingEvent(false);
+
+    if (error) {
+      console.error("Erreur evenement calendrier:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de creer l'evenement. Verifie que la table calendar_events existe." });
+      return;
+    }
+
+    const event = mapCalendarEventFromDb(data);
+    setCalendarEvents((current) => [...current, event].sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime()));
+    setCalendarEventForm(emptyCalendarEvent);
+    setPopup({ type: "success", title: "Evenement ajoute", message: `${event.title} a ete ajoute au calendrier abonne.` });
+  }
+
+  async function deleteCalendarEvent(eventId) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les donnees." });
+      return;
+    }
+
+    setIsSavingEvent(true);
+
+    const { error } = await supabase
+      .from("calendar_events")
+      .delete()
+      .eq("id", eventId);
+
+    setIsSavingEvent(false);
+
+    if (error) {
+      console.error("Erreur suppression evenement:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de supprimer cet evenement." });
+      return;
+    }
+
+    setCalendarEvents((current) => current.filter((event) => !idsEqual(event.id, eventId)));
+  }
+
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
     const draftEntry = draft.find((entry) => idsEqual(entry.driverId, driverId));
@@ -1386,7 +1467,7 @@ export default function URTTAdminPanel() {
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
-          {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} />}
+          {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel />}
           
@@ -1663,7 +1744,7 @@ function AdminDrivers({ drivers, teams, selectedSeasonId, form, setForm, editing
   return <div style={styles.twoColumnsSmallLeft}><Card title={editingId ? "Modifier un pilote" : "Créer un pilote"} icon="➕"><DriverForm form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} onSave={onSave} onCancel={onCancel} editingId={editingId} isSaving={isSaving} /></Card><Card title="Pilotes" icon="👥"><div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher..." style={styles.searchInput} /></div><div style={styles.cardGrid}>{drivers.map((driver) => <DriverAdminCard key={driver.id} driver={driver} team={teams.find((team) => team.id === driver.teamId)} onEdit={onEdit} onDelete={onDelete} />)}</div>{drivers.length === 0 && <Empty text="Aucun pilote pour le moment." />}</Card></div>;
 }
 
-function PlanningPanel({ races, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onUpdateStartAt }) {
+function PlanningPanel({ races, calendarEvents = [], eventForm, setEventForm, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onUpdateStartAt, onSaveEvent, onDeleteEvent, isSavingEvent }) {
   const [now] = useState(() => Date.now());
   const categoryId = normalizeCategoryId(selectedCategoryId);
   const seasonId = normalizeSeasonId(selectedSeasonId);
@@ -1674,8 +1755,54 @@ function PlanningPanel({ races, selectedCategoryId, setSelectedCategoryId, selec
     .filter((race) => race.startAt && new Date(race.startAt).getTime() > now)
     .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
     .slice(0, 8);
+  const upcomingEvents = calendarEvents
+    .filter((event) => event.startAt && new Date(event.startAt).getTime() > now)
+    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime())
+    .slice(0, 8);
 
-  return <div style={styles.section}><Card title="Planning des prochaines courses" icon="⏱️"><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label></div><div style={styles.stack}>{filteredRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p></div><RaceDateInput race={race} onSave={onUpdateStartAt} /></div>)}{filteredRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}</div></Card><Card title="Aperçu public" icon="📅"><div style={styles.stack}>{upcomingRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · Course #{race.round}</p></div><span style={styles.badgeGreen}>{formatRaceDate(race.startAt)}</span></div>)}{upcomingRaces.length === 0 && <Empty text="Aucune course future programmée." />}</div></Card></div>;
+  return (
+    <div style={styles.section}>
+      <Card title="Planning des prochaines courses" icon="⏱️">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+        </div>
+        <div style={styles.stack}>{filteredRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p></div><RaceDateInput race={race} onSave={onUpdateStartAt} /></div>)}{filteredRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}</div>
+      </Card>
+
+      <div style={styles.twoColumns}>
+        <Card title="Événement hors calendrier" icon="➕">
+          <div style={styles.stack}>
+            <Input label="Titre" value={eventForm.title} onChange={(value) => setEventForm({ ...eventForm, title: value })} />
+            <label style={styles.label}><span style={styles.labelText}>Description</span><textarea value={eventForm.description} onChange={(event) => setEventForm({ ...eventForm, description: event.target.value })} rows={4} style={styles.textarea} /></label>
+            <Input label="Début" type="datetime-local" value={eventForm.startAt} onChange={(value) => setEventForm({ ...eventForm, startAt: value })} />
+            <Input label="Fin optionnelle" type="datetime-local" value={eventForm.endAt} onChange={(value) => setEventForm({ ...eventForm, endAt: value })} />
+            <button type="button" onClick={onSaveEvent} disabled={isSavingEvent} style={styles.fullButton}>{isSavingEvent ? "Sauvegarde..." : "Ajouter au calendrier abonné"}</button>
+          </div>
+        </Card>
+
+        <Card title="Événements à venir" icon="📌">
+          <div style={styles.stack}>
+            {upcomingEvents.map((event) => (
+              <div key={event.id} style={styles.itemBox}>
+                <div>
+                  <strong>{event.title}</strong>
+                  <p style={styles.mutedSmall}>{formatRaceDate(event.startAt)}{event.endAt ? ` · Fin ${formatRaceDate(event.endAt)}` : ""}</p>
+                  {event.description && <p style={styles.mutedSmall}>{event.description}</p>}
+                </div>
+                <button type="button" onClick={() => onDeleteEvent(event.id)} disabled={isSavingEvent} style={styles.dangerButton}>Supprimer</button>
+              </div>
+            ))}
+            {upcomingEvents.length === 0 && <Empty text="Aucun événement hors calendrier programmé." />}
+          </div>
+        </Card>
+      </div>
+
+      <Card title="Aperçu public" icon="📅">
+        <div style={styles.stack}>{upcomingRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · Course #{race.round}</p></div><span style={styles.badgeGreen}>{formatRaceDate(race.startAt)}</span></div>)}{upcomingRaces.length === 0 && <Empty text="Aucune course future programmée." />}</div>
+      </Card>
+    </div>
+  );
 }
 
 function DriverForm({ form, setForm, teams, selectedSeasonId, onSave, onCancel, editingId, isSaving }) {

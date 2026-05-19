@@ -33,18 +33,32 @@ export default async function handler(_request, response) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
-  const { data, error } = await supabase
-    .from("season_calendar")
-    .select("id, name, round, season_id, category_id, start_at")
-    .not("start_at", "is", null)
-    .order("start_at", { ascending: true });
+  const [
+    { data, error },
+    { data: customEventsData, error: customEventsError },
+  ] = await Promise.all([
+    supabase
+      .from("season_calendar")
+      .select("id, name, round, season_id, category_id, start_at")
+      .not("start_at", "is", null)
+      .order("start_at", { ascending: true }),
+    supabase
+      .from("calendar_events")
+      .select("id, title, description, start_at, end_at")
+      .not("start_at", "is", null)
+      .order("start_at", { ascending: true }),
+  ]);
 
   if (error) {
     console.error("Erreur calendrier ICS:", error);
     return response.status(500).send("Unable to load calendar");
   }
+  if (customEventsError && customEventsError.code !== "42P01") {
+    console.error("Erreur evenements ICS:", customEventsError);
+    return response.status(500).send("Unable to load calendar events");
+  }
 
-  const events = (data || [])
+  const raceEvents = (data || [])
     .map((race) => {
       const start = new Date(race.start_at);
       if (Number.isNaN(start.getTime())) return null;
@@ -66,6 +80,27 @@ export default async function handler(_request, response) {
       ].join("\r\n");
     })
     .filter(Boolean);
+  const customEvents = (customEventsData || [])
+    .map((event) => {
+      const start = new Date(event.start_at);
+      if (Number.isNaN(start.getTime())) return null;
+
+      const storedEnd = event.end_at ? new Date(event.end_at) : null;
+      const end = storedEnd && !Number.isNaN(storedEnd.getTime()) ? storedEnd : new Date(start.getTime() + 60 * 60 * 1000);
+      const title = `URTT - ${event.title}`;
+
+      return [
+        "BEGIN:VEVENT",
+        `UID:urtt-event-${event.id}@urtt-stats`,
+        `DTSTAMP:${formatCalendarDate(new Date())}`,
+        `DTSTART:${formatCalendarDate(start)}`,
+        `DTEND:${formatCalendarDate(end)}`,
+        `SUMMARY:${escapeCalendarText(title)}`,
+        `DESCRIPTION:${escapeCalendarText(event.description || "Evenement URTT")}`,
+        "END:VEVENT",
+      ].join("\r\n");
+    })
+    .filter(Boolean);
 
   const calendar = [
     "BEGIN:VCALENDAR",
@@ -75,7 +110,8 @@ export default async function handler(_request, response) {
     "METHOD:PUBLISH",
     "X-WR-CALNAME:Calendrier URTT",
     "X-WR-CALDESC:Courses planifiees URTT",
-    ...events,
+    ...raceEvents,
+    ...customEvents,
     "END:VCALENDAR",
   ].join("\r\n");
 
