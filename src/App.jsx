@@ -148,9 +148,10 @@ function escapeCalendarText(value) {
 }
 function getRaceCalendarEvent(race) {
   const start = new Date(race.startAt);
-  const end = new Date(start.getTime() + 2 * 60 * 60 * 1000);
-  const title = `URTT ${race.categoryId} - ${race.name}`;
-  const details = `${seasonName(race.seasonId)} - Course #${race.round}`;
+  const storedEnd = race.endAt ? new Date(race.endAt) : null;
+  const end = storedEnd && !Number.isNaN(storedEnd.getTime()) ? storedEnd : new Date(start.getTime() + 2 * 60 * 60 * 1000);
+  const title = race.kind === "event" ? `URTT - ${race.title}` : `URTT ${race.categoryId} - ${race.name}`;
+  const details = race.kind === "event" ? (race.description || "Evenement URTT") : `${seasonName(race.seasonId)} - Course #${race.round}`;
   const dates = `${formatCalendarDate(start)}/${formatCalendarDate(end)}`;
   const googleUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${dates}&details=${encodeURIComponent(details)}`;
   const ics = [
@@ -172,7 +173,7 @@ function getRaceCalendarEvent(race) {
   return {
     googleUrl,
     icsUrl: `data:text/calendar;charset=utf-8,${encodeURIComponent(ics)}`,
-    fileName: `urtt-${race.categoryId}-${String(race.name || "course").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`,
+    fileName: `urtt-${String(race.categoryId || "event").toLowerCase()}-${String(race.name || race.title || "evenement").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.ics`,
   };
 }
 function getCalendarFeedLinks() {
@@ -1429,6 +1430,7 @@ export default function URTTAdminPanel() {
           cumulativeTeams={cumulativeTeams}
           races={currentSeasonRaces}
           countdownRaces={allCalendarRaces}
+          calendarEvents={calendarEvents}
           allRaces={allRaces}
           raceResults={raceResults}
           allDrivers={drivers}
@@ -1637,7 +1639,7 @@ function buildCumulativeStats(statsBySeason) {
   return cumulative;
 }
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -1664,7 +1666,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} countdownRaces={countdownRaces} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
+        {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} countdownRaces={countdownRaces} calendarEvents={calendarEvents} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
@@ -1674,7 +1676,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   );
 }
 
-function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTeam, races, countdownRaces = [], seasonOnlyDrivers, seasonOnlyTeams, raceResults, allDrivers, teams }) {
+function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTeam, races, countdownRaces = [], calendarEvents = [], seasonOnlyDrivers, seasonOnlyTeams, raceResults, allDrivers, teams }) {
   return (
     <>
       <div style={styles.statsGrid}>
@@ -1684,7 +1686,7 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
         <Stat label="Leader écurie" value={leaderTeam} />
         <Stat label="GP" value={races.length} />
       </div>
-      <RaceCountdown races={countdownRaces} />
+      <RaceCountdown races={countdownRaces} events={calendarEvents} />
       <div style={styles.section}>
         <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
         <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
@@ -2094,50 +2096,55 @@ function FeedbackWidget() {
     </>
   );
 }
-function RaceCountdown({ races }) {
+function RaceCountdown({ races, events = [] }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
     return () => window.clearInterval(timer);
   }, []);
 
-  const upcomingRaces = [...races]
-    .filter((race) => race.startAt && new Date(race.startAt).getTime() > now)
-    .sort((a, b) => new Date(a.startAt).getTime() - new Date(b.startAt).getTime());
-  const nextRace = upcomingRaces[0];
+  const upcomingItems = [
+    ...races.map((race) => ({ ...race, kind: "race", sortAt: race.startAt })),
+    ...events.map((event) => ({ ...event, kind: "event", sortAt: event.startAt })),
+  ]
+    .filter((item) => item.sortAt && new Date(item.sortAt).getTime() > now)
+    .sort((a, b) => new Date(a.sortAt).getTime() - new Date(b.sortAt).getTime());
+  const nextItem = upcomingItems[0];
 
-  if (!nextRace) {
-    return <Card title="Prochaine course" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course programmee</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses.</span></div><CalendarFeedLinks /></Card>;
+  if (!nextItem) {
+    return <Card title="Prochain rendez-vous" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course ou evenement programme</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses ou Planning.</span></div><CalendarFeedLinks /></Card>;
   }
 
-  const remaining = Math.max(0, new Date(nextRace.startAt).getTime() - now);
+  const remaining = Math.max(0, new Date(nextItem.sortAt).getTime() - now);
   const totalSeconds = Math.floor(remaining / 1000);
   const days = Math.floor(totalSeconds / 86400);
   const hours = Math.floor((totalSeconds % 86400) / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
+  const itemTitle = nextItem.kind === "event" ? nextItem.title : nextItem.name;
+  const itemMeta = nextItem.kind === "event" ? "Evenement" : `${seasonName(nextItem.seasonId)} · Course #${nextItem.round}`;
 
   return (
-    <Card title="Prochaines courses" icon="⏱️">
+    <Card title="Prochains rendez-vous" icon="⏱️">
       <div style={styles.countdownBox}>
         <div>
-          <p style={styles.mutedSmall}>Course #{nextRace.round}</p>
-          <strong style={styles.countdownRace}>{nextRace.name}</strong>
-          <p style={styles.mutedSmall}><span style={{ ...styles.categoryBadge, background: getCategoryColor(nextRace.categoryId) }}>{nextRace.categoryId}</span> {seasonName(nextRace.seasonId)} · {formatRaceDate(nextRace.startAt)}</p>
-          <AddToCalendarLinks race={nextRace} />
+          <p style={styles.mutedSmall}>{itemMeta}</p>
+          <strong style={styles.countdownRace}>{itemTitle}</strong>
+          <p style={styles.mutedSmall}><CountdownBadge item={nextItem} /> {formatRaceDate(nextItem.sortAt)}</p>
+          <AddToCalendarLinks race={nextItem} />
         </div>
         <div style={styles.countdownGrid}><CountdownUnit label="J" value={days} /><CountdownUnit label="H" value={hours} /><CountdownUnit label="MIN" value={minutes} /><CountdownUnit label="SEC" value={seconds} /></div>
       </div>
-      {upcomingRaces.length > 1 && (
+      {upcomingItems.length > 1 && (
         <div style={styles.upcomingList}>
-          {upcomingRaces.slice(1, 6).map((race) => (
-            <div key={race.id} style={styles.upcomingItem}>
+          {upcomingItems.slice(1, 6).map((item) => (
+            <div key={`${item.kind}-${item.id}`} style={styles.upcomingItem}>
               <div>
-                <strong>{race.name}</strong>
-                <p style={styles.mutedSmall}>{seasonName(race.seasonId)} · Course #{race.round}</p>
-                <AddToCalendarLinks race={race} compact />
+                <strong>{item.kind === "event" ? item.title : item.name}</strong>
+                <p style={styles.mutedSmall}>{item.kind === "event" ? "Evenement" : `${seasonName(item.seasonId)} · Course #${item.round}`}</p>
+                <AddToCalendarLinks race={item} compact />
               </div>
-              <div style={styles.upcomingMeta}><span style={{ ...styles.categoryBadge, background: getCategoryColor(race.categoryId) }}>{race.categoryId}</span><span style={styles.mutedSmall}>{formatRaceDate(race.startAt)}</span></div>
+              <div style={styles.upcomingMeta}><CountdownBadge item={item} /><span style={styles.mutedSmall}>{formatRaceDate(item.sortAt)}</span></div>
             </div>
           ))}
         </div>
@@ -2145,6 +2152,10 @@ function RaceCountdown({ races }) {
       <CalendarFeedLinks />
     </Card>
   );
+}
+function CountdownBadge({ item }) {
+  if (item.kind === "event") return <span style={{ ...styles.categoryBadge, background: "#2563eb" }}>Événement</span>;
+  return <span style={{ ...styles.categoryBadge, background: getCategoryColor(item.categoryId) }}>{item.categoryId}</span>;
 }
 function AddToCalendarLinks({ race, compact = false }) {
   const event = getRaceCalendarEvent(race);
