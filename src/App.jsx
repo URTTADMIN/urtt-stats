@@ -308,6 +308,11 @@ function mapCalendarEventFromDb(event) {
     endAt: event.end_at || "",
   };
 }
+function getCalendarFeedEstimate(hits, days) {
+  const limit = Date.now() - days * 24 * 60 * 60 * 1000;
+  const recentHits = hits.filter((hit) => new Date(hit.created_at).getTime() >= limit);
+  return new Set(recentHits.map((hit) => hit.visitor_hash).filter(Boolean)).size;
+}
 function mapRaceResultFromDb(result, entries = []) {
   return {
     id: result.id,
@@ -662,6 +667,7 @@ export default function URTTAdminPanel() {
   const [raceLibrary, setRaceLibrary] = useState([]);
   const [allCalendarRaces, setAllCalendarRaces] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [calendarFeedHits, setCalendarFeedHits] = useState([]);
   const [raceResults, setRaceResults] = useState([]);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
   const [driverForm, setDriverForm] = useState(emptyDriver);
@@ -704,6 +710,7 @@ export default function URTTAdminPanel() {
         { data: raceLibraryData, error: raceLibraryError },
         { data: calendarData, error: calendarError },
         { data: calendarEventsData, error: calendarEventsError },
+        { data: calendarFeedHitsData, error: calendarFeedHitsError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
       ] = await Promise.all([
@@ -713,6 +720,7 @@ export default function URTTAdminPanel() {
         supabase.from("race_library").select("*").order("id", { ascending: true }),
         supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
+        supabase.from("calendar_feed_hits").select("visitor_hash, user_agent, created_at").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
       ]);
@@ -724,6 +732,7 @@ export default function URTTAdminPanel() {
         raceLibraryError && `race_library: ${raceLibraryError.message}`,
         calendarError && `season_calendar: ${calendarError.message}`,
         calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
+        calendarFeedHitsError && calendarFeedHitsError.code !== "42P01" && `calendar_feed_hits: ${calendarFeedHitsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
       ].filter(Boolean);
@@ -739,6 +748,7 @@ export default function URTTAdminPanel() {
       const mappedCalendar = (calendarData || []).map(mapCalendarRaceFromDb);
       setAllCalendarRaces(mappedCalendar);
       setCalendarEvents((calendarEventsData || []).map(mapCalendarEventFromDb));
+      setCalendarFeedHits(calendarFeedHitsData || []);
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
       setIsLoadingData(false);
@@ -1452,7 +1462,7 @@ export default function URTTAdminPanel() {
           }}
         >
           {adminPage === "dashboard" && <Dashboard drivers={computed.globalDriverStats} teams={computed.globalTeamStats} races={currentSeasonRaces} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
-          {adminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} raceResults={raceResults} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
+          {adminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarFeedHits={calendarFeedHits} raceResults={raceResults} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} />}
           {adminPage === "search" && <AdminSearch search={adminGlobalSearch} setSearch={setAdminGlobalSearch} drivers={drivers} teams={teams} onEditDriver={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); setAdminPage("drivers"); }} onEditTeam={(team) => { setEditingTeamId(team.id); setTeamForm(team); setAdminPage("teams"); }} />}
           {adminPage === "titles" && (
   <TitlesPanel
@@ -1723,12 +1733,14 @@ function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId
   return <div style={styles.section}><div style={styles.statsGrid}><Stat label="Catégorie" value={selectedCategoryId} /><Stat label="Saison" value={seasonName(selectedSeasonId)} /><Stat label="Pilotes" value={drivers.length} /><Stat label="Écuries" value={teams.length} /><Stat label="GP" value={races.length} /></div><div style={styles.twoColumns}><Card title="Top pilotes global" icon="🏆"><DriverTable drivers={drivers} teams={[]} /></Card><Card title="Top écuries global" icon="🏎️"><TeamTable teams={teams} /></Card></div></div>;
 }
 
-function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, raceResults, selectedCategoryId, selectedSeasonId }) {
+function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, calendarFeedHits = [], raceResults, selectedCategoryId, selectedSeasonId }) {
   const visibleCalendar = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(race.seasonId) === normalizeSeasonId(selectedSeasonId));
   const visibleResults = raceResults.filter((result) => normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && normalizeSeasonId(result.seasonId) === normalizeSeasonId(selectedSeasonId));
   const visibleEntriesCount = visibleResults.reduce((sum, result) => sum + result.entries.length, 0);
+  const estimated7Days = getCalendarFeedEstimate(calendarFeedHits, 7);
+  const estimated30Days = getCalendarFeedEstimate(calendarFeedHits, 30);
 
-  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /><Stat label="Entrées résultats" value={visibleEntriesCount} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
+  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /><Stat label="Entrées résultats" value={visibleEntriesCount} /><Stat label="Abonnés estimés 7j" value={estimated7Days} /><Stat label="Abonnés estimés 30j" value={estimated30Days} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
 }
 
 function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTeam }) {

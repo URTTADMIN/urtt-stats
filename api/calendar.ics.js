@@ -24,7 +24,36 @@ function escapeCalendarText(value) {
     .replace(/\n/g, "\\n");
 }
 
-export default async function handler(_request, response) {
+async function hashText(value) {
+  const input = new TextEncoder().encode(value);
+  const digest = await crypto.subtle.digest("SHA-256", input);
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function getClientIp(request) {
+  const forwardedFor = request.headers["x-forwarded-for"];
+  if (typeof forwardedFor === "string" && forwardedFor) return forwardedFor.split(",")[0].trim();
+  return request.socket?.remoteAddress || "unknown";
+}
+
+async function logCalendarHit(supabase, request) {
+  try {
+    const userAgent = String(request.headers["user-agent"] || "unknown").slice(0, 500);
+    const ip = getClientIp(request);
+    const visitorHash = await hashText(`${ip}|${userAgent}|urtt-calendar`);
+
+    await supabase
+      .from("calendar_feed_hits")
+      .insert({
+        visitor_hash: visitorHash,
+        user_agent: userAgent,
+      });
+  } catch (error) {
+    console.error("Erreur tracking calendrier:", error);
+  }
+}
+
+export default async function handler(request, response) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
   const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
 
@@ -33,6 +62,8 @@ export default async function handler(_request, response) {
   }
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
+  await logCalendarHit(supabase, request);
+
   const [
     { data, error },
     { data: customEventsData, error: customEventsError },
