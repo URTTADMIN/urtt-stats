@@ -1954,6 +1954,7 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
   const [quickStatus, setQuickStatus] = useState("");
   const [poleDriverId, setPoleDriverId] = useState("");
   const [fastestDriverId, setFastestDriverId] = useState("");
+  const [positionOrder, setPositionOrder] = useState([]);
   const pointsLabel = usesSpecialF2Points(selectedCategoryId, selectedSeasonId)
     ? "Barème F2 S3/S4 : 20 · 18 · 17 · 16, puis -1 jusqu’à P19. P20 ne marque pas."
     : "Barème : 30 · 25 · 22 · 20 · 18 · 16 · 14 · 12 · puis -1 jusqu’à P19. Aucun point bonus pour le meilleur tour.";
@@ -1993,7 +1994,25 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
       applied += 1;
     });
 
+    setPositionOrder(lines.map((line) => findDriverFromLine(line)?.id || "").filter(Boolean));
     setQuickStatus(missing.length ? `${applied} positions remplies. Introuvables : ${missing.join(", ")}` : `${applied} positions remplies.`);
+  }
+
+  function updatePositionPick(positionIndex, driverId) {
+    if (!selectedRaceId) {
+      setQuickStatus("Choisis d'abord un circuit.");
+      return;
+    }
+
+    setPositionOrder((current) => {
+      const next = [...current];
+      const existingIndex = next.findIndex((item) => idsEqual(item, driverId));
+      if (existingIndex >= 0 && existingIndex !== positionIndex) next[existingIndex] = "";
+      next[positionIndex] = driverId;
+      return next;
+    });
+
+    if (driverId) updateResultEntry(driverId, "position", positionIndex + 1);
   }
 
   function applyQuickFlags() {
@@ -2008,7 +2027,30 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
     setQuickStatus("Pole et MT appliqués.");
   }
 
-  return <Card title="Résultats automatiques" icon="🏆"><div style={styles.stack}><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedRaceId(""); }} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setSelectedRaceId(""); }} style={styles.resultsSelect}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Circuit</span><select value={selectedRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}><option value="">Choisir un GP</option>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}</option>)}</select></label><button onClick={onValidate} disabled={isSavingResult} style={styles.primaryButton}>{isSavingResult ? "Sauvegarde..." : "Valider la course"}</button></div><p style={styles.mutedSmall}>{pointsLabel}</p>{drivers.length === 0 ? <Empty text={`Aucun pilote inscrit en ${selectedCategoryId} sur ${seasonName(selectedSeasonId)}.`} /> : <><div style={styles.quickResultBox}><label style={styles.label}><span style={styles.labelText}>Coller l'ordre d'arrivée</span><textarea value={quickResults} onChange={(event) => setQuickResults(event.target.value)} rows={8} placeholder={"Zach\nMarden\nLeroi\nNatalino"} style={styles.textarea} /></label><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Pole</span><select value={poleDriverId} onChange={(event) => setPoleDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Meilleur tour</span><select value={fastestDriverId} onChange={(event) => setFastestDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><button type="button" onClick={applyQuickResults} style={styles.secondaryButton}>Appliquer l'ordre</button><button type="button" onClick={applyQuickFlags} style={styles.secondaryButton}>Appliquer Pole / MT</button></div>{quickStatus && <p style={styles.mutedSmall}>{quickStatus}</p>}</div><ResultTable drivers={drivers} teams={teams} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} /></>}</div></Card>;
+  return <Card title="Résultats automatiques" icon="🏆"><div style={styles.stack}><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{SEASON_OPTIONS.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Circuit</span><select value={selectedRaceId} onChange={(event) => { setSelectedRaceId(event.target.value); setPositionOrder([]); }} style={styles.resultsSelect}><option value="">Choisir un GP</option>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}</option>)}</select></label><button onClick={onValidate} disabled={isSavingResult} style={styles.primaryButton}>{isSavingResult ? "Sauvegarde..." : "Valider la course"}</button></div><p style={styles.mutedSmall}>{pointsLabel}</p>{drivers.length === 0 ? <Empty text={`Aucun pilote inscrit en ${selectedCategoryId} sur ${seasonName(selectedSeasonId)}.`} /> : <><div style={styles.quickResultBox}><PositionPicker drivers={drivers} positionOrder={positionOrder} onPick={updatePositionPick} /><label style={styles.label}><span style={styles.labelText}>Coller l'ordre d'arrivée</span><textarea value={quickResults} onChange={(event) => setQuickResults(event.target.value)} rows={8} placeholder={"Zach\nMarden\nLeroi\nNatalino"} style={styles.textarea} /></label><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Pole</span><select value={poleDriverId} onChange={(event) => setPoleDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Meilleur tour</span><select value={fastestDriverId} onChange={(event) => setFastestDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><button type="button" onClick={applyQuickResults} style={styles.secondaryButton}>Appliquer l'ordre collé</button><button type="button" onClick={applyQuickFlags} style={styles.secondaryButton}>Appliquer Pole / MT</button></div>{quickStatus && <p style={styles.mutedSmall}>{quickStatus}</p>}</div><ResultTable drivers={drivers} teams={teams} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} /></>}</div></Card>;
+}
+
+function PositionPicker({ drivers, positionOrder, onPick }) {
+  return (
+    <div>
+      <span style={styles.labelText}>Saisie position par position</span>
+      <div style={styles.positionGrid}>
+        {drivers.map((_, index) => {
+          const selectedId = positionOrder[index] || "";
+          const usedIds = new Set(positionOrder.filter((driverId, driverIndex) => driverId && driverIndex !== index).map(String));
+          return (
+            <label key={index} style={styles.positionPick}>
+              <span>P{index + 1}</span>
+              <select value={selectedId} onChange={(event) => onPick(index, event.target.value)} style={styles.resultsSelect}>
+                <option value="">Choisir</option>
+                {drivers.filter((driver) => !usedIds.has(String(driver.id))).map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+              </select>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 function ResultTable({ drivers, teams, selectedCategoryId, selectedSeasonId, getResultEntry, updateResultEntry }) {
@@ -2520,6 +2562,8 @@ const styles = {
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
   resultsSelect: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 14, outline: "none", fontWeight: 700 },
   quickResultBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 12 },
+  positionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 10, marginTop: 10 },
+  positionPick: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", alignItems: "center", gap: 8, color: "#f4f4f5", fontWeight: 900 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
   feedbackButton: { position: "fixed", right: 22, bottom: 22, width: 58, height: 58, borderRadius: "50%", border: "2px solid rgba(255,255,255,.28)", background: "#2563eb", color: "white", fontSize: 24, fontWeight: 950, cursor: "pointer", zIndex: 45, boxShadow: "0 18px 42px rgba(37,99,235,.35)" },
   feedbackModal: { width: "min(620px, 100%)", maxHeight: "90vh", overflow: "auto", background: "#18181b", border: "1px solid #3f3f46", borderRadius: 26, padding: 20, display: "grid", gap: 14 },
