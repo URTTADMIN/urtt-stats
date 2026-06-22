@@ -55,7 +55,7 @@ async function fetchAllSupabaseRows(tableName, orderBy = "id") {
 
 const emptyDriver = { name: "", teamId: "", number: 1, color: "#dc2626", avatar: "", retired: false, driverTitles: 0, teamTitles: 0, participations: {}, teamHistory: {}, tripleCrown: { monaco: false, indy500: false, lemans: false } };
 const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesFE: 0, tripleCrowns: 0 };
-const emptyRace = { name: "" };
+const emptyRace = { name: "", country: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
 
@@ -323,7 +323,7 @@ function mapDriverToDb(driverForm) {
   };
 }
 function mapRaceLibraryFromDb(race) {
-  return { id: race.id, name: race.name };
+  return { id: race.id, name: race.name, country: race.country || "" };
 }
 function sortRacesByName(races) {
   return [...races].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""), "fr", { sensitivity: "base" }));
@@ -967,7 +967,7 @@ export default function URTTAdminPanel() {
 
     const { data, error } = await supabase
       .from("race_library")
-      .insert({ name: raceForm.name })
+      .insert({ name: raceForm.name, country: raceForm.country.trim() })
       .select()
       .single();
 
@@ -983,6 +983,30 @@ export default function URTTAdminPanel() {
     setRaceLibrary((current) => sortRacesByName([...current, race]));
     setRaceForm(emptyRace);
     setPopup({ type: "success", title: "Circuit créé", message: `${race.name} a été ajouté à Supabase.` });
+  }
+
+  async function updateRaceCountry(raceId, country) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from("race_library")
+      .update({ country: country.trim() })
+      .eq("id", raceId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Erreur pays GP:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier le pays. Vérifie que la colonne country existe dans race_library." });
+      return false;
+    }
+
+    const race = mapRaceLibraryFromDb(data);
+    setRaceLibrary((current) => sortRacesByName(current.map((item) => idsEqual(item.id, race.id) ? race : item)));
+    return true;
   }
 
   async function addRaceToSeason() {
@@ -1515,6 +1539,7 @@ export default function URTTAdminPanel() {
           races={currentSeasonRaces}
           countdownRaces={allCalendarRaces}
           calendarEvents={calendarEvents}
+          raceLibrary={raceLibrary}
           allRaces={allRaces}
           raceResults={raceResults}
           allDrivers={drivers}
@@ -1552,7 +1577,7 @@ export default function URTTAdminPanel() {
 )}
           {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={selectedSeasonId} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
-          {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
+          {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel seasons={seasonOptions} onAddSeason={addSeason} isSaving={isSaving} />}
@@ -1726,7 +1751,48 @@ function buildCumulativeStats(statsBySeason) {
   return cumulative;
 }
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
+const COUNTRY_POSITIONS = {
+  allemagne: { x: 50, y: 36 },
+  arabiesaoudite: { x: 58, y: 50 },
+  australie: { x: 78, y: 73 },
+  autriche: { x: 51, y: 39 },
+  azerbaidjan: { x: 58, y: 42 },
+  bahrein: { x: 59, y: 48 },
+  belgique: { x: 48, y: 35 },
+  bresil: { x: 35, y: 66 },
+  canada: { x: 22, y: 25 },
+  chine: { x: 70, y: 47 },
+  emiratsarabesunis: { x: 61, y: 50 },
+  espagne: { x: 47, y: 43 },
+  etatsunis: { x: 20, y: 42 },
+  france: { x: 48, y: 39 },
+  hongrie: { x: 52, y: 39 },
+  italie: { x: 51, y: 43 },
+  japon: { x: 82, y: 43 },
+  mexique: { x: 20, y: 51 },
+  monaco: { x: 50, y: 42 },
+  paysbas: { x: 49, y: 34 },
+  portugal: { x: 45, y: 43 },
+  qatar: { x: 60, y: 49 },
+  royaumeuni: { x: 46, y: 33 },
+  singapour: { x: 70, y: 61 },
+};
+
+function getCountryKey(country) {
+  return normalizeResultText(country);
+}
+
+function getCountryPosition(country, index = 0) {
+  const known = COUNTRY_POSITIONS[getCountryKey(country)];
+  if (known) return known;
+  return { x: 18 + (index * 13) % 64, y: 28 + (index * 17) % 42 };
+}
+
+function getRaceCountry(race, raceLibrary) {
+  return raceLibrary.find((item) => idsEqual(item.id, race.libraryRaceId))?.country || race.country || "Pays non renseigné";
+}
+
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -1747,8 +1813,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <nav className="urtt-public-nav" style={styles.publicNav}>
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.seasonSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-        {["home", "drivers", "teams", "seasons"].map((key) => {
-          const labels = { home: "Accueil", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison" };
+        {["home", "drivers", "teams", "seasons", "world"].map((key) => {
+          const labels = { home: "Accueil", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", world: "Carte" };
           return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(publicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
         })}
       </nav>
@@ -1757,8 +1823,60 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {publicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
       </main>
       <FeedbackWidget />
+    </div>
+  );
+}
+
+function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCategoryId }) {
+  const countries = Object.values(races.reduce((acc, race) => {
+    const country = getRaceCountry(race, raceLibrary);
+    const key = getCountryKey(country);
+    if (!acc[key]) acc[key] = { country, races: [] };
+    acc[key].races.push(race);
+    return acc;
+  }, {})).sort((a, b) => a.country.localeCompare(b.country, "fr"));
+  const [selectedCountry, setSelectedCountry] = useState(countries[0]?.country || "");
+  const activeCountry = countries.find((item) => item.country === selectedCountry) || countries[0];
+
+  return (
+    <div style={styles.worldPage}>
+      <div style={styles.worldHero}>
+        <h2 style={styles.worldTitle}>{seasonName(selectedSeasonId)} — Circuits du monde</h2>
+        <p style={styles.worldSubtitle}>Clique sur un pays pour voir les circuits disponibles en {selectedCategoryId}.</p>
+      </div>
+      <div style={styles.worldLayout}>
+        <div style={styles.worldMap}>
+          <div style={styles.worldMapImage} />
+          {countries.map((item, index) => {
+            const position = getCountryPosition(item.country, index);
+            const active = activeCountry?.country === item.country;
+            return (
+              <button key={item.country} type="button" onClick={() => setSelectedCountry(item.country)} style={{ ...styles.countryPin, left: `${position.x}%`, top: `${position.y}%`, ...(active ? styles.countryPinActive : {}) }}>
+                <span>{item.country}</span>
+                <strong>{item.races.length}</strong>
+              </button>
+            );
+          })}
+          {countries.length === 0 && <div style={styles.worldEmpty}>Aucun pays renseigné pour cette saison.</div>}
+        </div>
+        <Card title={activeCountry ? activeCountry.country : "Pays"} icon="🌍">
+          <div style={styles.stack}>
+            {activeCountry?.races.map((race) => (
+              <div key={race.id} style={styles.itemBox}>
+                <div>
+                  <strong>{race.round}. {race.name}</strong>
+                  <p style={styles.mutedSmall}>{selectedCategoryId} · {seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p>
+                </div>
+                <span style={{ ...styles.categoryBadge, background: getCategoryColor(selectedCategoryId) }}>{selectedCategoryId}</span>
+              </div>
+            ))}
+            {!activeCountry && <Empty text="Aucun circuit à afficher." />}
+          </div>
+        </Card>
+      </div>
     </div>
   );
 }
@@ -1962,7 +2080,7 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
   return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titre constructeur F1" type="number" value={form.teamTitlesF1 ?? form.teamTitles ?? 0} onChange={updateTeamTitleF1} /><Input label="Titre constructeur F2" type="number" value={form.teamTitlesF2 ?? 0} onChange={(value) => update("teamTitlesF2", value)} /><Input label="Titre constructeur FE" type="number" value={form.teamTitlesFE ?? 0} onChange={(value) => update("teamTitlesFE", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
-function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [], calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, onDeleteLibraryRace, onMoveRace, onUpdateStartAt, isSavingRace }) {
+function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [], calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, onDeleteLibraryRace, onUpdateLibraryRaceCountry, onMoveRace, onUpdateStartAt, isSavingRace }) {
   const [librarySearch, setLibrarySearch] = useState("");
   const [calendarSearch, setCalendarSearch] = useState("");
   const races = racesBySeason[selectedSeasonId] || [];
@@ -1983,17 +2101,12 @@ function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [],
       <Card title="Bibliothèque des GP" icon="🏁">
         <div style={styles.stack}>
           <Input label="Nom du Grand Prix" value={raceForm.name} onChange={(value) => setRaceForm({ ...raceForm, name: value })} />
+          <Input label="Pays" value={raceForm.country} onChange={(value) => setRaceForm({ ...raceForm, country: value })} />
           <button onClick={onSave} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Créer le GP"}</button>
           <div style={styles.searchBox}>🔎 <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Rechercher un circuit..." style={styles.searchInput} /></div>
           <div style={styles.stack}>
             {filteredLibrary.map((race) => (
-              <div key={race.id} style={styles.itemBox}>
-                <div>
-                  <strong>{race.name}</strong>
-                  <p style={styles.mutedSmall}>Participations : {participationCounts[String(race.id)] || 0}</p>
-                </div>
-                <button type="button" onClick={() => onDeleteLibraryRace(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>
-              </div>
+              <RaceLibraryItem key={race.id} race={race} participations={participationCounts[String(race.id)] || 0} onSaveCountry={onUpdateLibraryRaceCountry} onDelete={onDeleteLibraryRace} isSavingRace={isSavingRace} />
             ))}
             {filteredLibrary.length === 0 && <Empty text={libraryQuery ? "Aucun GP trouvé dans la bibliothèque." : "Aucun GP dans la bibliothèque."} />}
           </div>
@@ -2008,6 +2121,32 @@ function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [],
         <div style={styles.searchBox}>🔎 <input value={calendarSearch} onChange={(event) => setCalendarSearch(event.target.value)} placeholder="Rechercher dans le calendrier..." style={styles.searchInput} /></div>
         <RaceTable races={filteredRaces} onDelete={(raceId) => onDelete(selectedSeasonId, raceId)} onMoveRace={calendarQuery ? null : onMoveRace} onUpdateStartAt={onUpdateStartAt} isSavingRace={isSavingRace} />
       </Card>
+    </div>
+  );
+}
+
+function RaceLibraryItem({ race, participations, onSaveCountry, onDelete, isSavingRace }) {
+  const [country, setCountry] = useState(race.country || "");
+  const [status, setStatus] = useState("");
+
+  async function saveCountry() {
+    setStatus("");
+    const saved = await onSaveCountry(race.id, country);
+    if (saved) setStatus("Pays enregistré");
+  }
+
+  return (
+    <div style={styles.itemBox}>
+      <div style={styles.raceLibraryInfo}>
+        <strong>{race.name}</strong>
+        <p style={styles.mutedSmall}>Participations : {participations}</p>
+        {status && <p style={styles.mutedSmall}>{status}</p>}
+      </div>
+      <div style={styles.countryEditRow}>
+        <input value={country} onChange={(event) => setCountry(event.target.value)} placeholder="Pays" style={styles.compactInput} />
+        <button type="button" onClick={saveCountry} disabled={isSavingRace} style={styles.editButton}>Pays</button>
+        <button type="button" onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>
+      </div>
     </div>
   );
 }
@@ -2605,6 +2744,9 @@ const styles = {
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
   itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  raceLibraryInfo: { minWidth: 180 },
+  countryEditRow: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" },
+  compactInput: { minWidth: 160, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: "10px 12px", outline: "none" },
   actions: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 },
   editButton: { background: "#3f3f46", color: "white", border: 0, borderRadius: 12, padding: "10px 12px", fontWeight: 900, cursor: "pointer" },
   muted: { color: "#a1a1aa", margin: 0 },
@@ -2677,6 +2819,16 @@ const styles = {
   detailModal: { width: "min(1040px, 100%)", maxHeight: "90vh", overflow: "auto", display: "grid", gap: 18 },
   publicRaceCard: { background: "#27272a", borderRadius: 22, padding: 18, display: "grid", gap: 16 },
   publicRaceHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 },
+  worldPage: { display: "grid", gap: 22 },
+  worldHero: { width: "min(720px, 100%)", margin: "0 auto", textAlign: "center", border: "1px solid #a855f7", borderRadius: 18, padding: "18px 22px", background: "rgba(9,9,11,.76)", boxShadow: "0 0 34px rgba(168,85,247,.22)" },
+  worldTitle: { margin: 0, fontSize: 34, letterSpacing: 1, textTransform: "uppercase" },
+  worldSubtitle: { margin: "8px 0 0", color: "#d4d4d8", fontSize: 13 },
+  worldLayout: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 18, alignItems: "start" },
+  worldMap: { position: "relative", minHeight: 460, border: "1px solid #27272a", borderRadius: 22, overflow: "hidden", background: "#202020" },
+  worldMapImage: { position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(8,8,10,.08), rgba(8,8,10,.36)), url('/world-map.svg')", backgroundSize: "cover", backgroundPosition: "center", opacity: 1 },
+  countryPin: { position: "absolute", transform: "translate(-50%, -50%)", display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(126,34,206,.86)", color: "white", border: "1px solid rgba(255,255,255,.38)", borderRadius: 999, padding: "7px 10px", fontSize: 12, fontWeight: 900, cursor: "pointer", boxShadow: "0 12px 26px rgba(168,85,247,.3)", zIndex: 2 },
+  countryPinActive: { background: "#f97316", boxShadow: "0 0 24px rgba(249,115,22,.55)" },
+  worldEmpty: { position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#d4d4d8", zIndex: 2 },
   raceTitle: { margin: "4px 0 0", fontSize: 22 },
   raceTitleButton: { margin: "4px 0 0", padding: 0, border: 0, background: "transparent", color: "white", fontSize: 22, fontWeight: 900, cursor: "pointer", textAlign: "left", textDecoration: "underline", textDecorationColor: "#dc2626", textUnderlineOffset: 5 },
   raceStatsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 },
