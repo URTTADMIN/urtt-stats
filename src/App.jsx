@@ -8,6 +8,7 @@ let runtimeSeasonOptions = DEFAULT_SEASON_OPTIONS;
 const CATEGORY_OPTIONS = [
   { id: "F1", name: "F1", color: "#7c3aed" },
   { id: "F2", name: "F2", color: "#dc2626" },
+  { id: "F3", name: "F3", color: "#f97316" },
   { id: "FE", name: "FE", color: "#16a34a" },
 ];
 
@@ -424,7 +425,7 @@ function updateDriverSeasonTeam(form, seasonId, teamId) {
 }
 function getCategoryStatField(base, categoryId) {
   const normalizedCategoryId = normalizeCategoryId(categoryId);
-  const suffix = normalizedCategoryId === "F2" ? "F2" : normalizedCategoryId === "FE" ? "FE" : "F1";
+  const suffix = ["F1", "F2", "F3", "FE"].includes(normalizedCategoryId) ? normalizedCategoryId : "F1";
   return `${base}${suffix}`;
 }
 function buildRecordMap(rows, keys) {
@@ -508,7 +509,7 @@ function runTests() {
   console.assert(getPointsForPosition(1, "F2", "S5") === 30, "F2 S5 doit garder le barème standard");
   console.assert(isSeasonIncluded("S1", "S4") === true, "S1 doit être incluse dans S4");
   console.assert(isSeasonIncluded("S5", "S4") === false, "S5 ne doit pas être incluse dans S4");
-  console.assert(CATEGORY_OPTIONS.length === 3, "Il doit y avoir F1, F2 et FE");
+  console.assert(CATEGORY_OPTIONS.length === 4, "Il doit y avoir F1, F2, F3 et FE");
   console.assert(demoRaceLibrary.length > 0, "La bibliotheque de demo doit contenir des GP");
   console.assert(createDemoSeasonMap().S16.length === 3, "La saison de demo S16 doit contenir 3 GP");
   console.assert(toggleParticipation(emptyDriver, "S1", "F1").participations.S1.includes("F1"), "La participation F1 S1 doit pouvoir être ajoutée");
@@ -1586,13 +1587,15 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   };
   const blankTeamStats = (team) => ({
   ...team,
-  driverTitles: Number(team[driverTitleField] ?? team.driverTitles) || 0,
+  driverTitles: Number(team[driverTitleField] ?? (activeCategoryId === "F1" ? team.driverTitles : 0)) || 0,
   driverTitlesF1: Number(team.driverTitlesF1) || 0,
   driverTitlesF2: Number(team.driverTitlesF2) || 0,
+  driverTitlesF3: Number(team.driverTitlesF3) || 0,
   driverTitlesFE: Number(team.driverTitlesFE) || 0,
-  teamTitles: Number(team[teamTitleField] ?? team.teamTitles) || 0,
+  teamTitles: Number(team[teamTitleField] ?? (activeCategoryId === "F1" ? team.teamTitles : 0)) || 0,
   teamTitlesF1: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
   teamTitlesF2: Number(team.teamTitlesF2) || 0,
+  teamTitlesF3: Number(team.teamTitlesF3) || 0,
   teamTitlesFE: Number(team.teamTitlesFE) || 0,
   wins: 0,
   podiums: 0,
@@ -2157,7 +2160,7 @@ function DriverTable({ drivers, detailed = false, raceDetails = false, races = [
 
 function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, selectedCategoryId = "F1", onTeamClick }) {
   const records = buildRecordMap(teams, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
-  const titleSuffix = selectedCategoryId === "F2" ? "F2" : selectedCategoryId === "FE" ? "FE" : "F1";
+  const titleSuffix = normalizeCategoryId(selectedCategoryId);
   return (
     <div style={styles.tableWrap}>
       <table className="urtt-standings-table urtt-team-standings" style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}>
