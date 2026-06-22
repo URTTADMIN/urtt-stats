@@ -1877,21 +1877,23 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
-        {publicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
+        {publicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
     </div>
   );
 }
 
-function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCategoryId }) {
+function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCategoryId, allRaces, raceResults, drivers }) {
   const [mapRef] = useState(() => ({ current: null }));
   const [mapStateRef] = useState(() => ({ current: { map: null, layer: null, selectedLayer: null, countryLayers: {} } }));
   const [search, setSearch] = useState("");
   const [mapError, setMapError] = useState("");
   const [mapVersion, setMapVersion] = useState(0);
+  const [selectedGp, setSelectedGp] = useState(null);
   const circuitsByCountry = useMemo(() => buildCircuitsByCountry(races, raceLibrary), [races, raceLibrary]);
   const countryList = Object.keys(circuitsByCountry).sort((a, b) => getCountryDisplayName(a).localeCompare(getCountryDisplayName(b), "fr"));
+  const raceLookup = useMemo(() => new Map(races.map((race) => [String(race.id), race])), [races]);
 
   useEffect(() => {
     const L = window.L;
@@ -1939,7 +1941,7 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
       const circuits = circuitsByCountry[name] || [];
       const shownName = getCountryDisplayName(name);
       if (!circuits.length) return '<div class="urtt-map-popup-title"><h2>' + shownName + '</h2><span>0 circuit</span></div><div class="urtt-map-empty">Aucun circuit n\'est encore renseigne pour ce pays.</div>';
-      return '<div class="urtt-map-popup-title"><h2>' + shownName + '</h2><span>' + circuits.length + ' circuit' + (circuits.length > 1 ? 's' : '') + '</span></div>' + circuits.map((race) => '<div class="urtt-map-circuit"><b>' + race.round + '. ' + race.name + '</b><span>' + race.categoryId + ' - ' + seasonName(race.seasonId) + '<br>' + formatRaceDate(race.startAt) + '</span></div>').join('');
+      return '<div class="urtt-map-popup-title"><h2>' + shownName + '</h2><span>' + circuits.length + ' circuit' + (circuits.length > 1 ? 's' : '') + '</span></div>' + circuits.map((race) => '<button type="button" class="urtt-map-circuit urtt-map-circuit-button" data-race-id="' + race.id + '"><b>' + race.round + '. ' + race.name + '</b><span>' + race.categoryId + ' - ' + seasonName(race.seasonId) + '<br>' + formatRaceDate(race.startAt) + '</span><small>Voir historique du circuit</small></button>').join('');
     };
 
     const selectLayer = (countryLayer, name) => {
@@ -1969,6 +1971,22 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
     });
   }, [circuitsByCountry, mapStateRef, mapVersion]);
 
+  useEffect(() => {
+    const map = mapStateRef.current.map;
+    if (!map) return undefined;
+    const openHistory = (event) => {
+      const buttons = event.popup.getElement()?.querySelectorAll(".urtt-map-circuit-button") || [];
+      buttons.forEach((button) => {
+        button.addEventListener("click", () => {
+          const race = raceLookup.get(String(button.dataset.raceId));
+          if (race) setSelectedGp(race);
+        });
+      });
+    };
+    map.on("popupopen", openHistory);
+    return () => map.off("popupopen", openHistory);
+  }, [mapStateRef, mapVersion, raceLookup]);
+
   function searchCountry(event) {
     event.preventDefault();
     const name = getCanonicalCountry(search);
@@ -1978,7 +1996,7 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
     layer.fire("click");
   }
 
-  const popupStyles = ".urtt-map .leaflet-control-attribution{background:rgba(0,0,0,.55)!important;color:#ddd!important}.urtt-map .leaflet-control-attribution a{color:#fff!important}.urtt-map .leaflet-popup-content-wrapper{background:rgba(15,10,20,.96);color:white;border:2px solid #c000ff;border-radius:18px;box-shadow:0 0 36px rgba(192,0,255,.35)}.urtt-map .leaflet-popup-tip{background:#c000ff}.urtt-map .leaflet-popup-content{width:320px!important;margin:16px}.urtt-map-popup-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.urtt-map-popup-title h2{margin:0;font-size:1.35rem;text-transform:uppercase;letter-spacing:.04em}.urtt-map-popup-title span{padding:4px 9px;border-radius:999px;background:#c000ff;color:white;font-size:.78rem;font-weight:800;white-space:nowrap}.urtt-map-circuit{padding:11px 0;border-top:1px solid rgba(255,255,255,.14)}.urtt-map-circuit b{display:block;font-size:1.02rem;margin-bottom:3px}.urtt-map-circuit span,.urtt-map-empty{color:#cfc7d8;font-size:.9rem;line-height:1.35}";
+  const popupStyles = ".urtt-map .leaflet-control-attribution{background:rgba(0,0,0,.55)!important;color:#ddd!important}.urtt-map .leaflet-control-attribution a{color:#fff!important}.urtt-map .leaflet-popup-content-wrapper{background:rgba(15,10,20,.96);color:white;border:2px solid #c000ff;border-radius:18px;box-shadow:0 0 36px rgba(192,0,255,.35)}.urtt-map .leaflet-popup-tip{background:#c000ff}.urtt-map .leaflet-popup-content{width:320px!important;margin:16px}.urtt-map-popup-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.urtt-map-popup-title h2{margin:0;font-size:1.35rem;text-transform:uppercase;letter-spacing:.04em}.urtt-map-popup-title span{padding:4px 9px;border-radius:999px;background:#c000ff;color:white;font-size:.78rem;font-weight:800;white-space:nowrap}.urtt-map-circuit{width:100%;padding:11px 0;border:0;border-top:1px solid rgba(255,255,255,.14);background:transparent;color:white;text-align:left;cursor:pointer}.urtt-map-circuit:hover b{color:#ff38f2}.urtt-map-circuit b{display:block;font-size:1.02rem;margin-bottom:3px}.urtt-map-circuit span,.urtt-map-empty{color:#cfc7d8;font-size:.9rem;line-height:1.35}.urtt-map-circuit small{display:block;margin-top:6px;color:#ff38f2;font-weight:800}";
 
   return (
     <div style={styles.worldPage}>
@@ -2009,6 +2027,7 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
           </div>
         </Card>
       )}
+      {selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={drivers} onClose={() => setSelectedGp(null)} />}
     </div>
   );
 }
