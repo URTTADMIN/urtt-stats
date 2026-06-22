@@ -1943,7 +1943,9 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
     };
 
     const selectLayer = (countryLayer, name) => {
-      if (mapStateRef.current.selectedLayer) layer.resetStyle(mapStateRef.current.selectedLayer);
+      if (mapStateRef.current.selectedLayer) {
+        mapStateRef.current.selectedLayer.setStyle(styleCountry(mapStateRef.current.selectedLayer.feature));
+      }
       mapStateRef.current.selectedLayer = countryLayer;
       countryLayer.setStyle({ fillColor: "#ff38f2", fillOpacity: 0.9, color: "#ffffff", weight: 2 });
       countryLayer.bringToFront();
@@ -1960,7 +1962,7 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
           if (event.target !== mapStateRef.current.selectedLayer) event.target.setStyle({ fillOpacity: circuitsByCountry[name] ? 0.86 : 0.55, color: "#fff", weight: 1.5 });
         },
         mouseout: (event) => {
-          if (event.target !== mapStateRef.current.selectedLayer) layer.resetStyle(event.target);
+          if (event.target !== mapStateRef.current.selectedLayer) event.target.setStyle(styleCountry(event.target.feature));
         },
         click: (event) => selectLayer(event.target, name),
       });
