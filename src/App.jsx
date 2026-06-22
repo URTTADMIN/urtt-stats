@@ -1751,45 +1751,99 @@ function buildCumulativeStats(statsBySeason) {
   return cumulative;
 }
 
-const COUNTRY_POSITIONS = {
-  allemagne: { x: 50, y: 36 },
-  arabiesaoudite: { x: 58, y: 50 },
-  australie: { x: 78, y: 73 },
-  autriche: { x: 51, y: 39 },
-  azerbaidjan: { x: 58, y: 42 },
-  bahrein: { x: 59, y: 48 },
-  belgique: { x: 48, y: 35 },
-  bresil: { x: 35, y: 66 },
-  canada: { x: 22, y: 25 },
-  chine: { x: 70, y: 47 },
-  emiratsarabesunis: { x: 61, y: 50 },
-  espagne: { x: 47, y: 43 },
-  etatsunis: { x: 20, y: 42 },
-  france: { x: 48, y: 39 },
-  hongrie: { x: 52, y: 39 },
-  italie: { x: 51, y: 43 },
-  japon: { x: 82, y: 43 },
-  mexique: { x: 20, y: 51 },
-  monaco: { x: 50, y: 42 },
-  paysbas: { x: 49, y: 34 },
-  portugal: { x: 45, y: 43 },
-  qatar: { x: 60, y: 49 },
-  royaumeuni: { x: 46, y: 33 },
-  singapour: { x: 70, y: 61 },
+const COUNTRY_ALIASES = {
+  abudhabi: "United Arab Emirates",
+  afriquedusud: "South Africa",
+  allemagne: "Germany",
+  angleterre: "United Kingdom",
+  arabiesaoudite: "Saudi Arabia",
+  australie: "Australia",
+  autriche: "Austria",
+  azerbaidjan: "Azerbaijan",
+  bahrein: "Bahrain",
+  belgique: "Belgium",
+  bresil: "Brazil",
+  canada: "Canada",
+  chine: "China",
+  emiratsarabesunis: "United Arab Emirates",
+  espagne: "Spain",
+  etatsunis: "United States of America",
+  france: "France",
+  hongrie: "Hungary",
+  italie: "Italy",
+  japon: "Japan",
+  mexique: "Mexico",
+  monaco: "Monaco",
+  paysbas: "Netherlands",
+  portugal: "Portugal",
+  qatar: "Qatar",
+  royaumeuni: "United Kingdom",
+  singapour: "Singapore",
+  turquie: "Turkey",
+  usa: "United States of America",
+  unitedstates: "United States of America",
+  unitedstatesofamerica: "United States of America",
+};
+
+const COUNTRY_FRENCH_NAMES = {
+  Australia: "Australie",
+  Austria: "Autriche",
+  Azerbaijan: "Azerbaidjan",
+  Bahrain: "Bahrein",
+  Belgium: "Belgique",
+  Brazil: "Bresil",
+  Canada: "Canada",
+  China: "Chine",
+  France: "France",
+  Germany: "Allemagne",
+  Hungary: "Hongrie",
+  Italy: "Italie",
+  Japan: "Japon",
+  Mexico: "Mexique",
+  Monaco: "Monaco",
+  Netherlands: "Pays-Bas",
+  Portugal: "Portugal",
+  Qatar: "Qatar",
+  "Saudi Arabia": "Arabie saoudite",
+  Singapore: "Singapour",
+  "South Africa": "Afrique du Sud",
+  Spain: "Espagne",
+  Turkey: "Turquie",
+  "United Arab Emirates": "Emirats arabes unis",
+  "United Kingdom": "Royaume-Uni",
+  "United States of America": "Etats-Unis",
 };
 
 function getCountryKey(country) {
   return normalizeResultText(country);
 }
 
-function getCountryPosition(country, index = 0) {
-  const known = COUNTRY_POSITIONS[getCountryKey(country)];
-  if (known) return known;
-  return { x: 18 + (index * 13) % 64, y: 28 + (index * 17) % 42 };
+function getCanonicalCountry(country) {
+  const key = getCountryKey(country);
+  if (!key) return "";
+  return COUNTRY_ALIASES[key] || String(country || "").trim();
+}
+
+function getCountryDisplayName(country) {
+  return COUNTRY_FRENCH_NAMES[country] || country;
 }
 
 function getRaceCountry(race, raceLibrary) {
-  return raceLibrary.find((item) => idsEqual(item.id, race.libraryRaceId))?.country || race.country || "Pays non renseigné";
+  return raceLibrary.find((item) => idsEqual(item.id, race.libraryRaceId))?.country || race.country || "";
+}
+
+function countryNameFromFeature(feature) {
+  return feature?.properties?.ADMIN || feature?.properties?.name || feature?.properties?.NAME || "";
+}
+
+function buildCircuitsByCountry(races, raceLibrary) {
+  return races.reduce((acc, race) => {
+    const country = getCanonicalCountry(getRaceCountry(race, raceLibrary));
+    if (!country) return acc;
+    if (!acc[country]) acc[country] = [];
+    acc[country].push(race);
+    return acc;
+  }, {});
 }
 
 function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
@@ -1831,57 +1885,128 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
 }
 
 function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCategoryId }) {
-  const countries = Object.values(races.reduce((acc, race) => {
-    const country = getRaceCountry(race, raceLibrary);
-    const key = getCountryKey(country);
-    if (!acc[key]) acc[key] = { country, races: [] };
-    acc[key].races.push(race);
-    return acc;
-  }, {})).sort((a, b) => a.country.localeCompare(b.country, "fr"));
-  const [selectedCountry, setSelectedCountry] = useState(countries[0]?.country || "");
-  const activeCountry = countries.find((item) => item.country === selectedCountry) || countries[0];
+  const [mapRef] = useState(() => ({ current: null }));
+  const [mapStateRef] = useState(() => ({ current: { map: null, layer: null, selectedLayer: null, countryLayers: {} } }));
+  const [search, setSearch] = useState("");
+  const [mapError, setMapError] = useState("");
+  const [mapVersion, setMapVersion] = useState(0);
+  const circuitsByCountry = useMemo(() => buildCircuitsByCountry(races, raceLibrary), [races, raceLibrary]);
+  const countryList = Object.keys(circuitsByCountry).sort((a, b) => getCountryDisplayName(a).localeCompare(getCountryDisplayName(b), "fr"));
+
+  useEffect(() => {
+    const L = window.L;
+    if (!mapRef.current || !L) {
+      setMapError("Carte indisponible. Leaflet n'a pas encore charge.");
+      return undefined;
+    }
+    if (mapStateRef.current.map) return undefined;
+
+    const map = L.map(mapRef.current, { zoomControl: false, minZoom: 2, maxZoom: 7, worldCopyJump: true }).setView([28, 8], 3);
+    L.control.zoom({ position: "bottomleft" }).addTo(map);
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png", { attribution: "&copy; OpenStreetMap &copy; CARTO", subdomains: "abcd", maxZoom: 20 }).addTo(map);
+    mapStateRef.current.map = map;
+
+    fetch("https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson")
+      .then((response) => response.json())
+      .then((geojson) => {
+        mapStateRef.current.layer = L.geoJSON(geojson).addTo(map);
+        setMapVersion((version) => version + 1);
+      })
+      .catch((error) => {
+        console.error("Erreur carte pays:", error);
+        setMapError("Impossible de charger les pays de la carte.");
+      });
+
+    return () => {
+      map.remove();
+      mapStateRef.current = { map: null, layer: null, selectedLayer: null, countryLayers: {} };
+    };
+  }, [mapRef, mapStateRef]);
+
+  useEffect(() => {
+    const L = window.L;
+    const { layer } = mapStateRef.current;
+    if (!L || !layer) return;
+
+    mapStateRef.current.countryLayers = {};
+    const styleCountry = (feature) => {
+      const name = countryNameFromFeature(feature);
+      const active = Boolean(circuitsByCountry[name]);
+      return { fillColor: active ? "#c000ff" : "#2b1238", weight: active ? 1.1 : 0.7, opacity: 1, color: active ? "rgba(255,255,255,.38)" : "rgba(255,255,255,.16)", fillOpacity: active ? 0.64 : 0.38 };
+    };
+
+    const popupHtml = (name) => {
+      const circuits = circuitsByCountry[name] || [];
+      const shownName = getCountryDisplayName(name);
+      if (!circuits.length) return '<div class="urtt-map-popup-title"><h2>' + shownName + '</h2><span>0 circuit</span></div><div class="urtt-map-empty">Aucun circuit n\'est encore renseigne pour ce pays.</div>';
+      return '<div class="urtt-map-popup-title"><h2>' + shownName + '</h2><span>' + circuits.length + ' circuit' + (circuits.length > 1 ? 's' : '') + '</span></div>' + circuits.map((race) => '<div class="urtt-map-circuit"><b>' + race.round + '. ' + race.name + '</b><span>' + race.categoryId + ' - ' + seasonName(race.seasonId) + '<br>' + formatRaceDate(race.startAt) + '</span></div>').join('');
+    };
+
+    const selectLayer = (countryLayer, name) => {
+      if (mapStateRef.current.selectedLayer) layer.resetStyle(mapStateRef.current.selectedLayer);
+      mapStateRef.current.selectedLayer = countryLayer;
+      countryLayer.setStyle({ fillColor: "#ff38f2", fillOpacity: 0.9, color: "#ffffff", weight: 2 });
+      countryLayer.bringToFront();
+      countryLayer.bindPopup(popupHtml(name), { maxWidth: 380 }).openPopup();
+    };
+
+    layer.eachLayer((countryLayer) => {
+      const name = countryNameFromFeature(countryLayer.feature);
+      mapStateRef.current.countryLayers[getCountryKey(name)] = countryLayer;
+      countryLayer.setStyle(styleCountry(countryLayer.feature));
+      countryLayer.off();
+      countryLayer.on({
+        mouseover: (event) => {
+          if (event.target !== mapStateRef.current.selectedLayer) event.target.setStyle({ fillOpacity: circuitsByCountry[name] ? 0.86 : 0.55, color: "#fff", weight: 1.5 });
+        },
+        mouseout: (event) => {
+          if (event.target !== mapStateRef.current.selectedLayer) layer.resetStyle(event.target);
+        },
+        click: (event) => selectLayer(event.target, name),
+      });
+    });
+  }, [circuitsByCountry, mapStateRef, mapVersion]);
+
+  function searchCountry(event) {
+    event.preventDefault();
+    const name = getCanonicalCountry(search);
+    const layer = mapStateRef.current.countryLayers[getCountryKey(name)];
+    if (!layer || !mapStateRef.current.map) return;
+    mapStateRef.current.map.fitBounds(layer.getBounds(), { padding: [40, 40], maxZoom: 5 });
+    layer.fire("click");
+  }
+
+  const popupStyles = ".urtt-map .leaflet-control-attribution{background:rgba(0,0,0,.55)!important;color:#ddd!important}.urtt-map .leaflet-control-attribution a{color:#fff!important}.urtt-map .leaflet-popup-content-wrapper{background:rgba(15,10,20,.96);color:white;border:2px solid #c000ff;border-radius:18px;box-shadow:0 0 36px rgba(192,0,255,.35)}.urtt-map .leaflet-popup-tip{background:#c000ff}.urtt-map .leaflet-popup-content{width:320px!important;margin:16px}.urtt-map-popup-title{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.urtt-map-popup-title h2{margin:0;font-size:1.35rem;text-transform:uppercase;letter-spacing:.04em}.urtt-map-popup-title span{padding:4px 9px;border-radius:999px;background:#c000ff;color:white;font-size:.78rem;font-weight:800;white-space:nowrap}.urtt-map-circuit{padding:11px 0;border-top:1px solid rgba(255,255,255,.14)}.urtt-map-circuit b{display:block;font-size:1.02rem;margin-bottom:3px}.urtt-map-circuit span,.urtt-map-empty{color:#cfc7d8;font-size:.9rem;line-height:1.35}";
 
   return (
     <div style={styles.worldPage}>
+      <style>{popupStyles}</style>
       <div style={styles.worldHero}>
-        <h2 style={styles.worldTitle}>{seasonName(selectedSeasonId)} — Circuits du monde</h2>
+        <h2 style={styles.worldTitle}>{seasonName(selectedSeasonId)} - Circuits du monde</h2>
         <p style={styles.worldSubtitle}>Clique sur un pays pour voir les circuits disponibles en {selectedCategoryId}.</p>
       </div>
-      <div style={styles.worldLayout}>
-        <div style={styles.worldMap}>
-          <iframe
-            title="Carte du monde"
-            src="https://www.openstreetmap.org/export/embed.html?bbox=-180%2C-58%2C180%2C82&layer=mapnik"
-            style={styles.worldMapFrame}
-          />
-          <div style={styles.worldMapShade} />
-          {countries.map((item, index) => {
-            const position = getCountryPosition(item.country, index);
-            const active = activeCountry?.country === item.country;
-            return (
-              <button key={item.country} type="button" onClick={() => setSelectedCountry(item.country)} style={{ ...styles.countryPin, left: `${position.x}%`, top: `${position.y}%`, ...(active ? styles.countryPinActive : {}) }}>
-                <span>{item.country}</span>
-                <strong>{item.races.length}</strong>
-              </button>
-            );
-          })}
-          {countries.length === 0 && <div style={styles.worldEmpty}>Aucun pays renseigné pour cette saison.</div>}
+      <div style={styles.worldMapShell}>
+        <div ref={(node) => { mapRef.current = node; }} className="urtt-map" style={styles.worldLeafletMap} />
+        <form onSubmit={searchCountry} style={styles.worldSearch}>
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pays..." style={styles.worldSearchInput} />
+        </form>
+        <div style={styles.worldLegend}>
+          <div><span style={{ ...styles.worldSwatch, background: "#c000ff" }} /> Pays avec circuits</div>
+          <div><span style={{ ...styles.worldSwatch, background: "#2b1238" }} /> Pays cliquable</div>
         </div>
-        <Card title={activeCountry ? activeCountry.country : "Pays"} icon="🌍">
+        <div style={styles.worldCountrySummary}>
+          <strong>{countryList.length} pays renseigne{countryList.length > 1 ? "s" : ""}</strong>
+          <span>{countryList.map(getCountryDisplayName).join(" · ") || "Ajoute un pays dans Admin > Courses."}</span>
+        </div>
+        {mapError && <div style={styles.worldEmpty}>{mapError}</div>}
+      </div>
+      {countryList.length === 0 && (
+        <Card title="Pays a renseigner" icon="🌍">
           <div style={styles.stack}>
-            {activeCountry?.races.map((race) => (
-              <div key={race.id} style={styles.itemBox}>
-                <div>
-                  <strong>{race.round}. {race.name}</strong>
-                  <p style={styles.mutedSmall}>{selectedCategoryId} · {seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p>
-                </div>
-                <span style={{ ...styles.categoryBadge, background: getCategoryColor(selectedCategoryId) }}>{selectedCategoryId}</span>
-              </div>
-            ))}
-            {!activeCountry && <Empty text="Aucun circuit à afficher." />}
+            <Empty text="Ajoute le pays des circuits dans Admin > Courses > Bibliotheque des GP pour les voir apparaitre sur la carte." />
           </div>
         </Card>
-      </div>
+      )}
     </div>
   );
 }
@@ -2828,13 +2953,14 @@ const styles = {
   worldHero: { width: "min(720px, 100%)", margin: "0 auto", textAlign: "center", border: "1px solid #a855f7", borderRadius: 18, padding: "18px 22px", background: "rgba(9,9,11,.76)", boxShadow: "0 0 34px rgba(168,85,247,.22)" },
   worldTitle: { margin: 0, fontSize: 34, letterSpacing: 1, textTransform: "uppercase" },
   worldSubtitle: { margin: "8px 0 0", color: "#d4d4d8", fontSize: 13 },
-  worldLayout: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 18, alignItems: "start" },
-  worldMap: { position: "relative", minHeight: 460, border: "1px solid #27272a", borderRadius: 22, overflow: "hidden", background: "#111113" },
-  worldMapFrame: { position: "absolute", inset: 0, width: "100%", height: "100%", border: 0, filter: "grayscale(1) invert(.92) hue-rotate(185deg) brightness(.44) contrast(1.28)", transform: "scale(1.04)", pointerEvents: "none" },
-  worldMapShade: { position: "absolute", inset: 0, background: "radial-gradient(circle at 50% 45%, rgba(168,85,247,.16), rgba(9,9,11,.58) 70%)", pointerEvents: "none", zIndex: 1 },
-  countryPin: { position: "absolute", transform: "translate(-50%, -50%)", display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(126,34,206,.9)", color: "white", border: "1px solid rgba(255,255,255,.42)", borderRadius: 999, padding: "7px 10px", fontSize: 12, fontWeight: 900, cursor: "pointer", boxShadow: "0 12px 26px rgba(168,85,247,.38)", zIndex: 2 },
-  countryPinActive: { background: "#f97316", boxShadow: "0 0 24px rgba(249,115,22,.55)" },
-  worldEmpty: { position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#d4d4d8", zIndex: 2 },
+  worldMapShell: { position: "relative", minHeight: 620, border: "1px solid #27272a", borderRadius: 22, overflow: "hidden", background: "radial-gradient(circle at center, rgba(192,0,255,.18), transparent 36%), linear-gradient(135deg, #06020a, #160020)" },
+  worldLeafletMap: { position: "absolute", inset: 0, height: "100%", width: "100%", background: "transparent" },
+  worldLegend: { position: "absolute", left: 18, bottom: 18, zIndex: 1000, padding: "12px 14px", borderRadius: 14, border: "1px solid rgba(192,0,255,.65)", background: "rgba(10,4,18,.82)", color: "white", boxShadow: "0 0 28px rgba(0,0,0,.4)", display: "grid", gap: 6 },
+  worldSwatch: { width: 18, height: 12, borderRadius: 4, display: "inline-block", marginRight: 8 },
+  worldSearch: { position: "absolute", right: 18, bottom: 18, zIndex: 1000, width: "min(310px, calc(100% - 36px))", borderRadius: 14, border: "1px solid rgba(192,0,255,.65)", background: "rgba(10,4,18,.82)", padding: 10, boxShadow: "0 0 28px rgba(0,0,0,.4)" },
+  worldSearchInput: { width: "100%", boxSizing: "border-box", border: "1px solid rgba(255,255,255,.16)", outline: "none", borderRadius: 10, background: "rgba(255,255,255,.08)", color: "white", padding: "10px 12px", fontSize: 15 },
+  worldCountrySummary: { position: "absolute", left: 18, top: 18, zIndex: 1000, maxWidth: "min(520px, calc(100% - 36px))", borderRadius: 14, border: "1px solid rgba(192,0,255,.65)", background: "rgba(10,4,18,.82)", padding: "12px 14px", boxShadow: "0 0 28px rgba(0,0,0,.4)", display: "grid", gap: 4 },
+  worldEmpty: { position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#d4d4d8", zIndex: 1001, background: "rgba(9,9,11,.72)" },
   raceTitle: { margin: "4px 0 0", fontSize: 22 },
   raceTitleButton: { margin: "4px 0 0", padding: 0, border: 0, background: "transparent", color: "white", fontSize: 22, fontWeight: 900, cursor: "pointer", textAlign: "left", textDecoration: "underline", textDecorationColor: "#dc2626", textUnderlineOffset: 5 },
   raceStatsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 },
