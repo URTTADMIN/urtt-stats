@@ -2825,7 +2825,7 @@ const styles = {
   worldSubtitle: { margin: "8px 0 0", color: "#d4d4d8", fontSize: 13 },
   worldLayout: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: 18, alignItems: "start" },
   worldMap: { position: "relative", minHeight: 460, border: "1px solid #27272a", borderRadius: 22, overflow: "hidden", background: "#202020" },
-  worldMapImage: { position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(8,8,10,.08), rgba(8,8,10,.36)), url('/world-map.svg')", backgroundSize: "cover", backgroundPosition: "center", opacity: 1 },
+  worldMapImage: { position: "absolute", inset: 0, backgroundImage: "linear-gradient(rgba(8,8,10,.05), rgba(8,8,10,.22)), url('/world-map.svg')", backgroundSize: "contain", backgroundPosition: "center", backgroundRepeat: "no-repeat", opacity: 1 },
   countryPin: { position: "absolute", transform: "translate(-50%, -50%)", display: "inline-flex", alignItems: "center", gap: 6, background: "rgba(126,34,206,.86)", color: "white", border: "1px solid rgba(255,255,255,.38)", borderRadius: 999, padding: "7px 10px", fontSize: 12, fontWeight: 900, cursor: "pointer", boxShadow: "0 12px 26px rgba(168,85,247,.3)", zIndex: 2 },
   countryPinActive: { background: "#f97316", boxShadow: "0 0 24px rgba(249,115,22,.55)" },
   worldEmpty: { position: "absolute", inset: 0, display: "grid", placeItems: "center", color: "#d4d4d8", zIndex: 2 },
