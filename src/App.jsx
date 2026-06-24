@@ -2011,7 +2011,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {publicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} />}
+        {publicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />}
         {publicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -2171,25 +2171,32 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [] }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [] }) {
   return (
-    <>
+    <div style={styles.section}>
+      <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <RaceCountdown races={countdownRaces} events={calendarEvents} />
       <MediaLinksCard />
-    </>
+    </div>
+  );
+}
+
+function SeasonSummary({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [] }) {
+  return (
+    <div style={styles.statsGrid}>
+      <Stat label="Catégorie" value={selectedCategoryId} />
+      <Stat label="Saison" value={seasonName(selectedSeasonId)} />
+      <Stat label="Leader pilote" value={leaderDriver} />
+      <Stat label="Leader écurie" value={leaderTeam} />
+      <Stat label="GP" value={races.length} />
+    </div>
   );
 }
 
 function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
   return (
     <div className="urtt-standings-page" style={styles.section}>
-      <div style={styles.statsGrid}>
-        <Stat label="Catégorie" value={selectedCategoryId} />
-        <Stat label="Saison" value={seasonName(selectedSeasonId)} />
-        <Stat label="Leader pilote" value={leaderDriver} />
-        <Stat label="Leader écurie" value={leaderTeam} />
-        <Stat label="GP" value={races.length} />
-      </div>
+      <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <div className="urtt-standings-grid" style={styles.standingsGrid}>
         <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
         <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails compactRaceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
