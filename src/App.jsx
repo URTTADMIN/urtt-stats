@@ -465,16 +465,15 @@ function isRecordValue(records, key, value) {
 function RecordValue({ value, record }) {
   return <span style={record ? styles.recordValue : undefined}>{value}</span>;
 }
-function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "", seasonTitles = []) {
+function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "", seasonTitles = [], allDrivers = []) {
   const activeCategoryId = selectedCategoryId ? normalizeCategoryId(selectedCategoryId) : "";
+  const driverPool = allDrivers.length ? allDrivers : [driver];
   return getSeasonOptions().map((season) => {
     const seasonCategories = getDriverSeasonCategories(driver, season.id);
     const categories = activeCategoryId ? seasonCategories.filter((category) => normalizeCategoryId(category) === activeCategoryId) : seasonCategories;
     const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(result.categoryId) === activeCategoryId));
     const seasonTeam = getDriverSeasonTeam(driver, season.id, teams);
     const matchingTitles = seasonTitles.filter((title) => normalizeSeasonId(title.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(title.categoryId) === activeCategoryId));
-    const driverChampion = matchingTitles.some((title) => idsEqual(title.driverId, driver.id));
-    const constructorChampion = matchingTitles.some((title) => idsEqual(title.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
     let points = 0;
     let wins = 0;
     let podiums = 0;
@@ -489,14 +488,35 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
       poles += entry.pole ? 1 : 0;
       fastestLaps += entry.fastestLap ? 1 : 0;
     });
-    const standings = Array.from(seasonResults.reduce((map, result) => {
+    const standingsMap = seasonResults.reduce((map, result) => {
       result.entries.forEach((entry) => {
-        const current = map.get(entry.driverId) || 0;
-        map.set(entry.driverId, current + getPointsForPosition(Number(entry.position), result.categoryId, result.seasonId));
+        const position = Number(entry.position);
+        const current = map.get(entry.driverId) || { id: entry.driverId, points: 0, resultCounts: {} };
+        current.points += getPointsForPosition(position, result.categoryId, result.seasonId);
+        if (Number.isFinite(position) && position > 0) current.resultCounts[position] = (current.resultCounts[position] || 0) + 1;
+        map.set(entry.driverId, current);
       });
       return map;
-    }, new Map()).entries()).sort((a, b) => b[1] - a[1]);
-    const positionIndex = standings.findIndex(([driverId]) => idsEqual(driverId, driver.id));
+    }, new Map());
+    const standings = Array.from(standingsMap.values()).sort(sortSeasonStandings);
+    const positionIndex = standings.findIndex((item) => idsEqual(item.id, driver.id));
+    const teamStandingsMap = seasonResults.reduce((map, result) => {
+      result.entries.forEach((entry) => {
+        const entryDriver = driverPool.find((item) => idsEqual(item.id, entry.driverId));
+        const teamId = entryDriver?.teamHistory?.[season.id] || entryDriver?.teamId;
+        if (!teamId) return;
+        const position = Number(entry.position);
+        const current = map.get(String(teamId)) || { id: teamId, points: 0, resultCounts: {} };
+        current.points += getPointsForPosition(position, result.categoryId, result.seasonId);
+        if (Number.isFinite(position) && position > 0) current.resultCounts[position] = (current.resultCounts[position] || 0) + 1;
+        map.set(String(teamId), current);
+      });
+      return map;
+    }, new Map());
+    const teamStandings = Array.from(teamStandingsMap.values()).sort(sortSeasonStandings);
+    const championTeam = teamStandings[0];
+    const driverChampion = matchingTitles.some((title) => idsEqual(title.driverId, driver.id)) || (positionIndex === 0 && points > 0);
+    const constructorChampion = matchingTitles.some((title) => idsEqual(title.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId)) || (championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps };
   }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
@@ -1993,7 +2013,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {publicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} />}
         {publicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
-        {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} onClose={() => setSelectedDriver(null)} />}</>}
+        {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {publicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
@@ -2652,8 +2672,8 @@ function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
   return <div style={styles.detailOverlay} onClick={onClose}><div style={styles.detailModal} onClick={(event) => event.stopPropagation()}><div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE GRAND PRIX</p><h2 style={styles.gpDetailTitle}>{gp.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><div style={styles.statsGrid}><Stat label="Présences au calendrier" value={gpRaces.length} /><Stat label="Résultats validés" value={gpResults.filter((item) => item.result).length} /><Stat label="Dernier vainqueur" value={driverName(drivers, [...gpResults].reverse().find((item) => item.winner)?.winner?.driverId)} /><Stat label="Dernier poleman" value={driverName(drivers, [...gpResults].reverse().find((item) => item.poleman)?.poleman?.driverId)} /></div><div style={styles.twoColumns}><Card title="Vainqueurs" icon="🏆"><MiniCountList counts={winnerCounts} empty="Aucun vainqueur enregistré." /></Card><Card title="Polemen" icon="⚡"><MiniCountList counts={poleCounts} empty="Aucun poleman enregistré." /></Card></div><Card title="Historique du GP" icon="📜"><div style={styles.stack}>{gpResults.map((item) => <div key={item.race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>{seasonName(item.race.seasonId)} · Course #{item.race.round}</p><h3 style={styles.raceTitle}>{item.race.name}</h3></div><span style={item.result ? styles.badgeGreen : styles.badgeDark}>{item.result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, item.winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, item.poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, item.fastest?.driverId)} /><RaceStat label="Podium" value={item.podium.length ? item.podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>)}{gpResults.length === 0 && <Empty text="Aucun historique pour ce GP." />}</div></Card></div></div></div>;
 }
 
-function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, onClose }) {
-  const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId, seasonTitles);
+function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, allDrivers, onClose }) {
+  const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId, seasonTitles, allDrivers);
   return (
     <div style={styles.detailOverlay} onClick={onClose}>
       <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
