@@ -653,7 +653,7 @@ export default function URTTAdminPanel() {
           max-width: min(96vw, 1800px) !important;
         }
         .urtt-standings-grid {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr) !important;
           align-items: start;
         }
         .urtt-public-main .urtt-standings-table {
@@ -672,10 +672,12 @@ export default function URTTAdminPanel() {
           width: 44px;
         }
         .urtt-public-main .urtt-driver-standings th:nth-child(2),
-        .urtt-public-main .urtt-driver-standings td:nth-child(2),
+        .urtt-public-main .urtt-driver-standings td:nth-child(2) {
+          width: 190px;
+        }
         .urtt-public-main .urtt-team-standings th:nth-child(2),
         .urtt-public-main .urtt-team-standings td:nth-child(2) {
-          width: 190px;
+          width: 142px;
         }
         .urtt-public-main .urtt-driver-standings th:nth-child(3),
         .urtt-public-main .urtt-driver-standings td:nth-child(3) {
@@ -697,6 +699,11 @@ export default function URTTAdminPanel() {
         }
         .urtt-public-main .urtt-compact-race-table th:nth-last-child(n+2):nth-child(n+4),
         .urtt-public-main .urtt-compact-race-table td:nth-last-child(n+2):nth-child(n+4) {
+          width: 42px;
+          text-align: center;
+        }
+        .urtt-public-main .urtt-team-standings.urtt-compact-race-table th:nth-last-child(n+2):nth-child(n+3),
+        .urtt-public-main .urtt-team-standings.urtt-compact-race-table td:nth-last-child(n+2):nth-child(n+3) {
           width: 42px;
           text-align: center;
         }
