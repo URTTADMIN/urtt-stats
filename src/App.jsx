@@ -466,6 +466,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
   return getSeasonOptions().map((season) => {
     const seasonCategories = getDriverSeasonCategories(driver, season.id);
     const categories = activeCategoryId ? seasonCategories.filter((category) => normalizeCategoryId(category) === activeCategoryId) : seasonCategories;
+    const participatesInActiveCategory = activeCategoryId ? categories.length > 0 : seasonCategories.length > 0;
     const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(result.categoryId) === activeCategoryId));
     const seasonTeam = getDriverSeasonTeam(driver, season.id, teams);
     const matchingTitles = seasonTitles.filter((title) => normalizeSeasonId(title.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(title.categoryId) === activeCategoryId));
@@ -513,7 +514,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     const manualDriverTitle = matchingTitles.find((title) => title.driverId);
     const manualTeamTitle = matchingTitles.find((title) => title.teamId);
     const driverChampion = manualDriverTitle ? idsEqual(manualDriverTitle.driverId, driver.id) : positionIndex === 0 && points > 0;
-    const constructorChampion = manualTeamTitle ? idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId) : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId);
+    const constructorChampion = participatesInActiveCategory && (manualTeamTitle ? idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId) : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps };
   }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
@@ -1861,8 +1862,6 @@ function sortByTitlesAndResults(a, b) {
   return (
     (Number(b.driverTitles) || 0) - (Number(a.driverTitles) || 0) ||
     (Number(b.teamTitles) || 0) - (Number(a.teamTitles) || 0) ||
-    (Number(b.teamTitlesF2) || 0) - (Number(a.teamTitlesF2) || 0) ||
-    (Number(b.teamTitlesFE) || 0) - (Number(a.teamTitlesFE) || 0) ||
     (Number(b.wins) || 0) - (Number(a.wins) || 0) ||
     (Number(b.podiums) || 0) - (Number(a.podiums) || 0) ||
     (Number(b.poles) || 0) - (Number(a.poles) || 0) ||
