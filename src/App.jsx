@@ -691,6 +691,18 @@ export default function URTTAdminPanel() {
           overflow: hidden;
           text-overflow: ellipsis;
         }
+        .urtt-public-main .urtt-compact-race-table th,
+        .urtt-public-main .urtt-compact-race-table td {
+          padding: 9px 5px !important;
+        }
+        .urtt-public-main .urtt-compact-race-table th:nth-last-child(n+2):nth-child(n+4),
+        .urtt-public-main .urtt-compact-race-table td:nth-last-child(n+2):nth-child(n+4) {
+          width: 42px;
+          text-align: center;
+        }
+        .urtt-public-main .urtt-compact-race-table .urtt-race-column-sub {
+          display: none !important;
+        }
         .urtt-public-main .urtt-card {
           width: 100%;
         }
@@ -2059,7 +2071,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [] }) {
   );
 }
 
-function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, allDrivers, teams }) {
+function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
   return (
     <div className="urtt-standings-page" style={styles.section}>
       <div style={styles.statsGrid}>
@@ -2070,8 +2082,8 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
         <Stat label="GP" value={races.length} />
       </div>
       <div className="urtt-standings-grid" style={styles.standingsGrid}>
-        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
-        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
+        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails compactRaceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
       </div>
     </div>
   );
@@ -2479,34 +2491,34 @@ function SettingsPanel({ seasons = [], onAddSeason, isSaving }) {
   );
 }
 
-function DriverTable({ drivers, detailed = false, raceDetails = false, races = [], raceResults = [], showExtendedStats = false, onDriverClick, teams = [], selectedSeasonId }) {
+function DriverTable({ drivers, detailed = false, raceDetails = false, compactRaceDetails = false, races = [], raceResults = [], showExtendedStats = false, onDriverClick, teams = [], selectedSeasonId }) {
   const records = buildRecordMap(drivers, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
   return (
     <div style={styles.tableWrap}>
-      <table className="urtt-standings-table urtt-driver-standings" style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titre P.</th><th style={styles.th}>Titre C.</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
-        <tbody>{drivers.map((driver, index) => { const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /></button> : <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} />}</td><td style={styles.td}>{driver.retired ? "Retraité" : driver.teamName || team?.name || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={driver.driverTitles || 0} record={isRecordValue(records, "driverTitles", driver.driverTitles)} /></td><td style={styles.td}><RecordValue value={driver.teamTitles || 0} record={isRecordValue(records, "teamTitles", driver.teamTitles)} /></td><td style={styles.td}><RecordValue value={driver.wins} record={isRecordValue(records, "wins", driver.wins)} /></td><td style={styles.td}><RecordValue value={driver.podiums} record={isRecordValue(records, "podiums", driver.podiums)} /></td><td style={styles.td}><RecordValue value={driver.poles} record={isRecordValue(records, "poles", driver.poles)} /></td><td style={styles.td}><RecordValue value={driver.fastestLaps} record={isRecordValue(records, "fastestLaps", driver.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={driver.points} record={isRecordValue(records, "points", driver.points)} /></td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>; })}</tbody>
+      <table className={`urtt-standings-table urtt-driver-standings${compactRaceDetails ? " urtt-compact-race-table" : ""}`} style={{ ...styles.table, minWidth: raceDetails ? Math.max(compactRaceDetails ? 720 : 950, (compactRaceDetails ? 430 : 650) + races.length * (compactRaceDetails ? 42 : 105)) : 850 }}>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titre P.</th><th style={styles.th}>Titre C.</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
+        <tbody>{drivers.map((driver, index) => { const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /></button> : <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} />}</td><td style={styles.td}>{driver.retired ? "Retraité" : driver.teamName || team?.name || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={driver.driverTitles || 0} record={isRecordValue(records, "driverTitles", driver.driverTitles)} /></td><td style={styles.td}><RecordValue value={driver.teamTitles || 0} record={isRecordValue(records, "teamTitles", driver.teamTitles)} /></td><td style={styles.td}><RecordValue value={driver.wins} record={isRecordValue(records, "wins", driver.wins)} /></td><td style={styles.td}><RecordValue value={driver.podiums} record={isRecordValue(records, "podiums", driver.podiums)} /></td><td style={styles.td}><RecordValue value={driver.poles} record={isRecordValue(records, "poles", driver.poles)} /></td><td style={styles.td}><RecordValue value={driver.fastestLaps} record={isRecordValue(records, "fastestLaps", driver.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={driver.points} record={isRecordValue(records, "points", driver.points)} /></td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>; })}</tbody>
       </table>
       {drivers.length === 0 && <Empty text="Aucun pilote à afficher." />}
     </div>
   );
 }
 
-function TeamTable({ teams, detailed = false, raceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, selectedCategoryId = "F1", onTeamClick }) {
+function TeamTable({ teams, detailed = false, raceDetails = false, compactRaceDetails = false, races = [], raceResults = [], drivers = [], showExtendedStats = false, selectedCategoryId = "F1", onTeamClick }) {
   const records = buildRecordMap(teams, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
   const titleSuffix = normalizeCategoryId(selectedCategoryId);
   return (
     <div style={styles.tableWrap}>
-      <table className="urtt-standings-table urtt-team-standings" style={{ ...styles.table, minWidth: raceDetails ? Math.max(950, 650 + races.length * 105) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titre P. {titleSuffix}</th><th style={styles.th}>Titre C. {titleSuffix}</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
-        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitles || 0} record={isRecordValue(records, "driverTitles", team.driverTitles)} /></td><td style={styles.td}><RecordValue value={team.teamTitles || 0} record={isRecordValue(records, "teamTitles", team.teamTitles)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
+      <table className={`urtt-standings-table urtt-team-standings${compactRaceDetails ? " urtt-compact-race-table" : ""}`} style={{ ...styles.table, minWidth: raceDetails ? Math.max(compactRaceDetails ? 650 : 950, (compactRaceDetails ? 330 : 650) + races.length * (compactRaceDetails ? 42 : 105)) : 850 }}>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><th style={styles.th}>Titre P. {titleSuffix}</th><th style={styles.th}>Titre C. {titleSuffix}</th><th style={styles.th}>V</th><th style={styles.th}>Pod.</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></>}<th style={styles.th}>Points</th>{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
+        <tbody>{teams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitles || 0} record={isRecordValue(records, "driverTitles", team.driverTitles)} /></td><td style={styles.td}><RecordValue value={team.teamTitles || 0} record={isRecordValue(records, "teamTitles", team.teamTitles)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
       </table>
       {teams.length === 0 && <Empty text="Aucune écurie à afficher." />}
     </div>
   );
 }
 
-function DriverRaceCell({ driverId, race, raceResults }) {
+function DriverRaceCell({ driverId, race, raceResults, compact = false }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
   const driverResult = result?.entries.find((entry) => idsEqual(entry.driverId, driverId));
   if (!driverResult) return <span style={styles.mutedSmall}>—</span>;
@@ -2516,10 +2528,11 @@ function DriverRaceCell({ driverId, race, raceResults }) {
   if (position === 1) badges.push("V");
   if (driverResult.pole) badges.push("P");
   if (driverResult.fastestLap) badges.push("MT");
+  if (compact) return <div style={styles.compactRaceResultCell}><strong>P{position}</strong>{badges.length > 0 && <span style={styles.compactRaceBadges}>{badges.join("/")}</span>}</div>;
   return <div style={styles.raceResultCell}><strong>P{position}</strong><span style={styles.mutedSmall}>{points} pts</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
-function TeamRaceCell({ teamId, race, raceResults, drivers }) {
+function TeamRaceCell({ teamId, race, raceResults, drivers, compact = false }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
   if (!result) return <span style={styles.mutedSmall}>—</span>;
   const teamDriverIds = drivers.filter((driver) => idsEqual(driver.teamHistory?.[race.seasonId] || driver.teamId, teamId)).map((driver) => String(driver.id));
@@ -2531,6 +2544,7 @@ function TeamRaceCell({ teamId, race, raceResults, drivers }) {
   if (entries.some((entry) => Number(entry.position) === 1)) badges.push("V");
   if (entries.some((entry) => entry.pole)) badges.push("P");
   if (entries.some((entry) => entry.fastestLap)) badges.push("MT");
+  if (compact) return <div style={styles.compactRaceResultCell}><strong>{points}</strong>{badges.length > 0 && <span style={styles.compactRaceBadges}>{badges.join("/")}</span>}</div>;
   return <div style={styles.raceResultCell}><strong>{points} pts</strong><span style={styles.mutedSmall}>Meilleur P{bestPosition}</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
@@ -3040,6 +3054,8 @@ const styles = {
   raceColumnTitle: { display: "block", fontWeight: 900 },
   raceColumnSub: { display: "block", color: "#a1a1aa", fontSize: 11, maxWidth: 85, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
   raceResultCell: { display: "grid", gap: 3, minWidth: 72 },
+  compactRaceResultCell: { display: "grid", justifyItems: "center", gap: 2, fontSize: 12, lineHeight: 1.1 },
+  compactRaceBadges: { color: "#86efac", fontSize: 10, fontWeight: 950 },
   raceBadges: { color: "#86efac", fontSize: 11, fontWeight: 900 },
   teamPreview: { background: "#27272a", borderRadius: 18, padding: 14, display: "grid", gap: 8 },
   nameButton: { background: "transparent", border: 0, color: "white", padding: 0, cursor: "pointer", textAlign: "left" },
