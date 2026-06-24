@@ -447,11 +447,6 @@ function getDriverSeasonTeam(driver, seasonId, teams) {
 function updateDriverSeasonTeam(form, seasonId, teamId) {
   return { ...form, teamHistory: { ...(form.teamHistory || {}), [seasonId]: teamId ? Number(teamId) : "" } };
 }
-function getCategoryStatField(base, categoryId) {
-  const normalizedCategoryId = normalizeCategoryId(categoryId);
-  const suffix = ["F1", "F2", "F3", "FE"].includes(normalizedCategoryId) ? normalizedCategoryId : "F1";
-  return `${base}${suffix}`;
-}
 function buildRecordMap(rows, keys) {
   return keys.reduce((acc, key) => {
     acc[key] = Math.max(0, ...rows.map((row) => Number(row[key]) || 0));
@@ -515,8 +510,10 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     }, new Map());
     const teamStandings = Array.from(teamStandingsMap.values()).sort(sortSeasonStandings);
     const championTeam = teamStandings[0];
-    const driverChampion = matchingTitles.some((title) => idsEqual(title.driverId, driver.id)) || (positionIndex === 0 && points > 0);
-    const constructorChampion = matchingTitles.some((title) => idsEqual(title.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId)) || (championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
+    const manualDriverTitle = matchingTitles.find((title) => title.driverId);
+    const manualTeamTitle = matchingTitles.find((title) => title.teamId);
+    const driverChampion = manualDriverTitle ? idsEqual(manualDriverTitle.driverId, driver.id) : positionIndex === 0 && points > 0;
+    const constructorChampion = manualTeamTitle ? idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId) : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId);
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps };
   }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
 }
@@ -890,7 +887,7 @@ export default function URTTAdminPanel() {
 
   const racesBySelectedCategory = useMemo(() => createSeasonMapFromCalendar(allCalendarRaces, selectedCategoryId), [allCalendarRaces, selectedCategoryId]);
   const currentSeasonRaces = racesBySelectedCategory[selectedSeasonId] || [];
-  const computed = useMemo(() => computeStats({ drivers, teams, raceResults, selectedCategoryId }), [drivers, teams, raceResults, selectedCategoryId]);
+  const computed = useMemo(() => computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonTitles }), [drivers, teams, raceResults, selectedCategoryId, seasonTitles]);
   const seasonOnlyDrivers = computed.driverStatsBySeason[selectedSeasonId] || [];
   const seasonOnlyTeams = computed.teamStatsBySeason[selectedSeasonId] || [];
   const cumulativeDrivers = computed.cumulativeDriverStatsBySeason[selectedSeasonId] || [];
@@ -1722,19 +1719,17 @@ export default function URTTAdminPanel() {
   );
 }
 
-function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
+function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonTitles = [] }) {
   const activeCategoryId = normalizeCategoryId(selectedCategoryId);
   const latestSeasonId = getSeasonOptions().at(-1)?.id || "S16";
-  const driverTitleField = getCategoryStatField("driverTitles", activeCategoryId);
-  const teamTitleField = getCategoryStatField("teamTitles", activeCategoryId);
   const blankDriverStats = (driver, seasonId) => {
     const seasonTeamId = driver.teamHistory?.[seasonId] || driver.teamId;
     return {
       ...driver,
       teamId: seasonTeamId,
       teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
-      driverTitles: Number(driver.driverTitles) || 0,
-      teamTitles: Number(driver.teamTitles) || 0,
+      driverTitles: 0,
+      teamTitles: 0,
       wins: 0,
       podiums: 0,
       poles: 0,
@@ -1745,12 +1740,12 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
   };
   const blankTeamStats = (team) => ({
   ...team,
-  driverTitles: Number(team[driverTitleField] ?? (activeCategoryId === "F1" ? team.driverTitles : 0)) || 0,
+  driverTitles: 0,
   driverTitlesF1: Number(team.driverTitlesF1) || 0,
   driverTitlesF2: Number(team.driverTitlesF2) || 0,
   driverTitlesF3: Number(team.driverTitlesF3) || 0,
   driverTitlesFE: Number(team.driverTitlesFE) || 0,
-  teamTitles: Number(team[teamTitleField] ?? (activeCategoryId === "F1" ? team.teamTitles : 0)) || 0,
+  teamTitles: 0,
   teamTitlesF1: Number(team.teamTitlesF1 ?? team.teamTitles) || 0,
   teamTitlesF2: Number(team.teamTitlesF2) || 0,
   teamTitlesF3: Number(team.teamTitlesF3) || 0,
@@ -1799,11 +1794,37 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId }) {
         }
       });
     });
-    const seasonDriverStats = Array.from(driverMap.values()).filter((driver) => driver.points > 0 || (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort(sortSeasonStandings);
-    const seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
+    const seasonTitle = seasonTitles.find((title) => normalizeSeasonId(title.seasonId) === season.id && normalizeCategoryId(title.categoryId) === activeCategoryId);
+    const driverChampionIds = new Set();
+    const constructorChampionTeamIds = new Set();
+    let seasonDriverStats = Array.from(driverMap.values()).filter((driver) => driver.points > 0 || (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId)).sort(sortSeasonStandings);
+    let seasonTeamStats = Array.from(teamMap.values()).filter((team) => {
       const relatedDrivers = drivers.filter((driver) => idsEqual(driver.teamHistory?.[season.id] || driver.teamId, team.id));
       return team.points > 0 || relatedDrivers.some((driver) => (driver.participations?.[season.id] || []).some((category) => normalizeCategoryId(category) === activeCategoryId));
     }).sort(sortSeasonStandings);
+
+    if (seasonTitle?.driverId) {
+      driverChampionIds.add(String(seasonTitle.driverId));
+    } else if (seasonDriverStats[0]?.points > 0) {
+      driverChampionIds.add(String(seasonDriverStats[0].id));
+    }
+
+    if (seasonTitle?.teamId) {
+      constructorChampionTeamIds.add(String(seasonTitle.teamId));
+    } else if (seasonTeamStats[0]?.points > 0) {
+      constructorChampionTeamIds.add(String(seasonTeamStats[0].id));
+    }
+
+    seasonDriverStats = seasonDriverStats.map((driver) => ({
+      ...driver,
+      driverTitles: driverChampionIds.has(String(driver.id)) ? 1 : 0,
+      teamTitles: constructorChampionTeamIds.has(String(driver.teamId)) ? 1 : 0,
+    }));
+    seasonTeamStats = seasonTeamStats.map((team) => ({
+      ...team,
+      driverTitles: seasonDriverStats.some((driver) => driver.driverTitles && idsEqual(driver.teamId, team.id)) ? 1 : 0,
+      teamTitles: constructorChampionTeamIds.has(String(team.id)) ? 1 : 0,
+    }));
 
     driverStatsBySeason[season.id] = seasonDriverStats;
     teamStatsBySeason[season.id] = seasonTeamStats;
@@ -1866,10 +1887,12 @@ function buildCumulativeStats(statsBySeason) {
     getSeasonOptions().forEach((season) => {
       if (!isSeasonIncluded(season.id, selectedSeason.id)) return;
       (statsBySeason[season.id] || []).forEach((item) => {
-        const current = map.get(item.id) || { ...item, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0, resultCounts: {} };
+        const current = map.get(item.id) || { ...item, driverTitles: 0, teamTitles: 0, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0, resultCounts: {} };
         map.set(item.id, {
           ...current,
           ...item,
+          driverTitles: current.driverTitles + (Number(item.driverTitles) || 0),
+          teamTitles: current.teamTitles + (Number(item.teamTitles) || 0),
           wins: current.wins + item.wins,
           podiums: current.podiums + item.podiums,
           poles: current.poles + item.poles,
