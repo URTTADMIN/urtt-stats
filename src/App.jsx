@@ -35,6 +35,9 @@ function getNextSeasonOption(seasons = getSeasonOptions()) {
   const nextNumber = Math.max(...seasons.map((season) => getSeasonNumber(season.id)), 0) + 1;
   return { id: `S${nextNumber}`, name: `Saison ${nextNumber}`, sortOrder: nextNumber };
 }
+function getLatestSeasonId(seasons = getSeasonOptions()) {
+  return [...seasons].sort((a, b) => (b.sortOrder || getSeasonNumber(b.id)) - (a.sortOrder || getSeasonNumber(a.id)))[0]?.id || "S1";
+}
 
 async function fetchAllSupabaseRows(tableName, orderBy = "id") {
   const pageSize = 1000;
@@ -693,7 +696,7 @@ export default function URTTAdminPanel() {
   const [publicPage, setPublicPage] = useState("home");
   const [adminPage, setAdminPage] = useState("dashboard");
   const [selectedCategoryId, setSelectedCategoryId] = useState("F1");
-  const [selectedSeasonId, setSelectedSeasonId] = useState("S16");
+  const [selectedSeasonId, setSelectedSeasonId] = useState(() => getLatestSeasonId(DEFAULT_SEASON_OPTIONS));
   const [seasonOptions, setSeasonOptions] = useState(DEFAULT_SEASON_OPTIONS);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
@@ -789,7 +792,9 @@ export default function URTTAdminPanel() {
 
       setTeams((teamsData || []).map(mapTeamFromDb));
       setDrivers((driversData || []).map((driver) => mapDriverFromDb(driver, participationsData || [])));
-      setSeasonOptions(normalizeSeasonOptions(seasonsData || []));
+      const normalizedSeasons = normalizeSeasonOptions(seasonsData || []);
+      setSeasonOptions(normalizedSeasons);
+      setSelectedSeasonId(getLatestSeasonId(normalizedSeasons));
       setRaceLibrary(sortRacesByName((raceLibraryData || []).map(mapRaceLibraryFromDb)));
       const mappedCalendar = (calendarData || []).map(mapCalendarRaceFromDb);
       setAllCalendarRaces(mappedCalendar);
@@ -1878,8 +1883,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} countdownRaces={countdownRaces} calendarEvents={calendarEvents} />}
-        {publicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
+        {publicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} />}
+        {publicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
@@ -2038,9 +2043,18 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTeam, races, countdownRaces = [], calendarEvents = [] }) {
+function HomePage({ countdownRaces = [], calendarEvents = [] }) {
   return (
     <>
+      <RaceCountdown races={countdownRaces} events={calendarEvents} />
+      <MediaLinksCard />
+    </>
+  );
+}
+
+function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
+  return (
+    <div style={styles.section}>
       <div style={styles.statsGrid}>
         <Stat label="Catégorie" value={selectedCategoryId} />
         <Stat label="Saison" value={seasonName(selectedSeasonId)} />
@@ -2048,15 +2062,6 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
         <Stat label="Leader écurie" value={leaderTeam} />
         <Stat label="GP" value={races.length} />
       </div>
-      <RaceCountdown races={countdownRaces} events={calendarEvents} />
-      <MediaLinksCard />
-    </>
-  );
-}
-
-function StandingsPage({ selectedSeasonId, selectedCategoryId, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
-  return (
-    <div style={styles.section}>
       <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
       <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
     </div>
