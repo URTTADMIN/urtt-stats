@@ -2059,7 +2059,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [] }) {
   );
 }
 
-function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
+function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, allDrivers, teams }) {
   return (
     <div className="urtt-standings-page" style={styles.section}>
       <div style={styles.statsGrid}>
@@ -2070,8 +2070,8 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
         <Stat label="GP" value={races.length} />
       </div>
       <div className="urtt-standings-grid" style={styles.standingsGrid}>
-        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
-        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
+        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
       </div>
     </div>
   );
