@@ -649,6 +649,10 @@ export default function URTTAdminPanel() {
         }
       }
       @media (min-width: 761px) {
+        .urtt-standings-grid {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+          align-items: start;
+        }
         .urtt-public-main .urtt-standings-table {
           min-width: 100% !important;
           table-layout: fixed;
@@ -2062,8 +2066,10 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
         <Stat label="Leader écurie" value={leaderTeam} />
         <Stat label="GP" value={races.length} />
       </div>
-      <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
-      <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+      <div className="urtt-standings-grid" style={styles.standingsGrid}>
+        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
+        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+      </div>
     </div>
   );
 }
@@ -2928,6 +2934,7 @@ const styles = {
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
+  standingsGrid: { display: "grid", gridTemplateColumns: "1fr", gap: 22 },
   mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
