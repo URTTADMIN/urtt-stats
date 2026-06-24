@@ -649,6 +649,9 @@ export default function URTTAdminPanel() {
         }
       }
       @media (min-width: 761px) {
+        .urtt-public-main:has(.urtt-standings-page) {
+          max-width: min(96vw, 1800px) !important;
+        }
         .urtt-standings-grid {
           grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
           align-items: start;
@@ -2058,7 +2061,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [] }) {
 
 function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
   return (
-    <div style={styles.section}>
+    <div className="urtt-standings-page" style={styles.section}>
       <div style={styles.statsGrid}>
         <Stat label="Catégorie" value={selectedCategoryId} />
         <Stat label="Saison" value={seasonName(selectedSeasonId)} />
@@ -2934,7 +2937,7 @@ const styles = {
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
-  standingsGrid: { display: "grid", gridTemplateColumns: "1fr", gap: 22 },
+  standingsGrid: { display: "grid", gridTemplateColumns: "1fr", gap: 22, width: "100%" },
   mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
