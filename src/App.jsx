@@ -1846,6 +1846,11 @@ function buildCircuitsByCountry(races, raceLibrary) {
   }, {});
 }
 
+const AREKU_MEDIA_LINKS = [
+  { label: "Chaîne YouTube", detail: "Vidéos et rediffusions AREKU_F1", url: "https://www.youtube.com/@AREKU_F1", color: "#dc2626" },
+  { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
+];
+
 function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, allDrivers, teams = [], onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
@@ -1867,13 +1872,14 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <nav className="urtt-public-nav" style={styles.publicNav}>
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.seasonSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-        {["home", "drivers", "teams", "seasons", "world"].map((key) => {
-          const labels = { home: "Accueil", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", world: "Carte" };
+        {["home", "standings", "drivers", "teams", "seasons", "world"].map((key) => {
+          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", world: "Carte" };
           return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(publicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} countdownRaces={countdownRaces} calendarEvents={calendarEvents} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
+        {publicPage === "home" && <HomePage selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} countdownRaces={countdownRaces} calendarEvents={calendarEvents} />}
+        {publicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
@@ -2032,7 +2038,7 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTeam, races, countdownRaces = [], calendarEvents = [], seasonOnlyDrivers, seasonOnlyTeams, raceResults, allDrivers, teams }) {
+function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTeam, races, countdownRaces = [], calendarEvents = [] }) {
   return (
     <>
       <div style={styles.statsGrid}>
@@ -2043,11 +2049,35 @@ function HomePage({ selectedCategoryId, selectedSeasonId, leaderDriver, leaderTe
         <Stat label="GP" value={races.length} />
       </div>
       <RaceCountdown races={countdownRaces} events={calendarEvents} />
-      <div style={styles.section}>
-        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
-        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
-      </div>
+      <MediaLinksCard />
     </>
+  );
+}
+
+function StandingsPage({ selectedSeasonId, selectedCategoryId, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
+  return (
+    <div style={styles.section}>
+      <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
+      <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+    </div>
+  );
+}
+
+function MediaLinksCard() {
+  return (
+    <Card title="AREKU_F1 en vidéo" icon="▶️">
+      <div style={styles.mediaGrid}>
+        {AREKU_MEDIA_LINKS.map((link) => (
+          <a key={link.url} href={link.url} target="_blank" rel="noreferrer" style={{ ...styles.mediaLinkCard, borderColor: link.color }}>
+            <span style={{ ...styles.mediaDot, background: link.color }} />
+            <div>
+              <strong>{link.label}</strong>
+              <p style={styles.mutedSmall}>{link.detail}</p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </Card>
   );
 }
 
@@ -2893,6 +2923,9 @@ const styles = {
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
+  mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
+  mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
+  mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
   itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
   raceLibraryInfo: { minWidth: 180 },
