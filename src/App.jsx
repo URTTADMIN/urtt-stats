@@ -833,6 +833,7 @@ export default function URTTAdminPanel() {
   const [view, setView] = useState("front");
   const [publicPage, setPublicPage] = useState("home");
   const [adminPage, setAdminPage] = useState("dashboard");
+  const [isAdminPreview, setIsAdminPreview] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("F1");
   const [selectedSeasonId, setSelectedSeasonId] = useState(() => getLatestSeasonId(DEFAULT_SEASON_OPTIONS));
   const [seasonOptions, setSeasonOptions] = useState(DEFAULT_SEASON_OPTIONS);
@@ -1806,20 +1807,25 @@ export default function URTTAdminPanel() {
           developmentEntries={developmentEntries}
           siteSettings={siteSettings}
           allDrivers={drivers}
-          isAdminPreview={Boolean(adminUser)}
-          onOpenAdmin={() => { setView("login"); setLoginError(""); }}
+          isAdminPreview={isAdminPreview && Boolean(adminUser)}
+          onOpenAdmin={() => {
+            setIsAdminPreview(false);
+            setLoginError("");
+            setView(adminUser ? "admin" : "login");
+          }}
         />
       )}
-      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } setAdminUser(data.user); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => setView("front")} />} 
+      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } setAdminUser(data.user); setIsAdminPreview(false); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
         <AdminLayout
           active={adminPage}
           setActive={setAdminPage}
           adminUser={adminUser}
-          onPublic={() => setView("front")}
+          onPublic={() => { setIsAdminPreview(true); setView("front"); }}
           onLogout={async () => {
             await supabase.auth.signOut();
             setAdminUser(null);
+            setIsAdminPreview(false);
             setView("front");
             setAdminPage("dashboard");
           }}
