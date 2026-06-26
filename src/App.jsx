@@ -435,6 +435,13 @@ function getPreviousDevelopmentEntry(entries, target) {
     .filter((entry) => idsEqual(entry.teamId, target.teamId) && normalizeSeasonId(entry.seasonId) === normalizeSeasonId(target.seasonId) && normalizeCategoryId(entry.categoryId) === normalizeCategoryId(target.categoryId) && Number(entry.round) < Number(target.round))
     .sort((a, b) => Number(b.round) - Number(a.round))[0] || null;
 }
+function getDevelopmentSaveErrorMessage(error) {
+  const message = error?.message || "";
+  if (error?.code === "42P01") return "La table team_development n'existe pas encore. Lance la commande SQL de creation.";
+  if (message.includes("turbo_enabled") || error?.code === "PGRST204") return "La colonne turbo_enabled manque dans team_development. Lance la commande SQL d'ajout de colonne.";
+  if (message.toLowerCase().includes("row-level security") || error?.code === "42501") return "Supabase bloque l'ecriture sur team_development. Verifie les policies RLS de la table.";
+  return message ? `Supabase: ${message}` : "Impossible d'enregistrer le developpement.";
+}
 function mapRaceResultFromDb(result, entries = []) {
   return {
     id: result.id,
@@ -1470,8 +1477,7 @@ export default function URTTAdminPanel() {
 
     if (error) {
       console.error("Erreur developpement:", error);
-      const missingTable = error.code === "42P01";
-      setPopup({ type: "error", title: "Erreur Supabase", message: missingTable ? "La table team_development n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible d'enregistrer le developpement." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: getDevelopmentSaveErrorMessage(error) });
       return;
     }
 
