@@ -2380,7 +2380,6 @@ function DevelopmentChart({ teams, entries = [] }) {
 }
 
 function DevelopmentTeamCard({ team, entry, previous }) {
-  const delta = previous ? getDevelopmentCoef(entry) - getDevelopmentCoef(previous) : 0;
   return (
     <div style={{ ...styles.developmentCard, borderTop: `4px solid ${team.color || "#dc2626"}` }}>
       <div style={styles.developmentCardHeader}>
@@ -2392,11 +2391,6 @@ function DevelopmentTeamCard({ team, entry, previous }) {
         <DevelopmentStat label="Acceleration" value={entry.acceleration} previous={previous?.acceleration} />
         <DevelopmentStat label="Grip" value={entry.grip} previous={previous?.grip} />
         <DevelopmentStat label="Turbo" value={entry.turbo} previous={previous?.turbo} />
-      </div>
-      <div style={styles.developmentDrivers}>
-        <strong>{entry.driverOne || "Pilote 1"}</strong>
-        <strong>{entry.driverTwo || "Pilote 2"}</strong>
-        <span style={styles.mutedSmall}>Niveau {getDevelopmentCoef(entry)}{delta ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}</span>
       </div>
     </div>
   );
@@ -2558,9 +2552,6 @@ function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCat
           <Input label="Acceleration" type="number" value={form.acceleration} onChange={(value) => update("acceleration", value)} />
           <Input label="Grip" type="number" value={form.grip} onChange={(value) => update("grip", value)} />
           <Input label="Turbo" type="number" value={form.turbo} onChange={(value) => update("turbo", value)} />
-          <Input label="Niveau / coef" type="number" value={form.level} onChange={(value) => update("level", value)} />
-          <Input label="Pilote 1" value={form.driverOne} onChange={(value) => update("driverOne", value)} />
-          <Input label="Pilote 2" value={form.driverTwo} onChange={(value) => update("driverTwo", value)} />
         </div>
         <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : "Enregistrer le développement"}</button>
       </Card>
@@ -2569,7 +2560,7 @@ function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCat
         <div style={styles.stack}>
           {selectedEntries.map((entry) => {
             const team = teams.find((item) => idsEqual(item.id, entry.teamId));
-            return <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}><div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Coef {getDevelopmentCoef(entry)} · Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip} · Turbo {entry.turbo}</p></div><button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button></div>;
+            return <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}><div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip} · Turbo {entry.turbo}</p></div><button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button></div>;
           })}
           {selectedEntries.length === 0 && <Empty text="Aucune donnée enregistrée pour cette sélection." />}
         </div>
