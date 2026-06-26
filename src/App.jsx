@@ -1806,6 +1806,7 @@ export default function URTTAdminPanel() {
           developmentEntries={developmentEntries}
           siteSettings={siteSettings}
           allDrivers={drivers}
+          isAdminPreview={Boolean(adminUser)}
           onOpenAdmin={() => { setView("login"); setLoginError(""); }}
         />
       )}
@@ -2146,12 +2147,13 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
-  const publicPages = ["home", "standings", "drivers", "teams", "seasons", ...(siteSettings.publicDevelopmentEnabled === false ? [] : ["development"]), "world"];
+  const canSeeDevelopment = siteSettings.publicDevelopmentEnabled !== false || isAdminPreview;
+  const publicPages = ["home", "standings", "drivers", "teams", "seasons", ...(canSeeDevelopment ? ["development"] : []), "world"];
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : "home";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -2180,7 +2182,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
-        {activePublicPage === "development" && <DevelopmentPage teams={teams} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
+        {activePublicPage === "development" && <DevelopmentPage teams={teams} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && siteSettings.publicDevelopmentEnabled === false} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -2370,11 +2372,12 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCategoryId }) {
+function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCategoryId, isAdminPreview = false }) {
   const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
   const latestByTeam = getLatestDevelopmentByTeam(selectedEntries, teams);
   return (
     <div style={styles.section}>
+      {isAdminPreview && <div style={styles.previewNotice}><strong>Aperçu admin</strong><span>Cette page est masquée pour le public.</span></div>}
       <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
         <DevelopmentChart teams={teams} entries={selectedEntries} />
       </Card>
@@ -3413,6 +3416,7 @@ const styles = {
   developmentDrivers: { display: "grid", gap: 6 },
   devDeltaUp: { color: "#22c55e", fontSize: 12, fontWeight: 950 },
   devDeltaDown: { color: "#ef4444", fontSize: 12, fontWeight: 950 },
+  previewNotice: { background: "rgba(124,58,237,.16)", border: "1px solid rgba(168,85,247,.55)", color: "#f5f3ff", borderRadius: 16, padding: "12px 14px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
   itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
   raceLibraryInfo: { minWidth: 180 },
