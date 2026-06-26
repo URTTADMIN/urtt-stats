@@ -61,6 +61,7 @@ const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, drive
 const emptyRace = { name: "", country: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
+const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, level: 0, driverOne: "", driverTwo: "" };
 
 const demoTeams = [
   { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesF3: 0, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesF3: 0, teamTitlesFE: 0, tripleCrowns: 0 },
@@ -372,10 +373,65 @@ function mapSeasonTitleToDb(title) {
     team_id: title.teamId ? Number(title.teamId) : null,
   };
 }
+function mapDevelopmentFromDb(entry) {
+  return {
+    id: entry.id,
+    teamId: entry.team_id,
+    seasonId: normalizeSeasonId(entry.season_id),
+    categoryId: normalizeCategoryId(entry.category_id),
+    round: Number(entry.round) || 1,
+    speed: Number(entry.speed) || 0,
+    acceleration: Number(entry.acceleration) || 0,
+    grip: Number(entry.grip) || 0,
+    turbo: Number(entry.turbo) || 0,
+    level: Number(entry.level) || 0,
+    driverOne: entry.driver_one || "",
+    driverTwo: entry.driver_two || "",
+  };
+}
+function mapDevelopmentToDb(entry) {
+  return {
+    team_id: entry.teamId ? Number(entry.teamId) : null,
+    season_id: normalizeSeasonId(entry.seasonId),
+    category_id: normalizeCategoryId(entry.categoryId),
+    round: Number(entry.round) || 1,
+    speed: Number(entry.speed) || 0,
+    acceleration: Number(entry.acceleration) || 0,
+    grip: Number(entry.grip) || 0,
+    turbo: Number(entry.turbo) || 0,
+    level: Number(entry.level) || 0,
+    driver_one: entry.driverOne || "",
+    driver_two: entry.driverTwo || "",
+  };
+}
 function getCalendarFeedEstimate(hits, days) {
   const limit = Date.now() - days * 24 * 60 * 60 * 1000;
   const recentHits = hits.filter((hit) => new Date(hit.created_at).getTime() >= limit);
   return new Set(recentHits.map((hit) => hit.visitor_hash).filter(Boolean)).size;
+}
+function getDevelopmentCoef(entry) {
+  return Number(entry?.level) || (Number(entry?.speed) || 0) + (Number(entry?.acceleration) || 0) + (Number(entry?.grip) || 0) + (Number(entry?.turbo) || 0);
+}
+function getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId) {
+  return entries
+    .filter((entry) => normalizeSeasonId(entry.seasonId) === normalizeSeasonId(selectedSeasonId) && normalizeCategoryId(entry.categoryId) === normalizeCategoryId(selectedCategoryId))
+    .sort((a, b) => (Number(a.round) || 0) - (Number(b.round) || 0));
+}
+function getLatestDevelopmentByTeam(entries, teams) {
+  const map = new Map();
+  entries.forEach((entry) => {
+    const current = map.get(String(entry.teamId));
+    if (!current || Number(entry.round) >= Number(current.round)) map.set(String(entry.teamId), entry);
+  });
+  return teams
+    .map((team) => ({ team, entry: map.get(String(team.id)) }))
+    .filter((item) => item.entry)
+    .sort((a, b) => getDevelopmentCoef(b.entry) - getDevelopmentCoef(a.entry));
+}
+function getPreviousDevelopmentEntry(entries, target) {
+  return entries
+    .filter((entry) => idsEqual(entry.teamId, target.teamId) && normalizeSeasonId(entry.seasonId) === normalizeSeasonId(target.seasonId) && normalizeCategoryId(entry.categoryId) === normalizeCategoryId(target.categoryId) && Number(entry.round) < Number(target.round))
+    .sort((a, b) => Number(b.round) - Number(a.round))[0] || null;
 }
 function mapRaceResultFromDb(result, entries = []) {
   return {
@@ -783,6 +839,7 @@ export default function URTTAdminPanel() {
   const [calendarFeedHits, setCalendarFeedHits] = useState([]);
   const [raceResults, setRaceResults] = useState([]);
   const [seasonTitles, setSeasonTitles] = useState([]);
+  const [developmentEntries, setDevelopmentEntries] = useState([]);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [editingDriverId, setEditingDriverId] = useState(null);
@@ -791,6 +848,7 @@ export default function URTTAdminPanel() {
   const [raceForm, setRaceForm] = useState(emptyRace);
   const [calendarRaceForm, setCalendarRaceForm] = useState(emptyCalendarRace);
   const [calendarEventForm, setCalendarEventForm] = useState(emptyCalendarEvent);
+  const [developmentForm, setDevelopmentForm] = useState(emptyDevelopmentForm);
   const [selectedRaceId, setSelectedRaceId] = useState("");
   const [popup, setPopup] = useState(null);
   const [search, setSearch] = useState("");
@@ -828,6 +886,7 @@ export default function URTTAdminPanel() {
         { data: calendarEventsData, error: calendarEventsError },
         { data: calendarFeedHitsData, error: calendarFeedHitsError },
         { data: seasonTitlesData, error: seasonTitlesError },
+        { data: developmentData, error: developmentError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
       ] = await Promise.all([
@@ -840,6 +899,7 @@ export default function URTTAdminPanel() {
         supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
         supabase.from("calendar_feed_hits").select("visitor_hash, user_agent, created_at").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
+        supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
       ]);
@@ -854,6 +914,7 @@ export default function URTTAdminPanel() {
         calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
         calendarFeedHitsError && calendarFeedHitsError.code !== "42P01" && `calendar_feed_hits: ${calendarFeedHitsError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
+        developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
       ].filter(Boolean);
@@ -874,6 +935,7 @@ export default function URTTAdminPanel() {
       setCalendarEvents((calendarEventsData || []).map(mapCalendarEventFromDb));
       setCalendarFeedHits(calendarFeedHitsData || []);
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
+      setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
       setIsLoadingData(false);
@@ -1383,6 +1445,43 @@ export default function URTTAdminPanel() {
     setCalendarEvents((current) => current.filter((event) => !idsEqual(event.id, eventId)));
   }
 
+  async function saveDevelopmentEntry() {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier le developpement." });
+      return;
+    }
+
+    if (!developmentForm.teamId) {
+      setPopup({ type: "error", title: "Developpement incomplet", message: "Choisis une ecurie avant d'enregistrer." });
+      return;
+    }
+
+    const payload = { ...developmentForm, seasonId: selectedSeasonId, categoryId: selectedCategoryId };
+    const existing = developmentEntries.find((entry) => idsEqual(entry.teamId, payload.teamId) && normalizeSeasonId(entry.seasonId) === normalizeSeasonId(payload.seasonId) && normalizeCategoryId(entry.categoryId) === normalizeCategoryId(payload.categoryId) && Number(entry.round) === Number(payload.round));
+    const request = existing
+      ? supabase.from("team_development").update(mapDevelopmentToDb(payload)).eq("id", existing.id).select().single()
+      : supabase.from("team_development").insert(mapDevelopmentToDb(payload)).select().single();
+
+    setIsSaving(true);
+    const { data, error } = await request;
+    setIsSaving(false);
+
+    if (error) {
+      console.error("Erreur developpement:", error);
+      const missingTable = error.code === "42P01";
+      setPopup({ type: "error", title: "Erreur Supabase", message: missingTable ? "La table team_development n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible d'enregistrer le developpement." });
+      return;
+    }
+
+    const nextEntry = mapDevelopmentFromDb(data);
+    setDevelopmentEntries((current) => {
+      const withoutEntry = current.filter((entry) => !idsEqual(entry.id, nextEntry.id));
+      return [...withoutEntry, nextEntry].sort((a, b) => Number(a.round) - Number(b.round));
+    });
+    setDevelopmentForm((current) => ({ ...emptyDevelopmentForm, seasonId: selectedSeasonId, categoryId: selectedCategoryId, round: Number(current.round) + 1, teamId: current.teamId }));
+    setPopup({ type: "success", title: "Developpement enregistre", message: "La fiche developpement a ete mise a jour." });
+  }
+
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
     const draftEntry = draft.find((entry) => idsEqual(entry.driverId, driverId));
@@ -1666,6 +1765,7 @@ export default function URTTAdminPanel() {
           allRaces={allRaces}
           raceResults={raceResults}
           seasonTitles={seasonTitles}
+          developmentEntries={developmentEntries}
           allDrivers={drivers}
           onOpenAdmin={() => { setView("login"); setLoginError(""); }}
         />
@@ -1710,6 +1810,7 @@ export default function URTTAdminPanel() {
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
+          {adminPage === "development" && <DevelopmentAdminPanel teams={teams} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} isSaving={isSaving} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel seasons={seasonOptions} onAddSeason={addSeason} isSaving={isSaving} />}
           
@@ -2006,7 +2107,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], allDrivers, teams = [], onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], allDrivers, teams = [], onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -2027,8 +2128,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <nav className="urtt-public-nav" style={styles.publicNav}>
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.seasonSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-        {["home", "standings", "drivers", "teams", "seasons", "world"].map((key) => {
-          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", world: "Carte" };
+        {["home", "standings", "drivers", "teams", "seasons", "development", "world"].map((key) => {
+          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", development: "Développement", world: "Carte" };
           return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(publicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
         })}
       </nav>
@@ -2038,6 +2139,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {publicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {publicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {publicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {publicPage === "development" && <DevelopmentPage teams={teams} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
         {publicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -2227,6 +2329,84 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
+function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCategoryId }) {
+  const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
+  const latestByTeam = getLatestDevelopmentByTeam(selectedEntries, teams);
+  return (
+    <div style={styles.section}>
+      <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
+        <DevelopmentChart teams={teams} entries={selectedEntries} />
+      </Card>
+      <div style={styles.developmentCards}>
+        {latestByTeam.map(({ team, entry }) => <DevelopmentTeamCard key={team.id} team={team} entry={entry} previous={getPreviousDevelopmentEntry(selectedEntries, entry)} />)}
+      </div>
+      {latestByTeam.length === 0 && <Empty text="Aucune donnée de développement pour cette saison/catégorie." />}
+    </div>
+  );
+}
+
+function DevelopmentChart({ teams, entries = [] }) {
+  const rounds = Array.from(new Set(entries.map((entry) => Number(entry.round) || 1))).sort((a, b) => a - b);
+  const maxRound = Math.max(...rounds, 1);
+  const maxValue = Math.max(10, ...entries.map(getDevelopmentCoef));
+  const width = 920;
+  const height = 300;
+  const pad = 38;
+  const x = (round) => pad + ((Number(round) - 1) / Math.max(maxRound - 1, 1)) * (width - pad * 2);
+  const y = (value) => height - pad - (Number(value) / maxValue) * (height - pad * 2);
+  const entriesByTeam = teams.map((team) => ({
+    team,
+    entries: entries.filter((entry) => idsEqual(entry.teamId, team.id)).sort((a, b) => Number(a.round) - Number(b.round)),
+  })).filter((item) => item.entries.length);
+
+  if (entriesByTeam.length === 0) return <Empty text="Ajoute des données dans Admin > Développement." />;
+
+  return (
+    <div style={styles.developmentChartWrap}>
+      <svg viewBox={`0 0 ${width} ${height}`} style={styles.developmentChart} role="img" aria-label="Courbe de développement des écuries">
+        {Array.from({ length: 6 }, (_, index) => {
+          const value = Math.round((maxValue / 5) * index);
+          return <g key={value}><line x1={pad} y1={y(value)} x2={width - pad} y2={y(value)} stroke="rgba(255,255,255,.08)" /><text x={8} y={y(value) + 4} fill="#a1a1aa" fontSize="11">{value}</text></g>;
+        })}
+        {rounds.map((round) => <g key={round}><line x1={x(round)} y1={pad} x2={x(round)} y2={height - pad} stroke="rgba(255,255,255,.05)" /><text x={x(round) - 8} y={height - 10} fill="#a1a1aa" fontSize="11">R{round}</text></g>)}
+        {entriesByTeam.map(({ team, entries: teamEntries }) => {
+          const points = teamEntries.map((entry) => `${x(entry.round)},${y(getDevelopmentCoef(entry))}`).join(" ");
+          return <g key={team.id}><polyline points={points} fill="none" stroke={team.color || "#dc2626"} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />{teamEntries.map((entry) => <circle key={entry.id || `${team.id}-${entry.round}`} cx={x(entry.round)} cy={y(getDevelopmentCoef(entry))} r="4" fill={team.color || "#dc2626"} />)}</g>;
+        })}
+      </svg>
+      <div style={styles.developmentLegend}>{entriesByTeam.map(({ team }) => <span key={team.id} style={styles.developmentLegendItem}><span style={{ ...styles.mediaDot, background: team.color || "#dc2626" }} />{team.name}</span>)}</div>
+    </div>
+  );
+}
+
+function DevelopmentTeamCard({ team, entry, previous }) {
+  const delta = previous ? getDevelopmentCoef(entry) - getDevelopmentCoef(previous) : 0;
+  return (
+    <div style={{ ...styles.developmentCard, borderTop: `4px solid ${team.color || "#dc2626"}` }}>
+      <div style={styles.developmentCardHeader}>
+        <TeamIdentity team={team} />
+        <span style={{ ...styles.badgeDark, background: team.color || "#3f3f46" }}>R{entry.round}</span>
+      </div>
+      <div style={styles.developmentStats}>
+        <DevelopmentStat label="Speed" value={entry.speed} previous={previous?.speed} />
+        <DevelopmentStat label="Acceleration" value={entry.acceleration} previous={previous?.acceleration} />
+        <DevelopmentStat label="Grip" value={entry.grip} previous={previous?.grip} />
+        <DevelopmentStat label="Turbo" value={entry.turbo} previous={previous?.turbo} />
+      </div>
+      <div style={styles.developmentDrivers}>
+        <strong>{entry.driverOne || "Pilote 1"}</strong>
+        <strong>{entry.driverTwo || "Pilote 2"}</strong>
+        <span style={styles.mutedSmall}>Niveau {getDevelopmentCoef(entry)}{delta ? ` (${delta > 0 ? "+" : ""}${delta})` : ""}</span>
+      </div>
+    </div>
+  );
+}
+
+function DevelopmentStat({ label, value, previous }) {
+  const delta = Number(value) - Number(previous || value);
+  return <div style={styles.developmentStat}><span style={styles.mutedSmall}>{label}</span><strong>{value}</strong>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</div>;
+}
+
 function MediaLinksCard() {
   return (
     <Card title="AREKU_F1 en vidéo" icon="▶️">
@@ -2246,7 +2426,7 @@ function MediaLinksCard() {
 }
 
 function AdminLayout({ active, setActive, adminUser, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
+  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
   return (
     <div className="urtt-admin-page" style={styles.page}>
       <aside className="urtt-admin-sidebar" style={styles.sidebar}>
@@ -2354,6 +2534,45 @@ function PlanningPanel({ races, calendarEvents = [], eventForm, setEventForm, se
 
       <Card title="Aperçu public" icon="📅">
         <div style={styles.stack}>{upcomingRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · Course #{race.round}</p></div><span style={styles.badgeGreen}>{formatRaceDate(race.startAt)}</span></div>)}{upcomingRaces.length === 0 && <Empty text="Aucune course future programmée." />}</div>
+      </Card>
+    </div>
+  );
+}
+
+function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, isSaving }) {
+  const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
+  const update = (key, value) => setForm({ ...form, seasonId: selectedSeasonId, categoryId: selectedCategoryId, [key]: value });
+  const editEntry = (entry) => setForm({ ...entry });
+
+  return (
+    <div style={styles.section}>
+      <Card title="Développement écuries" icon="📈">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Écurie</span><select value={form.teamId || ""} onChange={(event) => update("teamId", event.target.value)} style={styles.resultsSelect}><option value="">Choisir une écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
+          <Input label="Round" type="number" value={form.round} onChange={(value) => update("round", value)} />
+        </div>
+        <div style={styles.formGrid}>
+          <Input label="Speed" type="number" value={form.speed} onChange={(value) => update("speed", value)} />
+          <Input label="Acceleration" type="number" value={form.acceleration} onChange={(value) => update("acceleration", value)} />
+          <Input label="Grip" type="number" value={form.grip} onChange={(value) => update("grip", value)} />
+          <Input label="Turbo" type="number" value={form.turbo} onChange={(value) => update("turbo", value)} />
+          <Input label="Niveau / coef" type="number" value={form.level} onChange={(value) => update("level", value)} />
+          <Input label="Pilote 1" value={form.driverOne} onChange={(value) => update("driverOne", value)} />
+          <Input label="Pilote 2" value={form.driverTwo} onChange={(value) => update("driverTwo", value)} />
+        </div>
+        <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : "Enregistrer le développement"}</button>
+      </Card>
+
+      <Card title={`Données enregistrées — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📋">
+        <div style={styles.stack}>
+          {selectedEntries.map((entry) => {
+            const team = teams.find((item) => idsEqual(item.id, entry.teamId));
+            return <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}><div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Coef {getDevelopmentCoef(entry)} · Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip} · Turbo {entry.turbo}</p></div><button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button></div>;
+          })}
+          {selectedEntries.length === 0 && <Empty text="Aucune donnée enregistrée pour cette sélection." />}
+        </div>
       </Card>
     </div>
   );
@@ -3136,6 +3355,18 @@ const styles = {
   mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
+  developmentChartWrap: { display: "grid", gap: 14 },
+  developmentChart: { width: "100%", minHeight: 260, background: "#09090b", border: "1px solid #27272a", borderRadius: 18 },
+  developmentLegend: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" },
+  developmentLegendItem: { display: "inline-flex", gap: 6, alignItems: "center", color: "#d4d4d8", fontWeight: 900 },
+  developmentCards: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 16 },
+  developmentCard: { background: "#101827", border: "1px solid #1f2937", borderRadius: 18, padding: 16, display: "grid", gap: 14, boxShadow: "0 18px 42px rgba(0,0,0,.22)" },
+  developmentCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
+  developmentStats: { display: "grid", gap: 8 },
+  developmentStat: { background: "#151f2e", border: "1px solid #1f2937", borderRadius: 10, padding: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  developmentDrivers: { display: "grid", gap: 6 },
+  devDeltaUp: { color: "#22c55e", fontSize: 12, fontWeight: 950 },
+  devDeltaDown: { color: "#ef4444", fontSize: 12, fontWeight: 950 },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
   itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
   raceLibraryInfo: { minWidth: 180 },
