@@ -61,7 +61,7 @@ const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, drive
 const emptyRace = { name: "", country: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
-const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, level: 0, driverOne: "", driverTwo: "" };
+const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "" };
 
 const demoTeams = [
   { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesF3: 0, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesF3: 0, teamTitlesFE: 0, tripleCrowns: 0 },
@@ -384,6 +384,7 @@ function mapDevelopmentFromDb(entry) {
     acceleration: Number(entry.acceleration) || 0,
     grip: Number(entry.grip) || 0,
     turbo: Number(entry.turbo) || 0,
+    turboEnabled: Boolean(entry.turbo_enabled),
     level: Number(entry.level) || 0,
     driverOne: entry.driver_one || "",
     driverTwo: entry.driver_two || "",
@@ -398,7 +399,8 @@ function mapDevelopmentToDb(entry) {
     speed: Number(entry.speed) || 0,
     acceleration: Number(entry.acceleration) || 0,
     grip: Number(entry.grip) || 0,
-    turbo: Number(entry.turbo) || 0,
+    turbo: entry.turboEnabled ? Number(entry.turbo) || 0 : 0,
+    turbo_enabled: Boolean(entry.turboEnabled),
     level: Number(entry.level) || 0,
     driver_one: entry.driverOne || "",
     driver_two: entry.driverTwo || "",
@@ -410,7 +412,7 @@ function getCalendarFeedEstimate(hits, days) {
   return new Set(recentHits.map((hit) => hit.visitor_hash).filter(Boolean)).size;
 }
 function getDevelopmentCoef(entry) {
-  return Number(entry?.level) || (Number(entry?.speed) || 0) + (Number(entry?.acceleration) || 0) + (Number(entry?.grip) || 0) + (Number(entry?.turbo) || 0);
+  return Number(entry?.level) || (Number(entry?.speed) || 0) + (Number(entry?.acceleration) || 0) + (Number(entry?.grip) || 0) + (entry?.turboEnabled ? Number(entry?.turbo) || 0 : 0);
 }
 function getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId) {
   return entries
@@ -2390,7 +2392,7 @@ function DevelopmentTeamCard({ team, entry, previous }) {
         <DevelopmentStat label="Speed" value={entry.speed} previous={previous?.speed} />
         <DevelopmentStat label="Acceleration" value={entry.acceleration} previous={previous?.acceleration} />
         <DevelopmentStat label="Grip" value={entry.grip} previous={previous?.grip} />
-        <DevelopmentStat label="Turbo" value={entry.turbo} previous={previous?.turbo} />
+        {entry.turboEnabled && <DevelopmentStat label="Turbo" value={entry.turbo} previous={previous?.turboEnabled ? previous?.turbo : undefined} />}
       </div>
     </div>
   );
@@ -2537,12 +2539,16 @@ function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCat
   const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
   const update = (key, value) => setForm({ ...form, seasonId: selectedSeasonId, categoryId: selectedCategoryId, [key]: value });
   const editEntry = (entry) => setForm({ ...entry });
+  const updateCategory = (value) => {
+    setSelectedCategoryId(value);
+    setForm({ ...form, categoryId: value, turboEnabled: normalizeCategoryId(value) === "FE" ? true : form.turboEnabled });
+  };
 
   return (
     <div style={styles.section}>
       <Card title="Développement écuries" icon="📈">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => updateCategory(event.target.value)} style={styles.resultsSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Écurie</span><select value={form.teamId || ""} onChange={(event) => update("teamId", event.target.value)} style={styles.resultsSelect}><option value="">Choisir une écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label>
           <Input label="Round" type="number" value={form.round} onChange={(value) => update("round", value)} />
@@ -2551,7 +2557,8 @@ function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCat
           <Input label="Speed" type="number" value={form.speed} onChange={(value) => update("speed", value)} />
           <Input label="Acceleration" type="number" value={form.acceleration} onChange={(value) => update("acceleration", value)} />
           <Input label="Grip" type="number" value={form.grip} onChange={(value) => update("grip", value)} />
-          <Input label="Turbo" type="number" value={form.turbo} onChange={(value) => update("turbo", value)} />
+          <label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.turboEnabled)} onChange={(event) => update("turboEnabled", event.target.checked)} /> Activer Turbo</label>
+          {form.turboEnabled && <Input label="Turbo" type="number" value={form.turbo} onChange={(value) => update("turbo", value)} />}
         </div>
         <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : "Enregistrer le développement"}</button>
       </Card>
@@ -2560,7 +2567,7 @@ function DevelopmentAdminPanel({ teams, entries = [], form, setForm, selectedCat
         <div style={styles.stack}>
           {selectedEntries.map((entry) => {
             const team = teams.find((item) => idsEqual(item.id, entry.teamId));
-            return <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}><div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip} · Turbo {entry.turbo}</p></div><button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button></div>;
+            return <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}><div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip}{entry.turboEnabled ? ` · Turbo ${entry.turbo}` : ""}</p></div><button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button></div>;
           })}
           {selectedEntries.length === 0 && <Empty text="Aucune donnée enregistrée pour cette sélection." />}
         </div>
