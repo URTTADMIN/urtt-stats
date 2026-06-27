@@ -11,6 +11,10 @@ const CATEGORY_OPTIONS = [
   { id: "F3", name: "F3", color: "#f97316" },
   { id: "FE", name: "FE", color: "#16a34a" },
 ];
+const SPECIAL_EVENT_OPTIONS = [
+  { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
+  { id: "INDY300", name: "Indy 300", color: "#ffff00" },
+];
 
 function getSeasonOptions() {
   return runtimeSeasonOptions;
@@ -61,6 +65,7 @@ const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, drive
 const emptyRace = { name: "", country: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
+const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", fastestDriverId: "", podium: "", notes: "", sortOrder: 1 };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const defaultSiteSettings = { publicDevelopmentEnabled: true };
 const DEVELOPMENT_COEFFICIENTS = {
@@ -230,6 +235,9 @@ function isSeasonIncluded(targetSeasonId, selectedSeasonId) {
 function getCategoryColor(categoryId) {
   return CATEGORY_OPTIONS.find((category) => category.id === normalizeCategoryId(categoryId))?.color || "#3f3f46";
 }
+function getSpecialEventName(eventType) {
+  return SPECIAL_EVENT_OPTIONS.find((event) => event.id === eventType)?.name || eventType || "Événement";
+}
 function seasonName(id) {
   return getSeasonOptions().find((season) => season.id === normalizeSeasonId(id))?.name || id;
 }
@@ -359,6 +367,35 @@ function mapCalendarEventFromDb(event) {
     description: event.description || "",
     startAt: event.start_at || "",
     endAt: event.end_at || "",
+  };
+}
+function mapSpecialEditionFromDb(edition) {
+  return {
+    id: edition.id,
+    eventType: edition.event_type || "LEMANS24",
+    editionLabel: edition.edition_label || "",
+    name: edition.name || "",
+    date: edition.date || "",
+    winnerDriverId: edition.winner_driver_id || "",
+    poleDriverId: edition.pole_driver_id || "",
+    fastestDriverId: edition.fastest_driver_id || "",
+    podium: edition.podium || "",
+    notes: edition.notes || "",
+    sortOrder: Number(edition.sort_order) || 0,
+  };
+}
+function mapSpecialEditionToDb(edition) {
+  return {
+    event_type: edition.eventType,
+    edition_label: edition.editionLabel.trim(),
+    name: edition.name.trim(),
+    date: edition.date || null,
+    winner_driver_id: edition.winnerDriverId ? Number(edition.winnerDriverId) : null,
+    pole_driver_id: edition.poleDriverId ? Number(edition.poleDriverId) : null,
+    fastest_driver_id: edition.fastestDriverId ? Number(edition.fastestDriverId) : null,
+    podium: edition.podium.trim(),
+    notes: edition.notes.trim(),
+    sort_order: Number(edition.sortOrder) || 0,
   };
 }
 function mapSeasonTitleFromDb(title) {
@@ -882,6 +919,7 @@ export default function URTTAdminPanel() {
   const [allCalendarRaces, setAllCalendarRaces] = useState([]);
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [calendarFeedHits, setCalendarFeedHits] = useState([]);
+  const [specialEditions, setSpecialEditions] = useState([]);
   const [raceResults, setRaceResults] = useState([]);
   const [seasonTitles, setSeasonTitles] = useState([]);
   const [developmentEntries, setDevelopmentEntries] = useState([]);
@@ -894,6 +932,8 @@ export default function URTTAdminPanel() {
   const [raceForm, setRaceForm] = useState(emptyRace);
   const [calendarRaceForm, setCalendarRaceForm] = useState(emptyCalendarRace);
   const [calendarEventForm, setCalendarEventForm] = useState(emptyCalendarEvent);
+  const [specialEditionForm, setSpecialEditionForm] = useState(emptySpecialEdition);
+  const [editingSpecialEditionId, setEditingSpecialEditionId] = useState(null);
   const [developmentForm, setDevelopmentForm] = useState(emptyDevelopmentForm);
   const [selectedRaceId, setSelectedRaceId] = useState("");
   const [popup, setPopup] = useState(null);
@@ -931,6 +971,7 @@ export default function URTTAdminPanel() {
         { data: calendarData, error: calendarError },
         { data: calendarEventsData, error: calendarEventsError },
         { data: calendarFeedHitsData, error: calendarFeedHitsError },
+        { data: specialEditionsData, error: specialEditionsError },
         { data: seasonTitlesData, error: seasonTitlesError },
         { data: developmentData, error: developmentError },
         { data: siteSettingsData, error: siteSettingsError },
@@ -945,6 +986,7 @@ export default function URTTAdminPanel() {
         supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
         supabase.from("calendar_feed_hits").select("visitor_hash, user_agent, created_at").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }),
+        supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("site_settings").select("*"),
@@ -961,6 +1003,7 @@ export default function URTTAdminPanel() {
         calendarError && `season_calendar: ${calendarError.message}`,
         calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
         calendarFeedHitsError && calendarFeedHitsError.code !== "42P01" && `calendar_feed_hits: ${calendarFeedHitsError.message}`,
+        specialEditionsError && specialEditionsError.code !== "42P01" && `special_event_editions: ${specialEditionsError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
@@ -983,6 +1026,7 @@ export default function URTTAdminPanel() {
       setAllCalendarRaces(mappedCalendar);
       setCalendarEvents((calendarEventsData || []).map(mapCalendarEventFromDb));
       setCalendarFeedHits(calendarFeedHitsData || []);
+      setSpecialEditions((specialEditionsData || []).map(mapSpecialEditionFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
@@ -1495,6 +1539,70 @@ export default function URTTAdminPanel() {
     setCalendarEvents((current) => current.filter((event) => !idsEqual(event.id, eventId)));
   }
 
+  async function saveSpecialEdition() {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les editions." });
+      return;
+    }
+
+    if (!specialEditionForm.editionLabel.trim()) {
+      setPopup({ type: "error", title: "Edition incomplete", message: "Ajoute au moins un nom d'edition, par exemple S3." });
+      return;
+    }
+
+    setIsSaving(true);
+    const request = editingSpecialEditionId
+      ? supabase.from("special_event_editions").update(mapSpecialEditionToDb(specialEditionForm)).eq("id", editingSpecialEditionId).select().single()
+      : supabase.from("special_event_editions").insert(mapSpecialEditionToDb(specialEditionForm)).select().single();
+
+    const { data, error } = await request;
+    setIsSaving(false);
+
+    if (error) {
+      console.error("Erreur edition speciale:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table special_event_editions n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible d'enregistrer cette edition." });
+      return;
+    }
+
+    const edition = mapSpecialEditionFromDb(data);
+    setSpecialEditions((current) => {
+      const withoutEdition = current.filter((item) => !idsEqual(item.id, edition.id));
+      return [...withoutEdition, edition].sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
+    });
+    setSpecialEditionForm({ ...emptySpecialEdition, eventType: specialEditionForm.eventType, sortOrder: Number(specialEditionForm.sortOrder) + 1 });
+    setEditingSpecialEditionId(null);
+    setPopup({ type: "success", title: "Edition enregistree", message: `${getSpecialEventName(edition.eventType)} ${edition.editionLabel} a ete mise a jour.` });
+  }
+
+  async function deleteSpecialEdition(editionId) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les editions." });
+      return;
+    }
+
+    if (!window.confirm("Supprimer cette edition ?")) return;
+
+    setIsSaving(true);
+    const { error } = await supabase
+      .from("special_event_editions")
+      .delete()
+      .eq("id", editionId);
+    setIsSaving(false);
+
+    if (error) {
+      console.error("Erreur suppression edition speciale:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de supprimer cette edition." });
+      return;
+    }
+
+    setSpecialEditions((current) => current.filter((edition) => !idsEqual(edition.id, editionId)));
+    if (idsEqual(editingSpecialEditionId, editionId)) {
+      setEditingSpecialEditionId(null);
+      setSpecialEditionForm(emptySpecialEdition);
+    }
+    setPopup({ type: "success", title: "Edition supprimee", message: "L'edition a ete retiree." });
+  }
+
   async function saveDevelopmentEntry(rows = []) {
     if (!adminUser) {
       setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier le developpement." });
@@ -1872,6 +1980,7 @@ export default function URTTAdminPanel() {
           races={currentSeasonRaces}
           countdownRaces={allCalendarRaces}
           calendarEvents={calendarEvents}
+          specialEditions={specialEditions}
           raceLibrary={raceLibrary}
           allRaces={allRaces}
           raceResults={raceResults}
@@ -1929,6 +2038,7 @@ export default function URTTAdminPanel() {
           {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={racesBySelectedCategory} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
+          {adminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {adminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)))} teams={teams} selectedCategoryId={selectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} races={currentSeasonRaces} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {adminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
@@ -2226,13 +2336,13 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], adminUser = null, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], adminUser = null, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
   const canSeeDevelopment = siteSettings.publicDevelopmentEnabled !== false || isAdminPreview;
-  const publicPages = ["home", "standings", "drivers", "teams", "seasons", ...(canSeeDevelopment ? ["development"] : []), "world"];
+  const publicPages = ["home", "standings", "drivers", "teams", "seasons", "editions", ...(canSeeDevelopment ? ["development"] : []), "world"];
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : "home";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -2254,7 +2364,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.seasonSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
         {publicPages.map((key) => {
-          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", development: "Développement", world: "Carte" };
+          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", editions: "Éditions", development: "Développement", world: "Carte" };
           return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
         })}
       </nav>
@@ -2264,6 +2374,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && siteSettings.publicDevelopmentEnabled === false} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
@@ -2454,6 +2565,42 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
+function SpecialEditionsPage({ editions = [], drivers = [] }) {
+  const sortedEditions = [...editions].sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
+  return (
+    <div style={styles.section}>
+      {SPECIAL_EVENT_OPTIONS.map((event) => {
+        const eventEditions = sortedEditions.filter((edition) => edition.eventType === event.id);
+        return (
+          <Card key={event.id} title={event.name} icon="🏁">
+            <div style={styles.stack}>
+              {eventEditions.map((edition) => (
+                <div key={edition.id} style={{ ...styles.publicRaceCard, borderColor: event.color }}>
+                  <div style={styles.publicRaceHeader}>
+                    <div>
+                      <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"}</p>
+                      <h3 style={styles.raceTitle}>{edition.editionLabel}{edition.name ? ` · ${edition.name}` : ""}</h3>
+                    </div>
+                    <span style={{ ...styles.categoryBadge, background: event.color, color: event.id === "INDY300" ? "#18181b" : "white" }}>{event.name}</span>
+                  </div>
+                  <div style={styles.raceStatsGrid}>
+                    <RaceStat label="Vainqueur" value={driverName(drivers, edition.winnerDriverId)} />
+                    <RaceStat label="Poleman" value={driverName(drivers, edition.poleDriverId)} />
+                    <RaceStat label="Meilleur tour" value={driverName(drivers, edition.fastestDriverId)} />
+                    <RaceStat label="Podium" value={edition.podium} />
+                  </div>
+                  {edition.notes && <p style={styles.mutedSmall}>{edition.notes}</p>}
+                </div>
+              ))}
+              {eventEditions.length === 0 && <Empty text={`Aucune édition ${event.name} enregistrée.`} />}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
 function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, selectedCategoryId, isAdminPreview = false }) {
   const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
   const seasonTeams = getSeasonCategoryTeams(teams, drivers, selectedSeasonId, selectedCategoryId);
@@ -2553,7 +2700,7 @@ function MediaLinksCard() {
 }
 
 function AdminLayout({ active, setActive, adminUser, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
+  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["editions", "🏁", "Éditions"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
   return (
     <div className="urtt-admin-page" style={styles.page}>
       <aside className="urtt-admin-sidebar" style={styles.sidebar}>
@@ -2821,6 +2968,63 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
     update("logo", data.publicUrl);
   }
   return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote F3" type="number" value={form.driverTitlesF3 ?? 0} onChange={(value) => update("driverTitlesF3", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titre constructeur F1" type="number" value={form.teamTitlesF1 ?? form.teamTitles ?? 0} onChange={updateTeamTitleF1} /><Input label="Titre constructeur F2" type="number" value={form.teamTitlesF2 ?? 0} onChange={(value) => update("teamTitlesF2", value)} /><Input label="Titre constructeur F3" type="number" value={form.teamTitlesF3 ?? 0} onChange={(value) => update("teamTitlesF3", value)} /><Input label="Titre constructeur FE" type="number" value={form.teamTitlesFE ?? 0} onChange={(value) => update("teamTitlesFE", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+}
+
+function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, editingId, setEditingId, onSave, onDelete, isSaving }) {
+  const update = (key, value) => setForm({ ...form, [key]: value });
+  const editEdition = (edition) => {
+    setEditingId(edition.id);
+    setForm({ ...emptySpecialEdition, ...edition });
+  };
+  const cancel = () => {
+    setEditingId(null);
+    setForm(emptySpecialEdition);
+  };
+  const sortedEditions = [...editions].sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
+
+  return (
+    <div style={styles.twoColumnsSmallLeft}>
+      <Card title={editingId ? "Modifier une édition" : "Créer une édition"} icon="🏁">
+        <div style={styles.stack}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={form.eventType} onChange={(event) => update("eventType", event.target.value)} style={styles.input}>{SPECIAL_EVENT_OPTIONS.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select></label>
+          <Input label="Édition" value={form.editionLabel} onChange={(value) => update("editionLabel", value)} />
+          <Input label="Nom optionnel" value={form.name} onChange={(value) => update("name", value)} />
+          <Input label="Date" type="date" value={form.date || ""} onChange={(value) => update("date", value)} />
+          <Input label="Ordre d'affichage" type="number" value={form.sortOrder} onChange={(value) => update("sortOrder", value)} />
+          <div style={styles.formGrid}>
+            <DriverSelect label="Vainqueur" value={form.winnerDriverId} onChange={(value) => update("winnerDriverId", value)} drivers={drivers} />
+            <DriverSelect label="Poleman" value={form.poleDriverId} onChange={(value) => update("poleDriverId", value)} drivers={drivers} />
+            <DriverSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={drivers} />
+          </div>
+          <label style={styles.label}><span style={styles.labelText}>Podium</span><input value={form.podium} onChange={(event) => update("podium", event.target.value)} placeholder="Pilote 1 · Pilote 2 · Pilote 3" style={styles.input} /></label>
+          <label style={styles.label}><span style={styles.labelText}>Notes</span><textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} rows={4} style={styles.textarea} /></label>
+          <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier l'édition" : "Créer l'édition"}</button>
+          {editingId && <button type="button" onClick={cancel} style={styles.secondaryButton}>Annuler</button>}
+        </div>
+      </Card>
+      <Card title="Éditions enregistrées" icon="📋">
+        <div style={styles.stack}>
+          {sortedEditions.map((edition) => (
+            <div key={edition.id} style={styles.itemBox}>
+              <div>
+                <strong>{getSpecialEventName(edition.eventType)} · {edition.editionLabel}</strong>
+                <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"} · Vainqueur {driverName(drivers, edition.winnerDriverId)}</p>
+              </div>
+              <div style={styles.actions}>
+                <button type="button" onClick={() => editEdition(edition)} style={styles.editButton}>Modifier</button>
+                <button type="button" onClick={() => onDelete(edition.id)} disabled={isSaving} style={styles.dangerButton}>Supprimer</button>
+              </div>
+            </div>
+          ))}
+          {sortedEditions.length === 0 && <Empty text="Aucune édition enregistrée." />}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+function DriverSelect({ label, value, onChange, drivers }) {
+  return <label style={styles.label}><span style={styles.labelText}>{label}</span><select value={value || ""} onChange={(event) => onChange(event.target.value)} style={styles.input}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>;
 }
 
 function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [], calendarRaceForm, setCalendarRaceForm, racesBySeason, selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, onSave, onAddToSeason, onDelete, onDeleteLibraryRace, onUpdateLibraryRaceCountry, onMoveRace, onUpdateStartAt, isSavingRace }) {
