@@ -65,7 +65,7 @@ const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, drive
 const emptyRace = { name: "", country: "" };
 const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
-const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", fastestDriverId: "", podium: "", notes: "", sortOrder: 1 };
+const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "", podium: "", notes: "", sortOrder: 1 };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const defaultSiteSettings = { publicDevelopmentEnabled: true };
 const DEVELOPMENT_COEFFICIENTS = {
@@ -264,6 +264,11 @@ function idsEqual(left, right) {
 function driverName(drivers, driverId) {
   return drivers.find((driver) => idsEqual(driver.id, driverId))?.name || "—";
 }
+function specialEditionPodium(edition, drivers) {
+  const podiumIds = [edition.podiumFirstDriverId, edition.podiumSecondDriverId, edition.podiumThirdDriverId].filter(Boolean);
+  if (podiumIds.length) return podiumIds.map((driverId) => driverName(drivers, driverId)).join(" · ");
+  return edition.podium || "—";
+}
 function mapTeamFromDb(team) {
   return {
     id: team.id,
@@ -378,7 +383,9 @@ function mapSpecialEditionFromDb(edition) {
     date: edition.date || "",
     winnerDriverId: edition.winner_driver_id || "",
     poleDriverId: edition.pole_driver_id || "",
-    fastestDriverId: edition.fastest_driver_id || "",
+    podiumFirstDriverId: edition.podium_first_driver_id || "",
+    podiumSecondDriverId: edition.podium_second_driver_id || "",
+    podiumThirdDriverId: edition.podium_third_driver_id || "",
     podium: edition.podium || "",
     notes: edition.notes || "",
     sortOrder: Number(edition.sort_order) || 0,
@@ -392,7 +399,10 @@ function mapSpecialEditionToDb(edition) {
     date: edition.date || null,
     winner_driver_id: edition.winnerDriverId ? Number(edition.winnerDriverId) : null,
     pole_driver_id: edition.poleDriverId ? Number(edition.poleDriverId) : null,
-    fastest_driver_id: edition.fastestDriverId ? Number(edition.fastestDriverId) : null,
+    fastest_driver_id: null,
+    podium_first_driver_id: edition.podiumFirstDriverId ? Number(edition.podiumFirstDriverId) : null,
+    podium_second_driver_id: edition.podiumSecondDriverId ? Number(edition.podiumSecondDriverId) : null,
+    podium_third_driver_id: edition.podiumThirdDriverId ? Number(edition.podiumThirdDriverId) : null,
     podium: edition.podium.trim(),
     notes: edition.notes.trim(),
     sort_order: Number(edition.sortOrder) || 0,
@@ -2586,8 +2596,7 @@ function SpecialEditionsPage({ editions = [], drivers = [] }) {
                   <div style={styles.raceStatsGrid}>
                     <RaceStat label="Vainqueur" value={driverName(drivers, edition.winnerDriverId)} />
                     <RaceStat label="Poleman" value={driverName(drivers, edition.poleDriverId)} />
-                    <RaceStat label="Meilleur tour" value={driverName(drivers, edition.fastestDriverId)} />
-                    <RaceStat label="Podium" value={edition.podium} />
+                    <RaceStat label="Podium" value={specialEditionPodium(edition, drivers)} />
                   </div>
                   {edition.notes && <p style={styles.mutedSmall}>{edition.notes}</p>}
                 </div>
@@ -2994,9 +3003,12 @@ function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, edit
           <div style={styles.formGrid}>
             <DriverSelect label="Vainqueur" value={form.winnerDriverId} onChange={(value) => update("winnerDriverId", value)} drivers={drivers} />
             <DriverSelect label="Poleman" value={form.poleDriverId} onChange={(value) => update("poleDriverId", value)} drivers={drivers} />
-            <DriverSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={drivers} />
           </div>
-          <label style={styles.label}><span style={styles.labelText}>Podium</span><input value={form.podium} onChange={(event) => update("podium", event.target.value)} placeholder="Pilote 1 · Pilote 2 · Pilote 3" style={styles.input} /></label>
+          <div style={styles.formGrid}>
+            <DriverSelect label="Podium P1" value={form.podiumFirstDriverId} onChange={(value) => update("podiumFirstDriverId", value)} drivers={drivers} />
+            <DriverSelect label="Podium P2" value={form.podiumSecondDriverId} onChange={(value) => update("podiumSecondDriverId", value)} drivers={drivers} />
+            <DriverSelect label="Podium P3" value={form.podiumThirdDriverId} onChange={(value) => update("podiumThirdDriverId", value)} drivers={drivers} />
+          </div>
           <label style={styles.label}><span style={styles.labelText}>Notes</span><textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} rows={4} style={styles.textarea} /></label>
           <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier l'édition" : "Créer l'édition"}</button>
           {editingId && <button type="button" onClick={cancel} style={styles.secondaryButton}>Annuler</button>}
