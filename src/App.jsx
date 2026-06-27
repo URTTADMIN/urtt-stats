@@ -63,7 +63,10 @@ const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const defaultSiteSettings = { publicDevelopmentEnabled: true };
-const DEVELOPMENT_COEFFICIENTS = { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 };
+const DEVELOPMENT_COEFFICIENTS = {
+  F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
+  FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
+};
 
 const demoTeams = [
   { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesF3: 0, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesF3: 0, teamTitlesFE: 0, tripleCrowns: 0 },
@@ -414,11 +417,12 @@ function getCalendarFeedEstimate(hits, days) {
   return new Set(recentHits.map((hit) => hit.visitor_hash).filter(Boolean)).size;
 }
 function getDevelopmentCoef(entry) {
+  const coefficients = DEVELOPMENT_COEFFICIENTS[normalizeCategoryId(entry?.categoryId)] || DEVELOPMENT_COEFFICIENTS.F1;
   return Number(entry?.level) || (
-    (Number(entry?.speed) || 0) * DEVELOPMENT_COEFFICIENTS.speed
-    + (Number(entry?.acceleration) || 0) * DEVELOPMENT_COEFFICIENTS.acceleration
-    + (Number(entry?.grip) || 0) * DEVELOPMENT_COEFFICIENTS.grip
-    + (entry?.turboEnabled ? (Number(entry?.turbo) || 0) * DEVELOPMENT_COEFFICIENTS.turbo : 0)
+    (Number(entry?.speed) || 0) * coefficients.speed
+    + (Number(entry?.acceleration) || 0) * coefficients.acceleration
+    + (Number(entry?.grip) || 0) * coefficients.grip
+    + (entry?.turboEnabled ? (Number(entry?.turbo) || 0) * coefficients.turbo : 0)
   );
 }
 function getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId) {
@@ -2259,7 +2263,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
-        {activePublicPage === "development" && <DevelopmentPage teams={teams} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && siteSettings.publicDevelopmentEnabled === false} />}
+        {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && siteSettings.publicDevelopmentEnabled === false} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -2449,9 +2453,16 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCategoryId, isAdminPreview = false }) {
+function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, selectedCategoryId, isAdminPreview = false }) {
   const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
-  const latestByTeam = getLatestDevelopmentByTeam(selectedEntries, teams);
+  const seasonTeams = getSeasonCategoryTeams(teams, drivers, selectedSeasonId, selectedCategoryId);
+  const latestRound = Math.max(1, ...selectedEntries.map((entry) => Number(entry.round) || 1));
+  const savedLatestByTeam = getLatestDevelopmentByTeam(selectedEntries, seasonTeams);
+  const savedMap = new Map(savedLatestByTeam.map((item) => [String(item.team.id), item.entry]));
+  const latestByTeam = seasonTeams.map((team) => ({
+    team,
+    entry: savedMap.get(String(team.id)) || { teamId: team.id, seasonId: selectedSeasonId, categoryId: selectedCategoryId, round: latestRound, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: normalizeCategoryId(selectedCategoryId) === "FE", level: 0 },
+  })).sort((a, b) => getDevelopmentCoef(b.entry) - getDevelopmentCoef(a.entry) || a.team.name.localeCompare(b.team.name, "fr"));
   return (
     <div style={styles.section}>
       {isAdminPreview && <div style={styles.previewNotice}><strong>Aperçu admin</strong><span>Cette page est masquée pour le public.</span></div>}
@@ -2461,7 +2472,7 @@ function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCatego
       <div className="urtt-development-cards" style={styles.developmentCards}>
         {latestByTeam.map(({ team, entry }) => <DevelopmentTeamCard key={team.id} team={team} entry={entry} previous={getPreviousDevelopmentEntry(selectedEntries, entry)} />)}
       </div>
-      {latestByTeam.length === 0 && <Empty text="Aucune donnée de développement pour cette saison/catégorie." />}
+      {latestByTeam.length === 0 && <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />}
     </div>
   );
 }
