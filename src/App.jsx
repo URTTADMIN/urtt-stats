@@ -63,6 +63,7 @@ const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "" };
 const defaultSiteSettings = { publicDevelopmentEnabled: true };
+const DEVELOPMENT_COEFFICIENTS = { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 };
 
 const demoTeams = [
   { id: 101, name: "Apex Racing", color: "#dc2626", logo: "", driverTitles: 1, driverTitlesF1: 1, driverTitlesF2: 1, driverTitlesF3: 0, driverTitlesFE: 0, teamTitles: 3, teamTitlesF1: 3, teamTitlesF2: 0, teamTitlesF3: 0, teamTitlesFE: 0, tripleCrowns: 0 },
@@ -413,7 +414,12 @@ function getCalendarFeedEstimate(hits, days) {
   return new Set(recentHits.map((hit) => hit.visitor_hash).filter(Boolean)).size;
 }
 function getDevelopmentCoef(entry) {
-  return Number(entry?.level) || (Number(entry?.speed) || 0) + (Number(entry?.acceleration) || 0) + (Number(entry?.grip) || 0) + (entry?.turboEnabled ? Number(entry?.turbo) || 0 : 0);
+  return Number(entry?.level) || (
+    (Number(entry?.speed) || 0) * DEVELOPMENT_COEFFICIENTS.speed
+    + (Number(entry?.acceleration) || 0) * DEVELOPMENT_COEFFICIENTS.acceleration
+    + (Number(entry?.grip) || 0) * DEVELOPMENT_COEFFICIENTS.grip
+    + (entry?.turboEnabled ? (Number(entry?.turbo) || 0) * DEVELOPMENT_COEFFICIENTS.turbo : 0)
+  );
 }
 function getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId) {
   return entries
