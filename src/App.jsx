@@ -439,8 +439,9 @@ function getSeasonCategoryTeams(teams, drivers, selectedSeasonId, selectedCatego
     if (teamId) teamIds.add(String(teamId));
   });
 
-  const selectedTeams = teams.filter((team) => teamIds.has(String(team.id)));
-  return (selectedTeams.length ? selectedTeams : teams).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  return teams
+    .filter((team) => teamIds.has(String(team.id)))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
 }
 function getLatestDevelopmentByTeam(entries, teams) {
   const map = new Map();
