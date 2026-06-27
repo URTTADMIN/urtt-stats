@@ -767,6 +767,9 @@ export default function URTTAdminPanel() {
         }
       }
       @media (min-width: 761px) {
+        .urtt-development-cards {
+          grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+        }
         .urtt-public-main:has(.urtt-standings-page) {
           max-width: min(96vw, 1800px) !important;
         }
@@ -830,6 +833,11 @@ export default function URTTAdminPanel() {
         }
         .urtt-public-main .urtt-card {
           width: 100%;
+        }
+      }
+      @media (min-width: 761px) and (max-width: 1180px) {
+        .urtt-development-cards {
+          grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
         }
       }
     `;
@@ -2397,7 +2405,7 @@ function DevelopmentPage({ teams, entries = [], selectedSeasonId, selectedCatego
       <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
         <DevelopmentChart teams={teams} entries={selectedEntries} />
       </Card>
-      <div style={styles.developmentCards}>
+      <div className="urtt-development-cards" style={styles.developmentCards}>
         {latestByTeam.map(({ team, entry }) => <DevelopmentTeamCard key={team.id} team={team} entry={entry} previous={getPreviousDevelopmentEntry(selectedEntries, entry)} />)}
       </div>
       {latestByTeam.length === 0 && <Empty text="Aucune donnée de développement pour cette saison/catégorie." />}
