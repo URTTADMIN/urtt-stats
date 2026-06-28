@@ -273,9 +273,10 @@ function getDriverSpecialEditionRows(driver, editions = []) {
   return editions
     .map((edition) => {
       const roles = [];
-      if (idsEqual(edition.winnerDriverId, driver.id)) roles.push("Vainqueur");
+      const isWinner = idsEqual(edition.winnerDriverId, driver.id);
+      if (isWinner) roles.push("Vainqueur");
       if (idsEqual(edition.poleDriverId, driver.id)) roles.push("Poleman");
-      if (idsEqual(edition.podiumFirstDriverId, driver.id)) roles.push("P1");
+      if (!isWinner && idsEqual(edition.podiumFirstDriverId, driver.id)) roles.push("P1");
       if (idsEqual(edition.podiumSecondDriverId, driver.id)) roles.push("P2");
       if (idsEqual(edition.podiumThirdDriverId, driver.id)) roles.push("P3");
       return { ...edition, roles };
