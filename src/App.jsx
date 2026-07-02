@@ -2666,16 +2666,31 @@ function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, 
 function DevelopmentChart({ teams, entries = [] }) {
   const rounds = Array.from(new Set(entries.map((entry) => Number(entry.round) || 1))).sort((a, b) => a - b);
   const maxRound = Math.max(...rounds, 1);
-  const maxValue = Math.max(10, ...entries.map(getDevelopmentCoef));
-  const width = 920;
-  const height = 300;
-  const pad = 38;
-  const x = (round) => pad + ((Number(round) - 1) / Math.max(maxRound - 1, 1)) * (width - pad * 2);
-  const y = (value) => height - pad - (Number(value) / maxValue) * (height - pad * 2);
+  const values = entries.map(getDevelopmentCoef);
+  const minValue = Math.max(0, Math.floor(Math.min(...values) - 2));
+  const maxValue = Math.ceil(Math.max(10, ...values) + 2);
+  const valueRange = Math.max(maxValue - minValue, 1);
+  const width = 1080;
+  const height = 380;
+  const padLeft = 48;
+  const padRight = 150;
+  const padTop = 34;
+  const padBottom = 46;
+  const x = (round) => padLeft + ((Number(round) - 1) / Math.max(maxRound - 1, 1)) * (width - padLeft - padRight);
+  const y = (value) => height - padBottom - ((Number(value) - minValue) / valueRange) * (height - padTop - padBottom);
   const entriesByTeam = teams.map((team) => ({
     team,
     entries: entries.filter((entry) => idsEqual(entry.teamId, team.id)).sort((a, b) => Number(a.round) - Number(b.round)),
-  })).filter((item) => item.entries.length);
+  })).filter((item) => item.entries.length).sort((a, b) => getDevelopmentCoef(b.entries.at(-1)) - getDevelopmentCoef(a.entries.at(-1)) || a.team.name.localeCompare(b.team.name, "fr"));
+  const labelPositions = new Map();
+  let nextLabelY = padTop + 13;
+  entriesByTeam.forEach(({ team, entries: teamEntries }) => {
+    const lastEntry = teamEntries.at(-1);
+    const labelY = Math.max(y(getDevelopmentCoef(lastEntry)), nextLabelY);
+    const clampedLabelY = Math.min(labelY, height - padBottom - 13);
+    labelPositions.set(String(team.id), clampedLabelY);
+    nextLabelY = clampedLabelY + 28;
+  });
 
   if (entriesByTeam.length === 0) return <Empty text="Ajoute des données dans Admin > Développement." />;
 
@@ -2683,13 +2698,13 @@ function DevelopmentChart({ teams, entries = [] }) {
     <div style={styles.developmentChartWrap}>
       <svg viewBox={`0 0 ${width} ${height}`} style={styles.developmentChart} role="img" aria-label="Courbe de développement des écuries">
         {Array.from({ length: 6 }, (_, index) => {
-          const value = Math.round((maxValue / 5) * index);
-          return <g key={value}><line x1={pad} y1={y(value)} x2={width - pad} y2={y(value)} stroke="rgba(255,255,255,.08)" /><text x={8} y={y(value) + 4} fill="#a1a1aa" fontSize="11">{value}</text></g>;
+          const value = Math.round(minValue + (valueRange / 5) * index);
+          return <g key={value}><line x1={padLeft} y1={y(value)} x2={width - padRight} y2={y(value)} stroke="rgba(255,255,255,.12)" /><text x={14} y={y(value) + 4} fill="#d4d4d8" fontSize="12" fontWeight="800">{value}</text></g>;
         })}
-        {rounds.map((round) => <g key={round}><line x1={x(round)} y1={pad} x2={x(round)} y2={height - pad} stroke="rgba(255,255,255,.05)" /><text x={x(round) - 8} y={height - 10} fill="#a1a1aa" fontSize="11">R{round}</text></g>)}
+        {rounds.map((round) => <g key={round}><line x1={x(round)} y1={padTop} x2={x(round)} y2={height - padBottom} stroke="rgba(255,255,255,.07)" /><text x={x(round) - 8} y={height - 15} fill="#d4d4d8" fontSize="12" fontWeight="800">R{round}</text></g>)}
         {entriesByTeam.map(({ team, entries: teamEntries }) => {
           const points = teamEntries.map((entry) => `${x(entry.round)},${y(getDevelopmentCoef(entry))}`).join(" ");
-          return <g key={team.id}><polyline points={points} fill="none" stroke={team.color || "#dc2626"} strokeWidth="3" strokeLinejoin="round" strokeLinecap="round" />{teamEntries.map((entry) => <circle key={entry.id || `${team.id}-${entry.round}`} cx={x(entry.round)} cy={y(getDevelopmentCoef(entry))} r="4" fill={team.color || "#dc2626"} />)}</g>;
+          return <g key={team.id}><polyline points={points} fill="none" stroke="rgba(0,0,0,.72)" strokeWidth="8" strokeLinejoin="round" strokeLinecap="round" /><polyline points={points} fill="none" stroke={team.color || "#dc2626"} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />{teamEntries.map((entry) => <circle key={entry.id || `${team.id}-${entry.round}`} cx={x(entry.round)} cy={y(getDevelopmentCoef(entry))} r="5" fill={team.color || "#dc2626"} stroke="#09090b" strokeWidth="2" />)}{(() => { const lastEntry = teamEntries.at(-1); const lastValue = getDevelopmentCoef(lastEntry); const pointY = y(lastValue); const labelY = labelPositions.get(String(team.id)) || pointY; return <g><line x1={x(lastEntry.round) + 6} y1={pointY} x2={x(lastEntry.round) + 13} y2={labelY} stroke={team.color || "#dc2626"} strokeWidth="2" opacity=".8" /><rect x={x(lastEntry.round) + 14} y={labelY - 13} width="126" height="26" rx="13" fill="rgba(9,9,11,.9)" stroke={team.color || "#dc2626"} /><text x={x(lastEntry.round) + 24} y={labelY + 5} fill="#ffffff" fontSize="12" fontWeight="900">{team.name} · {lastValue}</text></g>; })()}</g>;
         })}
       </svg>
       <div style={styles.developmentLegend}>{entriesByTeam.map(({ team }) => <span key={team.id} style={styles.developmentLegendItem}><span style={{ ...styles.mediaDot, background: team.color || "#dc2626" }} />{team.name}</span>)}</div>
@@ -3797,9 +3812,9 @@ const styles = {
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
   developmentChartWrap: { display: "grid", gap: 14 },
-  developmentChart: { width: "100%", minHeight: 260, background: "#09090b", border: "1px solid #27272a", borderRadius: 18 },
-  developmentLegend: { display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" },
-  developmentLegendItem: { display: "inline-flex", gap: 6, alignItems: "center", color: "#d4d4d8", fontWeight: 900 },
+  developmentChart: { width: "100%", minHeight: 340, background: "#09090b", border: "1px solid #27272a", borderRadius: 18 },
+  developmentLegend: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
+  developmentLegendItem: { display: "inline-flex", gap: 6, alignItems: "center", color: "#f4f4f5", fontWeight: 900, background: "#18181b", border: "1px solid #27272a", borderRadius: 999, padding: "6px 9px" },
   developmentCards: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 16 },
   developmentCard: { background: "#101827", border: "1px solid #1f2937", borderRadius: 18, padding: 16, display: "grid", gap: 14, boxShadow: "0 18px 42px rgba(0,0,0,.22)" },
   developmentCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
