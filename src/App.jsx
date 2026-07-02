@@ -2673,7 +2673,7 @@ function DevelopmentChart({ teams, entries = [] }) {
   const width = 1080;
   const height = 380;
   const padLeft = 48;
-  const padRight = 150;
+  const padRight = 32;
   const padTop = 34;
   const padBottom = 46;
   const x = (round) => padLeft + ((Number(round) - 1) / Math.max(maxRound - 1, 1)) * (width - padLeft - padRight);
@@ -2682,15 +2682,6 @@ function DevelopmentChart({ teams, entries = [] }) {
     team,
     entries: entries.filter((entry) => idsEqual(entry.teamId, team.id)).sort((a, b) => Number(a.round) - Number(b.round)),
   })).filter((item) => item.entries.length).sort((a, b) => getDevelopmentCoef(b.entries.at(-1)) - getDevelopmentCoef(a.entries.at(-1)) || a.team.name.localeCompare(b.team.name, "fr"));
-  const labelPositions = new Map();
-  let nextLabelY = padTop + 13;
-  entriesByTeam.forEach(({ team, entries: teamEntries }) => {
-    const lastEntry = teamEntries.at(-1);
-    const labelY = Math.max(y(getDevelopmentCoef(lastEntry)), nextLabelY);
-    const clampedLabelY = Math.min(labelY, height - padBottom - 13);
-    labelPositions.set(String(team.id), clampedLabelY);
-    nextLabelY = clampedLabelY + 28;
-  });
 
   if (entriesByTeam.length === 0) return <Empty text="Ajoute des données dans Admin > Développement." />;
 
@@ -2704,7 +2695,7 @@ function DevelopmentChart({ teams, entries = [] }) {
         {rounds.map((round) => <g key={round}><line x1={x(round)} y1={padTop} x2={x(round)} y2={height - padBottom} stroke="rgba(255,255,255,.07)" /><text x={x(round) - 8} y={height - 15} fill="#d4d4d8" fontSize="12" fontWeight="800">R{round}</text></g>)}
         {entriesByTeam.map(({ team, entries: teamEntries }) => {
           const points = teamEntries.map((entry) => `${x(entry.round)},${y(getDevelopmentCoef(entry))}`).join(" ");
-          return <g key={team.id}><polyline points={points} fill="none" stroke="rgba(0,0,0,.72)" strokeWidth="8" strokeLinejoin="round" strokeLinecap="round" /><polyline points={points} fill="none" stroke={team.color || "#dc2626"} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />{teamEntries.map((entry) => <circle key={entry.id || `${team.id}-${entry.round}`} cx={x(entry.round)} cy={y(getDevelopmentCoef(entry))} r="5" fill={team.color || "#dc2626"} stroke="#09090b" strokeWidth="2" />)}{(() => { const lastEntry = teamEntries.at(-1); const lastValue = getDevelopmentCoef(lastEntry); const pointY = y(lastValue); const labelY = labelPositions.get(String(team.id)) || pointY; return <g><line x1={x(lastEntry.round) + 6} y1={pointY} x2={x(lastEntry.round) + 13} y2={labelY} stroke={team.color || "#dc2626"} strokeWidth="2" opacity=".8" /><rect x={x(lastEntry.round) + 14} y={labelY - 13} width="126" height="26" rx="13" fill="rgba(9,9,11,.9)" stroke={team.color || "#dc2626"} /><text x={x(lastEntry.round) + 24} y={labelY + 5} fill="#ffffff" fontSize="12" fontWeight="900">{team.name} · {lastValue}</text></g>; })()}</g>;
+          return <g key={team.id}><polyline points={points} fill="none" stroke="rgba(0,0,0,.72)" strokeWidth="8" strokeLinejoin="round" strokeLinecap="round" /><polyline points={points} fill="none" stroke={team.color || "#dc2626"} strokeWidth="4" strokeLinejoin="round" strokeLinecap="round" />{teamEntries.map((entry) => <circle key={entry.id || `${team.id}-${entry.round}`} cx={x(entry.round)} cy={y(getDevelopmentCoef(entry))} r="5" fill={team.color || "#dc2626"} stroke="#09090b" strokeWidth="2" />)}</g>;
         })}
       </svg>
       <div style={styles.developmentLegend}>{entriesByTeam.map(({ team }) => <span key={team.id} style={styles.developmentLegendItem}><span style={{ ...styles.mediaDot, background: team.color || "#dc2626" }} />{team.name}</span>)}</div>
