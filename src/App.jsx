@@ -12,6 +12,7 @@ const CATEGORY_OPTIONS = [
   { id: "FE", name: "FE", color: "#16a34a" },
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
+const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS };
 const SPECIAL_EVENT_OPTIONS = [
   { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
@@ -73,6 +74,20 @@ function getAdminCategoryOptions(permissions) {
   const allowed = normalizeAllowedCategories(permissions?.allowedCategories);
   return CATEGORY_OPTIONS.filter((category) => allowed.includes(category.id));
 }
+function isPermissionsOwner(user) {
+  return user?.email?.trim().toLowerCase() === ADMIN_PERMISSIONS_OWNER_EMAIL;
+}
+function mapAdminPermissionRowFromDb(row) {
+  return {
+    id: row.id,
+    userEmail: row.user_email || "",
+    role: row.role || "admin",
+    allowedCategories: normalizeAllowedCategories(row.allowed_categories),
+  };
+}
+function createEmptyPermissionForm() {
+  return { userEmail: "", role: "admin", allowedCategories: [...ALL_CATEGORY_IDS] };
+}
 
 async function fetchAllSupabaseRows(tableName, orderBy = "id") {
   const pageSize = 1000;
@@ -98,6 +113,7 @@ const emptyCalendarRace = { seasonId: "S16", raceId: "" };
 const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" };
 const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "", podium: "", notes: "", sortOrder: 1 };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
+const emptyPermissionForm = createEmptyPermissionForm();
 const defaultSiteSettings = { publicDevelopmentEnabled: true };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
@@ -994,6 +1010,7 @@ export default function URTTAdminPanel() {
   const [raceResults, setRaceResults] = useState([]);
   const [seasonTitles, setSeasonTitles] = useState([]);
   const [developmentEntries, setDevelopmentEntries] = useState([]);
+  const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
   const [driverForm, setDriverForm] = useState(emptyDriver);
@@ -1006,6 +1023,8 @@ export default function URTTAdminPanel() {
   const [specialEditionForm, setSpecialEditionForm] = useState(emptySpecialEdition);
   const [editingSpecialEditionId, setEditingSpecialEditionId] = useState(null);
   const [developmentForm, setDevelopmentForm] = useState(emptyDevelopmentForm);
+  const [permissionForm, setPermissionForm] = useState(emptyPermissionForm);
+  const [editingPermissionId, setEditingPermissionId] = useState(null);
   const [selectedRaceId, setSelectedRaceId] = useState("");
   const [popup, setPopup] = useState(null);
   const [search, setSearch] = useState("");
@@ -1070,6 +1089,7 @@ export default function URTTAdminPanel() {
         { data: specialEditionsData, error: specialEditionsError },
         { data: seasonTitlesData, error: seasonTitlesError },
         { data: developmentData, error: developmentError },
+        { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
@@ -1085,6 +1105,7 @@ export default function URTTAdminPanel() {
         supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
+        supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
@@ -1102,6 +1123,7 @@ export default function URTTAdminPanel() {
         specialEditionsError && specialEditionsError.code !== "42P01" && `special_event_editions: ${specialEditionsError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
+        adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
@@ -1125,6 +1147,7 @@ export default function URTTAdminPanel() {
       setSpecialEditions((specialEditionsData || []).map(mapSpecialEditionFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
+      setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
@@ -1820,6 +1843,92 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Reglage sauvegarde", message: "La visibilite publique a ete mise a jour." });
   }
 
+  async function saveAdminPermission() {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Seul kolti@urtt.fr peut modifier les permissions." });
+      return;
+    }
+
+    const userEmail = permissionForm.userEmail.trim().toLowerCase();
+    const allowedCategories = (permissionForm.allowedCategories || [])
+      .map(normalizeCategoryId)
+      .filter((categoryId) => ALL_CATEGORY_IDS.includes(categoryId));
+
+    if (!userEmail) {
+      setPopup({ type: "error", title: "Email manquant", message: "Renseigne l'adresse mail du compte admin." });
+      return;
+    }
+    if (!allowedCategories.length) {
+      setPopup({ type: "error", title: "Categorie manquante", message: "Coche au moins une categorie pour ce compte." });
+      return;
+    }
+
+    const payload = {
+      user_email: userEmail,
+      role: permissionForm.role || "admin",
+      allowed_categories: Array.from(new Set(allowedCategories)),
+    };
+
+    setIsSaving(true);
+    const request = editingPermissionId
+      ? supabase.from("admin_permissions").update(payload).eq("id", editingPermissionId).select().single()
+      : supabase.from("admin_permissions").upsert(payload, { onConflict: "user_email" }).select().single();
+    const { data, error } = await request;
+    setIsSaving(false);
+
+    if (error) {
+      console.error("Erreur permissions admin:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table admin_permissions n'existe pas encore. Lance la commande SQL fournie par Codex." : `Impossible de sauvegarder les permissions: ${error.message}` });
+      return;
+    }
+
+    const savedRow = mapAdminPermissionRowFromDb(data);
+    setAdminPermissionRows((current) => {
+      const withoutRow = current.filter((row) => !idsEqual(row.id, savedRow.id) && row.userEmail.toLowerCase() !== savedRow.userEmail.toLowerCase());
+      return [...withoutRow, savedRow].sort((a, b) => a.userEmail.localeCompare(b.userEmail));
+    });
+    if (adminUser?.email?.toLowerCase() === savedRow.userEmail.toLowerCase()) {
+      setAdminPermissions({ role: savedRow.role, allowedCategories: savedRow.allowedCategories });
+    }
+    setPermissionForm(createEmptyPermissionForm());
+    setEditingPermissionId(null);
+    setPopup({ type: "success", title: "Permissions sauvegardees", message: `${savedRow.userEmail} peut gerer : ${savedRow.allowedCategories.join(", ")}.` });
+  }
+
+  async function deleteAdminPermission(permissionId) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Seul kolti@urtt.fr peut modifier les permissions." });
+      return;
+    }
+
+    const row = adminPermissionRows.find((item) => idsEqual(item.id, permissionId));
+    if (!row) return;
+    if (!window.confirm(`Supprimer les permissions de ${row.userEmail} ?`)) return;
+
+    setIsSaving(true);
+    const { error } = await supabase
+      .from("admin_permissions")
+      .delete()
+      .eq("id", permissionId);
+    setIsSaving(false);
+
+    if (error) {
+      console.error("Erreur suppression permissions:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: `Impossible de supprimer les permissions: ${error.message}` });
+      return;
+    }
+
+    setAdminPermissionRows((current) => current.filter((item) => !idsEqual(item.id, permissionId)));
+    if (adminUser?.email?.toLowerCase() === row.userEmail.toLowerCase()) {
+      setAdminPermissions(defaultAdminPermissions);
+    }
+    if (idsEqual(editingPermissionId, permissionId)) {
+      setEditingPermissionId(null);
+      setPermissionForm(createEmptyPermissionForm());
+    }
+    setPopup({ type: "success", title: "Permissions supprimees", message: `${row.userEmail} n'a plus de restriction personnalisee.` });
+  }
+
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
     const draftEntry = draft.find((entry) => idsEqual(entry.driverId, driverId));
@@ -2166,6 +2275,19 @@ export default function URTTAdminPanel() {
           {adminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {adminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
+          {adminPage === "permissions" && (
+            <PermissionsPanel
+              adminUser={adminUser}
+              rows={adminPermissionRows}
+              form={permissionForm}
+              setForm={setPermissionForm}
+              editingId={editingPermissionId}
+              setEditingId={setEditingPermissionId}
+              onSave={saveAdminPermission}
+              onDelete={deleteAdminPermission}
+              isSaving={isSaving}
+            />
+          )}
           {adminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
           
         </AdminLayout>
@@ -2842,7 +2964,8 @@ function MediaLinksCard() {
 }
 
 function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["editions", "🏁", "Hors Saison"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["settings", "⚙️", "Réglages"]];
+  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["editions", "🏁", "Hors Saison"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["permissions", "🔐", "Permissions"], ["settings", "⚙️", "Réglages"]];
+  const visibleItems = isPermissionsOwner(adminUser) ? items : items.filter(([key]) => key !== "permissions");
   return (
     <div className="urtt-admin-page" style={styles.page}>
       <aside className="urtt-admin-sidebar" style={styles.sidebar}>
@@ -2851,7 +2974,7 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
           <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div>
         </div>
         <nav className="urtt-admin-nav" style={styles.nav}>
-          {items.map(([key, icon, label]) => <button className="urtt-admin-nav-button" key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
+          {visibleItems.map(([key, icon, label]) => <button className="urtt-admin-nav-button" key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
         </nav>
       </aside>
       <main className="urtt-admin-main" style={styles.main}>
@@ -3326,6 +3449,74 @@ function PositionPicker({ drivers, positionOrder, onPick }) {
 
 function ResultTable({ drivers, teams, selectedCategoryId, selectedSeasonId, getResultEntry, updateResultEntry }) {
   return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th><th style={styles.th}>Position</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Points</th></tr></thead><tbody>{drivers.map((driver, index) => { const entry = getResultEntry(driver.id); const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /></td><td style={styles.td}>{team?.name || "—"}</td><td style={styles.td}><input type="number" min="1" max="30" value={entry.position || index + 1} onChange={(event) => updateResultEntry(driver.id, "position", Number(event.target.value))} style={styles.positionInput} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.pole)} onChange={(event) => updateResultEntry(driver.id, "pole", event.target.checked)} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.fastestLap)} onChange={(event) => updateResultEntry(driver.id, "fastestLap", event.target.checked)} /></td><td style={{ ...styles.td, ...styles.points }}>{getPointsForPosition(Number(entry.position || index + 1), selectedCategoryId, selectedSeasonId)}</td></tr>; })}</tbody></table></div>;
+}
+
+function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setEditingId, onSave, onDelete, isSaving }) {
+  if (!isPermissionsOwner(adminUser)) {
+    return <div style={styles.section}><Card title="Permissions admin" icon="🔐"><Empty text="Seul kolti@urtt.fr peut gérer les permissions du panel." /></Card></div>;
+  }
+
+  const selectedCategories = form.allowedCategories || [];
+  const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const toggleCategory = (categoryId) => {
+    const normalizedCategoryId = normalizeCategoryId(categoryId);
+    setForm((current) => {
+      const currentCategories = current.allowedCategories || [];
+      const nextCategories = currentCategories.includes(normalizedCategoryId)
+        ? currentCategories.filter((item) => item !== normalizedCategoryId)
+        : [...currentCategories, normalizedCategoryId];
+      return { ...current, allowedCategories: nextCategories };
+    });
+  };
+  const editRow = (row) => {
+    setEditingId(row.id);
+    setForm({ userEmail: row.userEmail, role: row.role, allowedCategories: [...row.allowedCategories] });
+  };
+  const cancelEdit = () => {
+    setEditingId(null);
+    setForm(createEmptyPermissionForm());
+  };
+
+  return (
+    <div style={styles.section}>
+      <Card title="Permissions admin" icon="🔐">
+        <div style={styles.formGrid}>
+          <label style={styles.label}><span style={styles.labelText}>Email utilisateur</span><input value={form.userEmail} onChange={(event) => updateForm("userEmail", event.target.value)} placeholder="exemple@urtt.fr" style={styles.input} /></label>
+          <label style={styles.label}><span style={styles.labelText}>Rôle</span><select value={form.role} onChange={(event) => updateForm("role", event.target.value)} style={styles.input}><option value="admin">Admin</option><option value="owner">Owner</option></select></label>
+        </div>
+        <div style={styles.permissionCategoryGrid}>
+          {CATEGORY_OPTIONS.map((category) => (
+            <label key={category.id} style={{ ...styles.permissionCategoryPill, borderColor: category.color, background: selectedCategories.includes(category.id) ? `${category.color}33` : "#18181b" }}>
+              <input type="checkbox" checked={selectedCategories.includes(category.id)} onChange={() => toggleCategory(category.id)} />
+              <span>{category.name}</span>
+            </label>
+          ))}
+        </div>
+        <div style={styles.actions}>
+          <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier les permissions" : "Ajouter les permissions"}</button>
+          {editingId && <button type="button" onClick={cancelEdit} style={styles.secondaryButton}>Annuler</button>}
+        </div>
+        <p style={styles.mutedSmall}>Seul {ADMIN_PERMISSIONS_OWNER_EMAIL} voit cet onglet. Les comptes ajoutés ici seront limités aux catégories cochées dans le panel admin.</p>
+      </Card>
+      <Card title="Comptes configurés" icon="👥">
+        <div style={styles.stack}>
+          {rows.map((row) => (
+            <div key={row.id || row.userEmail} style={styles.itemBox}>
+              <div>
+                <strong>{row.userEmail}</strong>
+                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")}</p>
+              </div>
+              <div style={styles.actions}>
+                <button type="button" onClick={() => editRow(row)} style={styles.editButton}>Modifier</button>
+                <button type="button" onClick={() => onDelete(row.id)} disabled={isSaving} style={styles.dangerButton}>Supprimer</button>
+              </div>
+            </div>
+          ))}
+          {rows.length === 0 && <Empty text="Aucune permission enregistrée. Ajoute un compte pour limiter ses catégories." />}
+        </div>
+      </Card>
+    </div>
+  );
 }
 
 function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpdateSetting, onAddSeason, isSaving }) {
@@ -3922,6 +4113,8 @@ const styles = {
   colorInputRow: { display: "grid", gridTemplateColumns: "56px 1fr", gap: 10, alignItems: "center" },
   colorInput: { width: 56, height: 46, border: "1px solid #3f3f46", borderRadius: 14, background: "#09090b", padding: 4, cursor: "pointer" },
   formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 },
+  permissionCategoryGrid: { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 },
+  permissionCategoryPill: { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #3f3f46", borderRadius: 999, padding: "10px 13px", color: "white", fontWeight: 900, cursor: "pointer" },
   identity: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
   identityText: { minWidth: 0 },
   logoSmall: {
