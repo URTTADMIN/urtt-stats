@@ -155,7 +155,7 @@ const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" 
 const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "", podium: "", notes: "", sortOrder: 1 };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"] };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -628,6 +628,9 @@ function normalizeThanksNames(value) {
   const cleaned = names.map((name) => String(name || "").trim()).filter(Boolean);
   return cleaned.length ? Array.from(new Set(cleaned)) : defaultSiteSettings.thanksNames;
 }
+function normalizeThanksText(value) {
+  return String(value || "").trim();
+}
 function mapSiteSettingsFromDb(rows = []) {
   const rawSettings = rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
   const hasPublicPagesSetting = rows.some((row) => row.key === "publicPages");
@@ -636,6 +639,7 @@ function mapSiteSettingsFromDb(rows = []) {
     ...rawSettings,
     publicPages: normalizePublicPageSettings(hasPublicPagesSetting ? rawSettings.publicPages : null, rawSettings.publicDevelopmentEnabled),
     thanksNames: normalizeThanksNames(rawSettings.thanksNames),
+    thanksText: normalizeThanksText(rawSettings.thanksText),
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
@@ -2696,7 +2700,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -2858,12 +2862,12 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], thanksNames = defaultSiteSettings.thanksNames }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   return (
     <div style={styles.section}>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <RaceCountdown races={countdownRaces} events={calendarEvents} />
-      <MediaLinksCard thanksNames={thanksNames} />
+      <MediaLinksCard thanksNames={thanksNames} thanksText={thanksText} />
     </div>
   );
 }
@@ -3013,8 +3017,9 @@ function DevelopmentStat({ label, value, previous }) {
   return <div style={styles.developmentStat}><span style={styles.mutedSmall}>{label}</span><strong>{value}</strong>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</div>;
 }
 
-function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames }) {
+function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   const names = normalizeThanksNames(thanksNames);
+  const text = normalizeThanksText(thanksText);
   return (
     <Card title="AREKU_F1 en vidéo" icon="▶️">
       <div style={styles.mediaGrid}>
@@ -3030,6 +3035,7 @@ function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames }) {
       </div>
       <div style={styles.thanksCard}>
         <strong>Remerciements</strong>
+        {text && <p style={styles.thanksText}>{text}</p>}
         <div style={styles.thanksList}>
           {names.map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}
         </div>
@@ -3655,7 +3661,7 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
         </div>
       </Card>
       <Card title="Remerciements accueil" icon="🙏">
-        <ThanksSettings key={normalizeThanksNames(siteSettings.thanksNames).join("|")} siteSettings={siteSettings} onUpdateSetting={onUpdateSetting} isSaving={isSaving} />
+        <ThanksSettings key={`${normalizeThanksNames(siteSettings.thanksNames).join("|")}::${normalizeThanksText(siteSettings.thanksText)}`} siteSettings={siteSettings} onUpdateSetting={onUpdateSetting} isSaving={isSaving} />
       </Card>
     </div>
   );
@@ -3663,12 +3669,18 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
 
 function ThanksSettings({ siteSettings = defaultSiteSettings, onUpdateSetting, isSaving }) {
   const [thanksDraft, setThanksDraft] = useState(() => normalizeThanksNames(siteSettings.thanksNames).join("\n"));
+  const [thanksTextDraft, setThanksTextDraft] = useState(() => normalizeThanksText(siteSettings.thanksText));
   const saveThanksNames = () => {
     onUpdateSetting("thanksNames", normalizeThanksNames(thanksDraft));
+    onUpdateSetting("thanksText", normalizeThanksText(thanksTextDraft));
   };
 
   return (
     <div style={styles.stack}>
+      <label style={styles.label}>
+        <span style={styles.labelText}>Texte affiché</span>
+        <textarea value={thanksTextDraft} onChange={(event) => setThanksTextDraft(event.target.value)} placeholder="Texte libre affiché au-dessus des noms..." style={{ ...styles.input, minHeight: 110, resize: "vertical" }} />
+      </label>
       <label style={styles.label}>
         <span style={styles.labelText}>Noms affichés</span>
         <textarea value={thanksDraft} onChange={(event) => setThanksDraft(event.target.value)} placeholder="Un nom par ligne" style={{ ...styles.input, minHeight: 130, resize: "vertical" }} />
@@ -3676,6 +3688,7 @@ function ThanksSettings({ siteSettings = defaultSiteSettings, onUpdateSetting, i
       <div style={styles.itemBox}>
         <div>
           <strong>Aperçu</strong>
+          {normalizeThanksText(thanksTextDraft) && <p style={styles.thanksText}>{normalizeThanksText(thanksTextDraft)}</p>}
           <div style={styles.thanksList}>{normalizeThanksNames(thanksDraft).map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}</div>
         </div>
         <button type="button" onClick={saveThanksNames} disabled={isSaving} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</button>
@@ -4201,6 +4214,7 @@ const styles = {
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
   thanksCard: { marginTop: 14, background: "#18181b", border: "1px solid #3f3f46", borderRadius: 14, padding: 14, display: "grid", gap: 10 },
+  thanksText: { color: "#d4d4d8", margin: 0, lineHeight: 1.45, whiteSpace: "pre-line" },
   thanksList: { display: "flex", flexWrap: "wrap", gap: 8 },
   thanksBadge: { background: "rgba(124,58,237,.2)", border: "1px solid rgba(168,85,247,.55)", borderRadius: 999, color: "white", fontWeight: 900, padding: "6px 10px" },
   developmentChartWrap: { display: "grid", gap: 14 },
