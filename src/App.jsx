@@ -13,7 +13,23 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
-const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS };
+const ADMIN_PAGE_OPTIONS = [
+  { id: "dashboard", icon: "🏠", label: "Dashboard" },
+  { id: "supabase", icon: "🗄️", label: "Supabase" },
+  { id: "search", icon: "🔎", label: "Recherche" },
+  { id: "titles", icon: "👑", label: "Titres" },
+  { id: "drivers", icon: "👥", label: "Pilotes" },
+  { id: "teams", icon: "🏎️", label: "Écuries" },
+  { id: "races", icon: "🏁", label: "Courses" },
+  { id: "planning", icon: "⏱️", label: "Planning" },
+  { id: "editions", icon: "🏁", label: "Hors Saison" },
+  { id: "development", icon: "📈", label: "Développement" },
+  { id: "results", icon: "🏆", label: "Résultats" },
+  { id: "permissions", icon: "🔐", label: "Permissions" },
+  { id: "settings", icon: "⚙️", label: "Réglages" },
+];
+const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
+const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
 const SPECIAL_EVENT_OPTIONS = [
   { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
@@ -60,11 +76,17 @@ function normalizeAllowedCategories(value) {
   const allowed = raw.map(normalizeCategoryId).filter((categoryId) => ALL_CATEGORY_IDS.includes(categoryId));
   return allowed.length ? Array.from(new Set(allowed)) : ALL_CATEGORY_IDS;
 }
+function normalizeAllowedPages(value) {
+  const raw = Array.isArray(value) ? value : String(value || "").split(",");
+  const allowed = raw.map((pageId) => String(pageId || "").trim()).filter((pageId) => ALL_ADMIN_PAGE_IDS.includes(pageId));
+  return allowed.length ? Array.from(new Set(allowed)) : ALL_ADMIN_PAGE_IDS;
+}
 function mapAdminPermissionsFromDb(row) {
   if (!row) return defaultAdminPermissions;
   return {
     role: row.role || "admin",
     allowedCategories: normalizeAllowedCategories(row.allowed_categories),
+    allowedPages: normalizeAllowedPages(row.allowed_pages),
   };
 }
 function hasAdminCategoryAccess(permissions, categoryId) {
@@ -73,6 +95,13 @@ function hasAdminCategoryAccess(permissions, categoryId) {
 function getAdminCategoryOptions(permissions) {
   const allowed = normalizeAllowedCategories(permissions?.allowedCategories);
   return CATEGORY_OPTIONS.filter((category) => allowed.includes(category.id));
+}
+function hasAdminPageAccess(permissions, pageId, user) {
+  if (pageId === "permissions") return isPermissionsOwner(user);
+  return normalizeAllowedPages(permissions?.allowedPages).includes(pageId);
+}
+function getAdminPageOptions(user, permissions) {
+  return ADMIN_PAGE_OPTIONS.filter((page) => hasAdminPageAccess(permissions, page.id, user));
 }
 function isPermissionsOwner(user) {
   return user?.email?.trim().toLowerCase() === ADMIN_PERMISSIONS_OWNER_EMAIL;
@@ -83,10 +112,11 @@ function mapAdminPermissionRowFromDb(row) {
     userEmail: row.user_email || "",
     role: row.role || "admin",
     allowedCategories: normalizeAllowedCategories(row.allowed_categories),
+    allowedPages: normalizeAllowedPages(row.allowed_pages),
   };
 }
 function createEmptyPermissionForm() {
-  return { userEmail: "", role: "admin", allowedCategories: [...ALL_CATEGORY_IDS] };
+  return { userEmail: "", role: "admin", allowedCategories: [...ALL_CATEGORY_IDS], allowedPages: ALL_ADMIN_PAGE_IDS.filter((pageId) => pageId !== "permissions") };
 }
 
 async function fetchAllSupabaseRows(tableName, orderBy = "id") {
@@ -1167,6 +1197,8 @@ export default function URTTAdminPanel() {
     ? getLatestSeasonId(availableSeasonOptions)
     : selectedSeasonId;
   const adminCategoryOptions = useMemo(() => getAdminCategoryOptions(adminPermissions), [adminPermissions]);
+  const adminPageOptions = useMemo(() => getAdminPageOptions(adminUser, adminPermissions), [adminUser, adminPermissions]);
+  const visibleAdminPage = adminPageOptions.some((page) => page.id === adminPage) ? adminPage : adminPageOptions[0]?.id || "dashboard";
   const adminSelectedCategoryId = hasAdminCategoryAccess(adminPermissions, selectedCategoryId) ? selectedCategoryId : adminCategoryOptions[0]?.id || selectedCategoryId;
   const effectiveDevelopmentCategoryId = isDevelopmentCategory(adminSelectedCategoryId) ? adminSelectedCategoryId : adminCategoryOptions.find((category) => isDevelopmentCategory(category.id))?.id || "F1";
   const adminRacesBySelectedCategory = useMemo(() => createSeasonMapFromCalendar(allCalendarRaces, adminSelectedCategoryId), [allCalendarRaces, adminSelectedCategoryId]);
@@ -1853,6 +1885,9 @@ export default function URTTAdminPanel() {
     const allowedCategories = (permissionForm.allowedCategories || [])
       .map(normalizeCategoryId)
       .filter((categoryId) => ALL_CATEGORY_IDS.includes(categoryId));
+    const allowedPages = (permissionForm.allowedPages || [])
+      .map((pageId) => String(pageId || "").trim())
+      .filter((pageId) => ALL_ADMIN_PAGE_IDS.includes(pageId) && pageId !== "permissions");
 
     if (!userEmail) {
       setPopup({ type: "error", title: "Email manquant", message: "Renseigne l'adresse mail du compte admin." });
@@ -1862,11 +1897,16 @@ export default function URTTAdminPanel() {
       setPopup({ type: "error", title: "Categorie manquante", message: "Coche au moins une categorie pour ce compte." });
       return;
     }
+    if (!allowedPages.length) {
+      setPopup({ type: "error", title: "Page manquante", message: "Coche au moins une page accessible pour ce compte." });
+      return;
+    }
 
     const payload = {
       user_email: userEmail,
-      role: permissionForm.role || "admin",
+      role: permissionForm.role.trim() || "admin",
       allowed_categories: Array.from(new Set(allowedCategories)),
+      allowed_pages: Array.from(new Set(allowedPages)),
     };
 
     setIsSaving(true);
@@ -1888,11 +1928,11 @@ export default function URTTAdminPanel() {
       return [...withoutRow, savedRow].sort((a, b) => a.userEmail.localeCompare(b.userEmail));
     });
     if (adminUser?.email?.toLowerCase() === savedRow.userEmail.toLowerCase()) {
-      setAdminPermissions({ role: savedRow.role, allowedCategories: savedRow.allowedCategories });
+      setAdminPermissions({ role: savedRow.role, allowedCategories: savedRow.allowedCategories, allowedPages: savedRow.allowedPages });
     }
     setPermissionForm(createEmptyPermissionForm());
     setEditingPermissionId(null);
-    setPopup({ type: "success", title: "Permissions sauvegardees", message: `${savedRow.userEmail} peut gerer : ${savedRow.allowedCategories.join(", ")}.` });
+    setPopup({ type: "success", title: "Permissions sauvegardees", message: `${savedRow.userEmail} peut gerer ${savedRow.allowedCategories.join(", ")} sur ${savedRow.allowedPages.length} pages.` });
   }
 
   async function deleteAdminPermission(permissionId) {
@@ -2232,10 +2272,11 @@ export default function URTTAdminPanel() {
       {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } setAdminUser(data.user); setIsAdminPreview(false); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
         <AdminLayout
-          active={adminPage}
+          active={visibleAdminPage}
           setActive={setAdminPage}
           adminUser={adminUser}
           adminPermissions={adminPermissions}
+          adminPageOptions={adminPageOptions}
           onPublic={() => { setIsAdminPreview(true); setView("front"); }}
           onLogout={async () => {
             await supabase.auth.signOut();
@@ -2245,10 +2286,10 @@ export default function URTTAdminPanel() {
             setAdminPage("dashboard");
           }}
         >
-          {adminPage === "dashboard" && <Dashboard drivers={computed.globalDriverStats} teams={computed.globalTeamStats} races={currentAdminSeasonRaces} selectedCategoryId={adminSelectedCategoryId} selectedSeasonId={effectiveSelectedSeasonId} />}
-          {adminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarFeedHits={calendarFeedHits} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} selectedSeasonId={effectiveSelectedSeasonId} />}
-          {adminPage === "search" && <AdminSearch search={adminGlobalSearch} setSearch={setAdminGlobalSearch} drivers={drivers} teams={teams} onEditDriver={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); setAdminPage("drivers"); }} onEditTeam={(team) => { setEditingTeamId(team.id); setTeamForm(team); setAdminPage("teams"); }} />}
-          {adminPage === "titles" && (
+          {visibleAdminPage === "dashboard" && <Dashboard drivers={computed.globalDriverStats} teams={computed.globalTeamStats} races={currentAdminSeasonRaces} selectedCategoryId={adminSelectedCategoryId} selectedSeasonId={effectiveSelectedSeasonId} />}
+          {visibleAdminPage === "supabase" && <SupabasePanel isLoading={isLoadingData} lastSyncAt={lastSyncAt} errors={supabaseErrors} teams={teams} drivers={drivers} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarFeedHits={calendarFeedHits} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} selectedSeasonId={effectiveSelectedSeasonId} />}
+          {visibleAdminPage === "search" && <AdminSearch search={adminGlobalSearch} setSearch={setAdminGlobalSearch} drivers={drivers} teams={teams} onEditDriver={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); setAdminPage("drivers"); }} onEditTeam={(team) => { setEditingTeamId(team.id); setTeamForm(team); setAdminPage("teams"); }} />}
+          {visibleAdminPage === "titles" && (
   <TitlesPanel
     drivers={drivers}
     teams={teams}
@@ -2268,14 +2309,14 @@ export default function URTTAdminPanel() {
     isSaving={isSaving}
   />
 )}
-          {adminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
-          {adminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
-          {adminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
-          {adminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
-          {adminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
-          {adminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
-          {adminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
-          {adminPage === "permissions" && (
+          {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
+          {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
+          {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
+          {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
+          {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
+          {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
+          {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
+          {visibleAdminPage === "permissions" && (
             <PermissionsPanel
               adminUser={adminUser}
               rows={adminPermissionRows}
@@ -2288,7 +2329,7 @@ export default function URTTAdminPanel() {
               isSaving={isSaving}
             />
           )}
-          {adminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
+          {visibleAdminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
           
         </AdminLayout>
       )}
@@ -2963,9 +3004,7 @@ function MediaLinksCard() {
   );
 }
 
-function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, onPublic, onLogout, children }) {
-  const items = [["dashboard", "🏠", "Dashboard"], ["supabase", "🗄️", "Supabase"], ["search", "🔎", "Recherche"],["titles", "👑", "Titres"], ["drivers", "👥", "Pilotes"], ["teams", "🏎️", "Écuries"], ["races", "🏁", "Courses"], ["planning", "⏱️", "Planning"], ["editions", "🏁", "Hors Saison"], ["development", "📈", "Développement"], ["results", "🏆", "Résultats"], ["permissions", "🔐", "Permissions"], ["settings", "⚙️", "Réglages"]];
-  const visibleItems = isPermissionsOwner(adminUser) ? items : items.filter(([key]) => key !== "permissions");
+function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, adminPageOptions = ADMIN_PAGE_OPTIONS, onPublic, onLogout, children }) {
   return (
     <div className="urtt-admin-page" style={styles.page}>
       <aside className="urtt-admin-sidebar" style={styles.sidebar}>
@@ -2974,7 +3013,7 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
           <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div>
         </div>
         <nav className="urtt-admin-nav" style={styles.nav}>
-          {visibleItems.map(([key, icon, label]) => <button className="urtt-admin-nav-button" key={key} onClick={() => setActive(key)} style={{ ...styles.navButton, ...(active === key ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
+          {adminPageOptions.map(({ id, icon, label }) => <button className="urtt-admin-nav-button" key={id} onClick={() => setActive(id)} style={{ ...styles.navButton, ...(active === id ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
         </nav>
       </aside>
       <main className="urtt-admin-main" style={styles.main}>
@@ -3457,6 +3496,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
   }
 
   const selectedCategories = form.allowedCategories || [];
+  const selectedPages = form.allowedPages || [];
   const updateForm = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const toggleCategory = (categoryId) => {
     const normalizedCategoryId = normalizeCategoryId(categoryId);
@@ -3468,9 +3508,19 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
       return { ...current, allowedCategories: nextCategories };
     });
   };
+  const togglePage = (pageId) => {
+    if (pageId === "permissions") return;
+    setForm((current) => {
+      const currentPages = current.allowedPages || [];
+      const nextPages = currentPages.includes(pageId)
+        ? currentPages.filter((item) => item !== pageId)
+        : [...currentPages, pageId];
+      return { ...current, allowedPages: nextPages };
+    });
+  };
   const editRow = (row) => {
     setEditingId(row.id);
-    setForm({ userEmail: row.userEmail, role: row.role, allowedCategories: [...row.allowedCategories] });
+    setForm({ userEmail: row.userEmail, role: row.role, allowedCategories: [...row.allowedCategories], allowedPages: row.allowedPages.filter((pageId) => pageId !== "permissions") });
   };
   const cancelEdit = () => {
     setEditingId(null);
@@ -3482,13 +3532,24 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
       <Card title="Permissions admin" icon="🔐">
         <div style={styles.formGrid}>
           <label style={styles.label}><span style={styles.labelText}>Email utilisateur</span><input value={form.userEmail} onChange={(event) => updateForm("userEmail", event.target.value)} placeholder="exemple@urtt.fr" style={styles.input} /></label>
-          <label style={styles.label}><span style={styles.labelText}>Rôle</span><select value={form.role} onChange={(event) => updateForm("role", event.target.value)} style={styles.input}><option value="admin">Admin</option><option value="owner">Owner</option></select></label>
+          <label style={styles.label}><span style={styles.labelText}>Rôle</span><input value={form.role} onChange={(event) => updateForm("role", event.target.value)} placeholder="Admin F1, Résultats, Courses..." style={styles.input} /></label>
         </div>
+        <p style={styles.labelText}>Catégories accessibles</p>
         <div style={styles.permissionCategoryGrid}>
           {CATEGORY_OPTIONS.map((category) => (
             <label key={category.id} style={{ ...styles.permissionCategoryPill, borderColor: category.color, background: selectedCategories.includes(category.id) ? `${category.color}33` : "#18181b" }}>
               <input type="checkbox" checked={selectedCategories.includes(category.id)} onChange={() => toggleCategory(category.id)} />
               <span>{category.name}</span>
+            </label>
+          ))}
+        </div>
+        <p style={{ ...styles.labelText, marginTop: 18 }}>Pages accessibles</p>
+        <div style={styles.permissionPageGrid}>
+          {ADMIN_PAGE_OPTIONS.filter((page) => page.id !== "permissions").map((page) => (
+            <label key={page.id} style={{ ...styles.permissionPagePill, background: selectedPages.includes(page.id) ? "rgba(124,58,237,.22)" : "#18181b", borderColor: selectedPages.includes(page.id) ? "#7c3aed" : "#3f3f46" }}>
+              <input type="checkbox" checked={selectedPages.includes(page.id)} onChange={() => togglePage(page.id)} />
+              <span>{page.icon}</span>
+              <span>{page.label}</span>
             </label>
           ))}
         </div>
@@ -3504,7 +3565,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
             <div key={row.id || row.userEmail} style={styles.itemBox}>
               <div>
                 <strong>{row.userEmail}</strong>
-                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")}</p>
+                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")} · {row.allowedPages.filter((pageId) => pageId !== "permissions").map((pageId) => ADMIN_PAGE_OPTIONS.find((page) => page.id === pageId)?.label || pageId).join(", ")}</p>
               </div>
               <div style={styles.actions}>
                 <button type="button" onClick={() => editRow(row)} style={styles.editButton}>Modifier</button>
@@ -4115,6 +4176,8 @@ const styles = {
   formGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 12 },
   permissionCategoryGrid: { display: "flex", flexWrap: "wrap", gap: 10, marginTop: 14 },
   permissionCategoryPill: { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #3f3f46", borderRadius: 999, padding: "10px 13px", color: "white", fontWeight: 900, cursor: "pointer" },
+  permissionPageGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: 10, marginTop: 10 },
+  permissionPagePill: { display: "inline-flex", alignItems: "center", gap: 8, border: "1px solid #3f3f46", borderRadius: 14, padding: "11px 12px", color: "white", fontWeight: 900, cursor: "pointer" },
   identity: { display: "flex", alignItems: "center", gap: 10, minWidth: 0 },
   identityText: { minWidth: 0 },
   logoSmall: {
