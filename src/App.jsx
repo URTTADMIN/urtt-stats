@@ -30,6 +30,17 @@ const ADMIN_PAGE_OPTIONS = [
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
+const PUBLIC_PAGE_OPTIONS = [
+  { id: "home", label: "Accueil" },
+  { id: "standings", label: "Classements" },
+  { id: "drivers", label: "Stats pilotes" },
+  { id: "teams", label: "Stats écuries" },
+  { id: "seasons", label: "Saison" },
+  { id: "editions", label: "Hors Saison" },
+  { id: "development", label: "Développement" },
+  { id: "world", label: "Carte" },
+];
+const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
   { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
@@ -144,7 +155,7 @@ const emptyCalendarEvent = { title: "", description: "", startAt: "", endAt: "" 
 const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "", date: "", winnerDriverId: "", poleDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "", podium: "", notes: "", sortOrder: 1 };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"] };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -605,8 +616,27 @@ function getDevelopmentSaveErrorMessage(error) {
   if (message.toLowerCase().includes("row-level security") || error?.code === "42501") return "Supabase bloque l'ecriture sur team_development. Verifie les policies RLS de la table.";
   return message ? `Supabase: ${message}` : "Impossible d'enregistrer le developpement.";
 }
+function normalizePublicPageSettings(value, publicDevelopmentEnabled = true) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  return PUBLIC_PAGE_OPTIONS.reduce((settings, page) => {
+    settings[page.id] = source[page.id] !== false;
+    return settings;
+  }, { ...DEFAULT_PUBLIC_PAGE_VISIBILITY, development: publicDevelopmentEnabled !== false });
+}
+function normalizeThanksNames(value) {
+  const names = Array.isArray(value) ? value : String(value || "").split(/[\n,]/);
+  const cleaned = names.map((name) => String(name || "").trim()).filter(Boolean);
+  return cleaned.length ? Array.from(new Set(cleaned)) : defaultSiteSettings.thanksNames;
+}
 function mapSiteSettingsFromDb(rows = []) {
-  return rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
+  const rawSettings = rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
+  const hasPublicPagesSetting = rows.some((row) => row.key === "publicPages");
+  return {
+    ...defaultSiteSettings,
+    ...rawSettings,
+    publicPages: normalizePublicPageSettings(hasPublicPagesSetting ? rawSettings.publicPages : null, rawSettings.publicDevelopmentEnabled),
+    thanksNames: normalizeThanksNames(rawSettings.thanksNames),
+  };
 }
 function mapRaceResultFromDb(result, entries = []) {
   return {
@@ -2634,9 +2664,12 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
-  const canSeeDevelopment = (siteSettings.publicDevelopmentEnabled !== false || isAdminPreview) && isDevelopmentCategory(selectedCategoryId);
-  const publicPages = ["home", "standings", "drivers", "teams", "seasons", "editions", ...(canSeeDevelopment ? ["development"] : []), "world"];
-  const activePublicPage = publicPages.includes(publicPage) ? publicPage : "home";
+  const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
+  const publicPages = PUBLIC_PAGE_OPTIONS
+    .filter((page) => page.id !== "development" || isDevelopmentCategory(selectedCategoryId))
+    .filter((page) => isAdminPreview || publicVisibility[page.id] !== false)
+    .map((page) => page.id);
+  const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -2658,18 +2691,18 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={seasonSelectValue} onChange={(event) => setSelectedSeasonId(event.target.value)} disabled={!seasonOptions.length} style={styles.seasonSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
         {publicPages.map((key) => {
-          const labels = { home: "Accueil", standings: "Classements", drivers: "Stats pilotes", teams: "Stats écuries", seasons: "Saison", editions: "Hors Saison", development: "Développement", world: "Carte" };
-          return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{labels[key]}</button>;
+          const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
+          return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{label}</button>;
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
-        {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && siteSettings.publicDevelopmentEnabled === false} />}
+        {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -2825,12 +2858,12 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [] }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], thanksNames = defaultSiteSettings.thanksNames }) {
   return (
     <div style={styles.section}>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <RaceCountdown races={countdownRaces} events={calendarEvents} />
-      <MediaLinksCard />
+      <MediaLinksCard thanksNames={thanksNames} />
     </div>
   );
 }
@@ -2980,7 +3013,8 @@ function DevelopmentStat({ label, value, previous }) {
   return <div style={styles.developmentStat}><span style={styles.mutedSmall}>{label}</span><strong>{value}</strong>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</div>;
 }
 
-function MediaLinksCard() {
+function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames }) {
+  const names = normalizeThanksNames(thanksNames);
   return (
     <Card title="AREKU_F1 en vidéo" icon="▶️">
       <div style={styles.mediaGrid}>
@@ -2997,7 +3031,7 @@ function MediaLinksCard() {
       <div style={styles.thanksCard}>
         <strong>Remerciements</strong>
         <div style={styles.thanksList}>
-          {["LORDEN", "Thibaut", "Etienne"].map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}
+          {names.map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}
         </div>
       </div>
     </Card>
@@ -3583,6 +3617,12 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
 function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpdateSetting, onAddSeason, isSaving }) {
   const nextSeason = getNextSeasonOption(seasons);
   const latestSeason = seasons[seasons.length - 1];
+  const publicPages = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
+
+  const updatePublicPage = (pageId, visible) => {
+    onUpdateSetting("publicPages", { ...publicPages, [pageId]: visible });
+  };
+
   return (
     <div style={styles.section}>
       <Card title="Réglages" icon="⚙️">
@@ -3602,14 +3642,44 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
         </div>
       </Card>
       <Card title="Visibilité publique" icon="👁️">
-        <div style={styles.itemBox}>
-          <div>
-            <strong>Page Développement</strong>
-            <p style={styles.mutedSmall}>Quand c'est désactivé, le public ne voit pas l'onglet. L'admin garde accès au panel Développement.</p>
-          </div>
-          <label style={styles.checkboxPill}><input type="checkbox" checked={siteSettings.publicDevelopmentEnabled !== false} onChange={(event) => onUpdateSetting("publicDevelopmentEnabled", event.target.checked)} /> Visible public</label>
+        <div style={styles.stack}>
+          {PUBLIC_PAGE_OPTIONS.map((page) => (
+            <div key={page.id} style={styles.itemBox}>
+              <div>
+                <strong>Page {page.label}</strong>
+                <p style={styles.mutedSmall}>{page.id === "development" ? "Quand c'est désactivé, le public ne voit pas l'onglet. L'admin garde accès en aperçu." : "Quand c'est désactivé, l'onglet disparaît côté public."}</p>
+              </div>
+              <label style={styles.checkboxPill}><input type="checkbox" checked={publicPages[page.id] !== false} onChange={(event) => updatePublicPage(page.id, event.target.checked)} /> Visible public</label>
+            </div>
+          ))}
         </div>
       </Card>
+      <Card title="Remerciements accueil" icon="🙏">
+        <ThanksSettings key={normalizeThanksNames(siteSettings.thanksNames).join("|")} siteSettings={siteSettings} onUpdateSetting={onUpdateSetting} isSaving={isSaving} />
+      </Card>
+    </div>
+  );
+}
+
+function ThanksSettings({ siteSettings = defaultSiteSettings, onUpdateSetting, isSaving }) {
+  const [thanksDraft, setThanksDraft] = useState(() => normalizeThanksNames(siteSettings.thanksNames).join("\n"));
+  const saveThanksNames = () => {
+    onUpdateSetting("thanksNames", normalizeThanksNames(thanksDraft));
+  };
+
+  return (
+    <div style={styles.stack}>
+      <label style={styles.label}>
+        <span style={styles.labelText}>Noms affichés</span>
+        <textarea value={thanksDraft} onChange={(event) => setThanksDraft(event.target.value)} placeholder="Un nom par ligne" style={{ ...styles.input, minHeight: 130, resize: "vertical" }} />
+      </label>
+      <div style={styles.itemBox}>
+        <div>
+          <strong>Aperçu</strong>
+          <div style={styles.thanksList}>{normalizeThanksNames(thanksDraft).map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}</div>
+        </div>
+        <button type="button" onClick={saveThanksNames} disabled={isSaving} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Sauvegarder"}</button>
+      </div>
     </div>
   );
 }
