@@ -2761,6 +2761,12 @@ function MediaLinksCard() {
           </a>
         ))}
       </div>
+      <div style={styles.thanksCard}>
+        <strong>Remerciements</strong>
+        <div style={styles.thanksList}>
+          {["LORDEN", "Thibaut", "Etienne"].map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}
+        </div>
+      </div>
     </Card>
   );
 }
@@ -3801,6 +3807,9 @@ const styles = {
   mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
   mediaLinkCard: { display: "flex", alignItems: "center", gap: 12, background: "#27272a", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, color: "white", textDecoration: "none" },
   mediaDot: { width: 14, height: 14, borderRadius: "50%", flex: "0 0 auto", boxShadow: "0 0 22px currentColor" },
+  thanksCard: { marginTop: 14, background: "#18181b", border: "1px solid #3f3f46", borderRadius: 14, padding: 14, display: "grid", gap: 10 },
+  thanksList: { display: "flex", flexWrap: "wrap", gap: 8 },
+  thanksBadge: { background: "rgba(124,58,237,.2)", border: "1px solid rgba(168,85,247,.55)", borderRadius: 999, color: "white", fontWeight: 900, padding: "6px 10px" },
   developmentChartWrap: { display: "grid", gap: 14 },
   developmentChart: { width: "100%", minHeight: 340, background: "#09090b", border: "1px solid #27272a", borderRadius: 18 },
   developmentLegend: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
