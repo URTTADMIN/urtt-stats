@@ -3014,7 +3014,13 @@ function DevelopmentTeamCard({ team, entry, previous }) {
 
 function DevelopmentStat({ label, value, previous }) {
   const delta = Number(value) - Number(previous || value);
-  return <div style={styles.developmentStat}><span style={styles.mutedSmall}>{label}</span><strong>{value}</strong>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</div>;
+  return (
+    <div style={styles.developmentStat}>
+      <span style={styles.developmentStatLabel}>{label}</span>
+      <span style={styles.developmentDeltaSlot}>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</span>
+      <strong style={styles.developmentStatValue}>{value}</strong>
+    </div>
+  );
 }
 
 function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
@@ -4225,7 +4231,10 @@ const styles = {
   developmentCard: { background: "#101827", border: "1px solid #1f2937", borderRadius: 18, padding: 16, display: "grid", gap: 14, boxShadow: "0 18px 42px rgba(0,0,0,.22)" },
   developmentCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
   developmentStats: { display: "grid", gap: 8 },
-  developmentStat: { background: "#151f2e", border: "1px solid #1f2937", borderRadius: 10, padding: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 },
+  developmentStat: { background: "#151f2e", border: "1px solid #1f2937", borderRadius: 10, padding: 10, display: "grid", gridTemplateColumns: "minmax(0, 1fr) 48px 28px", alignItems: "center", gap: 8 },
+  developmentStatLabel: { color: "#a1a1aa", margin: 0, fontSize: 13, minWidth: 0 },
+  developmentDeltaSlot: { minWidth: 48, display: "flex", justifyContent: "center", alignItems: "center" },
+  developmentStatValue: { textAlign: "right", fontWeight: 950 },
   developmentAdminGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 230px), 1fr))", gap: 14, marginTop: 16 },
   developmentAdminTeamCard: { background: "#101827", border: "1px solid #1f2937", borderTop: "4px solid #dc2626", borderRadius: 16, padding: 14, display: "grid", gap: 10 },
   developmentDrivers: { display: "grid", gap: 6 },
