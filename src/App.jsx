@@ -3516,10 +3516,14 @@ function RaceAwardsPanel({ drivers = [], teams = [], raceResults = [], racesBySe
   const races = [...(racesBySeason[selectedSeasonId] || [])].sort((a, b) => Number(a.round) - Number(b.round));
   const buildAwardRows = (awardKey) => races.map((race) => {
     const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
-    const awardEntry = result?.entries.find((entry) => Boolean(entry[awardKey]));
-    const driver = drivers.find((item) => idsEqual(item.id, awardEntry?.driverId));
-    const team = driver ? getDriverSeasonTeam(driver, race.seasonId, teams) : null;
-    return { race, result, driver, team };
+    const awards = (result?.entries || [])
+      .filter((entry) => Boolean(entry[awardKey]))
+      .map((entry) => {
+        const driver = drivers.find((item) => idsEqual(item.id, entry.driverId));
+        const team = driver ? getDriverSeasonTeam(driver, race.seasonId, teams) : null;
+        return { driver, team };
+      });
+    return { race, result, awards };
   });
 
   return (
@@ -3549,8 +3553,8 @@ function RaceAwardTable({ title, icon, rows = [], empty }) {
           <tbody>{visibleRows.map((row) => (
             <tr key={row.race.id} style={styles.tr}>
               <td style={styles.td}><strong>R{row.race.round}</strong><p style={styles.mutedSmall}>{row.race.name}</p></td>
-              <td style={styles.td}>{row.driver ? <AwardDriverIdentity driver={row.driver} team={row.team} /> : "—"}</td>
-              <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
+              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.driver ? <AwardDriverIdentity key={`${row.race.id}-driver-${award.driver.id}`} driver={award.driver} team={award.team} /> : <span key={`${row.race.id}-missing-${index}`}>—</span>)}</div> : "—"}</td>
+              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.team ? <TeamIdentity key={`${row.race.id}-team-${award.team.id}`} team={award.team} /> : <span key={`${row.race.id}-team-missing-${index}`}>—</span>)}</div> : "—"}</td>
             </tr>
           ))}</tbody>
         </table>
