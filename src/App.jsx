@@ -25,6 +25,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "editions", icon: "🏁", label: "Hors Saison" },
   { id: "development", icon: "📈", label: "Développement" },
   { id: "results", icon: "🏆", label: "Résultats" },
+  { id: "race-awards", icon: "⚡", label: "Poles / MT" },
   { id: "permissions", icon: "🔐", label: "Permissions" },
   { id: "settings", icon: "⚙️", label: "Réglages" },
 ];
@@ -108,6 +109,7 @@ function getAdminCategoryOptions(permissions) {
   return CATEGORY_OPTIONS.filter((category) => allowed.includes(category.id));
 }
 function hasAdminPageAccess(permissions, pageId, user) {
+  if (isPermissionsOwner(user)) return true;
   if (pageId === "permissions") return isPermissionsOwner(user);
   return normalizeAllowedPages(permissions?.allowedPages).includes(pageId);
 }
@@ -2350,6 +2352,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
+          {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "permissions" && (
             <PermissionsPanel
               adminUser={adminUser}
@@ -3507,6 +3510,58 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
   }
 
   return <Card title="Résultats automatiques" icon="🏆"><div style={styles.stack}><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Circuit</span><select value={selectedRaceId} onChange={(event) => { setSelectedRaceId(event.target.value); setPositionOrder([]); }} style={styles.resultsSelect}><option value="">Choisir un GP</option>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}</option>)}</select></label><button onClick={onValidate} disabled={isSavingResult} style={styles.primaryButton}>{isSavingResult ? "Sauvegarde..." : "Valider la course"}</button></div><p style={styles.mutedSmall}>{pointsLabel}</p>{drivers.length === 0 ? <Empty text={`Aucun pilote inscrit en ${selectedCategoryId} sur ${seasonName(selectedSeasonId)}.`} /> : <><div style={styles.quickResultBox}><PositionPicker drivers={drivers} positionOrder={positionOrder} onPick={updatePositionPick} /><label style={styles.label}><span style={styles.labelText}>Coller l'ordre d'arrivée</span><textarea value={quickResults} onChange={(event) => setQuickResults(event.target.value)} rows={8} placeholder={"Zach\nMarden\nLeroi\nNatalino"} style={styles.textarea} /></label><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Pole</span><select value={poleDriverId} onChange={(event) => setPoleDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Meilleur tour</span><select value={fastestDriverId} onChange={(event) => setFastestDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><button type="button" onClick={applyQuickResults} style={styles.secondaryButton}>Appliquer l'ordre collé</button><button type="button" onClick={applyQuickFlags} style={styles.secondaryButton}>Appliquer Pole / MT</button></div>{quickStatus && <p style={styles.mutedSmall}>{quickStatus}</p>}</div><ResultTable drivers={drivers} teams={teams} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} /></>}</div></Card>;
+}
+
+function RaceAwardsPanel({ drivers = [], teams = [], raceResults = [], racesBySeason = {}, selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId }) {
+  const races = [...(racesBySeason[selectedSeasonId] || [])].sort((a, b) => Number(a.round) - Number(b.round));
+  const buildAwardRows = (awardKey) => races.map((race) => {
+    const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
+    const awardEntry = result?.entries.find((entry) => Boolean(entry[awardKey]));
+    const driver = drivers.find((item) => idsEqual(item.id, awardEntry?.driverId));
+    const team = driver ? getDriverSeasonTeam(driver, race.seasonId, teams) : null;
+    return { race, result, driver, team };
+  });
+
+  return (
+    <div style={styles.section}>
+      <Card title="Poles & meilleurs tours" icon="⚡">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+        </div>
+        <p style={styles.mutedSmall}>Vue rapide des polemen et des meilleurs tours pour chaque course validée de la saison.</p>
+      </Card>
+      <div style={styles.twoColumns}>
+        <RaceAwardTable title={`Poles — ${seasonName(selectedSeasonId)}`} icon="⚡" rows={buildAwardRows("pole")} empty="Aucune pole enregistrée pour cette saison." />
+        <RaceAwardTable title={`Meilleurs tours — ${seasonName(selectedSeasonId)}`} icon="🟢" rows={buildAwardRows("fastestLap")} empty="Aucun meilleur tour enregistré pour cette saison." />
+      </div>
+    </div>
+  );
+}
+
+function RaceAwardTable({ title, icon, rows = [], empty }) {
+  const visibleRows = rows.filter((row) => row.result);
+  return (
+    <Card title={title} icon={icon}>
+      <div style={styles.tableWrap}>
+        <table style={{ ...styles.table, minWidth: 620 }}>
+          <thead><tr style={styles.tableHead}><th style={styles.th}>Course</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th></tr></thead>
+          <tbody>{visibleRows.map((row) => (
+            <tr key={row.race.id} style={styles.tr}>
+              <td style={styles.td}><strong>R{row.race.round}</strong><p style={styles.mutedSmall}>{row.race.name}</p></td>
+              <td style={styles.td}>{row.driver ? <AwardDriverIdentity driver={row.driver} team={row.team} /> : "—"}</td>
+              <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </div>
+      {visibleRows.length === 0 && <Empty text={empty} />}
+    </Card>
+  );
+}
+
+function AwardDriverIdentity({ driver, team }) {
+  return <DriverIdentity driver={{ ...driver, avatar: "" }} teamColor={team?.color} teamLogo={team?.logo} showRetired={false} />;
 }
 
 function PositionPicker({ drivers, positionOrder, onPick }) {
