@@ -25,6 +25,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "planning", icon: "⏱️", label: "Planning" },
   { id: "editions", icon: "🏁", label: "Hors Saison" },
   { id: "development", icon: "📈", label: "Développement" },
+  { id: "games", icon: "🎮", label: "Jeux" },
   { id: "results", icon: "🏆", label: "Résultats" },
   { id: "race-awards", icon: "⚡", label: "Poles / MT" },
   { id: "permissions", icon: "🔐", label: "Permissions" },
@@ -40,6 +41,7 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "seasons", label: "Saison" },
   { id: "editions", label: "Hors Saison" },
   { id: "development", label: "Développement" },
+  { id: "predictions", label: "Pronos" },
   { id: "world", label: "Carte" },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
@@ -667,6 +669,72 @@ function mapRaceResultFromDb(result, entries = []) {
       })),
   };
 }
+function mapRacePredictionFromDb(prediction) {
+  return {
+    id: prediction.id,
+    pseudo: prediction.pseudo || "",
+    raceId: prediction.race_id,
+    seasonId: normalizeSeasonId(prediction.season_id),
+    categoryId: normalizeCategoryId(prediction.category_id),
+    winnerDriverId: prediction.winner_driver_id || "",
+    poleDriverId: prediction.pole_driver_id || "",
+    fastestDriverId: prediction.fastest_driver_id || "",
+    podiumFirstDriverId: prediction.podium_first_driver_id || "",
+    podiumSecondDriverId: prediction.podium_second_driver_id || "",
+    podiumThirdDriverId: prediction.podium_third_driver_id || "",
+    createdAt: prediction.created_at || "",
+  };
+}
+function mapRacePredictionToDb(prediction) {
+  return {
+    pseudo: String(prediction.pseudo || "").trim(),
+    race_id: Number(prediction.raceId),
+    season_id: normalizeSeasonId(prediction.seasonId),
+    category_id: normalizeCategoryId(prediction.categoryId),
+    winner_driver_id: prediction.winnerDriverId ? Number(prediction.winnerDriverId) : null,
+    pole_driver_id: prediction.poleDriverId ? Number(prediction.poleDriverId) : null,
+    fastest_driver_id: prediction.fastestDriverId ? Number(prediction.fastestDriverId) : null,
+    podium_first_driver_id: prediction.podiumFirstDriverId ? Number(prediction.podiumFirstDriverId) : null,
+    podium_second_driver_id: prediction.podiumSecondDriverId ? Number(prediction.podiumSecondDriverId) : null,
+    podium_third_driver_id: prediction.podiumThirdDriverId ? Number(prediction.podiumThirdDriverId) : null,
+  };
+}
+function getRaceResultForRace(raceResults = [], raceId) {
+  return raceResults.find((result) => String(result.raceId) === String(raceId));
+}
+function scoreRacePrediction(prediction, raceResults = []) {
+  const result = getRaceResultForRace(raceResults, prediction.raceId);
+  if (!result) return { scored: false, score: 0, details: "En attente du résultat" };
+  const sortedEntries = [...result.entries].sort((a, b) => Number(a.position) - Number(b.position));
+  const winner = sortedEntries.find((entry) => Number(entry.position) === 1);
+  const poleIds = sortedEntries.filter((entry) => entry.pole).map((entry) => String(entry.driverId));
+  const fastestIds = sortedEntries.filter((entry) => entry.fastestLap).map((entry) => String(entry.driverId));
+  const podiumIds = sortedEntries.slice(0, 3).map((entry) => String(entry.driverId));
+  const predictedPodium = [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].map((id) => String(id || "")).filter(Boolean);
+  let score = 0;
+  const parts = [];
+  if (idsEqual(prediction.winnerDriverId, winner?.driverId)) { score += 10; parts.push("Vainqueur +10"); }
+  if (poleIds.includes(String(prediction.poleDriverId))) { score += 5; parts.push("Pole +5"); }
+  if (fastestIds.includes(String(prediction.fastestDriverId))) { score += 5; parts.push("MT +5"); }
+  const podiumHits = predictedPodium.filter((driverId) => podiumIds.includes(driverId)).length;
+  if (podiumHits) { score += podiumHits * 3; parts.push(`Podium +${podiumHits * 3}`); }
+  if (predictedPodium.length === 3 && predictedPodium.every((driverId, index) => podiumIds[index] === driverId)) {
+    score += 10;
+    parts.push("Podium exact +10");
+  }
+  return { scored: true, score, details: parts.length ? parts.join(" · ") : "0 point" };
+}
+function getPredictionLeaderboard(predictions = [], raceResults = []) {
+  const map = new Map();
+  predictions.forEach((prediction) => {
+    const key = prediction.pseudo.trim().toLowerCase();
+    if (!key) return;
+    const scored = scoreRacePrediction(prediction, raceResults);
+    const current = map.get(key) || { pseudo: prediction.pseudo, score: 0, entries: 0 };
+    map.set(key, { ...current, pseudo: current.pseudo || prediction.pseudo, score: current.score + scored.score, entries: current.entries + 1 });
+  });
+  return Array.from(map.values()).sort((a, b) => b.score - a.score || a.pseudo.localeCompare(b.pseudo, "fr"));
+}
 function createSeasonMapFromCalendar(calendarRaces, selectedCategoryId = "F1") {
   const map = createEmptySeasonMap();
   const activeCategoryId = normalizeCategoryId(selectedCategoryId);
@@ -1168,6 +1236,7 @@ export default function URTTAdminPanel() {
   const [raceResults, setRaceResults] = useState([]);
   const [seasonTitles, setSeasonTitles] = useState([]);
   const [developmentEntries, setDevelopmentEntries] = useState([]);
+  const [racePredictions, setRacePredictions] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
@@ -1188,6 +1257,7 @@ export default function URTTAdminPanel() {
   const [search, setSearch] = useState("");
   const [adminGlobalSearch, setAdminGlobalSearch] = useState("");
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [isSavingPrediction, setIsSavingPrediction] = useState(false);
   const [supabaseErrors, setSupabaseErrors] = useState([]);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [titleDriverId, setTitleDriverId] = useState("");
@@ -1247,6 +1317,7 @@ export default function URTTAdminPanel() {
         { data: specialEditionsData, error: specialEditionsError },
         { data: seasonTitlesData, error: seasonTitlesError },
         { data: developmentData, error: developmentError },
+        { data: racePredictionsData, error: racePredictionsError },
         { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
@@ -1263,6 +1334,7 @@ export default function URTTAdminPanel() {
         supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
+        supabase.from("race_predictions").select("*").order("created_at", { ascending: false }),
         supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
@@ -1281,6 +1353,7 @@ export default function URTTAdminPanel() {
         specialEditionsError && specialEditionsError.code !== "42P01" && `special_event_editions: ${specialEditionsError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
+        racePredictionsError && racePredictionsError.code !== "42P01" && `race_predictions: ${racePredictionsError.message}`,
         adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
@@ -1305,6 +1378,7 @@ export default function URTTAdminPanel() {
       setSpecialEditions((specialEditionsData || []).map(mapSpecialEditionFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
+      setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
@@ -2331,6 +2405,38 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
   }
 
+  async function saveRacePrediction(prediction) {
+    if (!prediction.pseudo?.trim()) return { ok: false, message: "Ajoute un pseudo pour envoyer ton prono." };
+    if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
+    const requiredDriverIds = [prediction.winnerDriverId, prediction.poleDriverId, prediction.fastestDriverId, prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId];
+    if (requiredDriverIds.some((driverId) => !driverId)) return { ok: false, message: "Remplis tous les choix du prono." };
+    const podiumSet = new Set([prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].map(String));
+    if (podiumSet.size < 3) return { ok: false, message: "Choisis trois pilotes différents pour le podium." };
+    if (getRaceResultForRace(raceResults, prediction.raceId)) return { ok: false, message: "Les pronos sont fermés pour cette course déjà validée." };
+
+    setIsSavingPrediction(true);
+    const { data, error } = await supabase
+      .from("race_predictions")
+      .insert(mapRacePredictionToDb(prediction))
+      .select()
+      .single();
+    setIsSavingPrediction(false);
+
+    if (error) {
+      console.error("Erreur prono:", error);
+      const message = error.code === "42P01"
+        ? "La table race_predictions n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
+          ? "Supabase bloque l'envoi du prono. Vérifie les policies RLS de race_predictions."
+          : "Impossible d'envoyer le prono pour le moment.";
+      return { ok: false, message };
+    }
+
+    const savedPrediction = mapRacePredictionFromDb(data);
+    setRacePredictions((current) => [savedPrediction, ...current]);
+    return { ok: true, message: "Prono envoyé ! Il sera scoré quand le résultat sera validé." };
+  }
+
   async function addSeason() {
     if (!adminUser) {
       setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les saisons." });
@@ -2386,8 +2492,11 @@ export default function URTTAdminPanel() {
           raceResults={raceResults}
           seasonTitles={seasonTitles}
           developmentEntries={developmentEntries}
+          racePredictions={racePredictions}
           siteSettings={siteSettings}
           allDrivers={drivers}
+          onSavePrediction={saveRacePrediction}
+          isSavingPrediction={isSavingPrediction}
           adminUser={adminUser}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
           onOpenAdmin={() => {
@@ -2443,6 +2552,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
+          {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "permissions" && (
@@ -2763,7 +2873,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], adminUser = null, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -2827,6 +2937,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
+        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -3014,6 +3125,107 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
       </div>
     </div>
   );
+}
+
+function PredictionsPage({ races = [], drivers = [], teams = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], onSubmit, isSaving }) {
+  const categoryId = normalizeCategoryId(selectedCategoryId);
+  const seasonId = normalizeSeasonId(selectedSeasonId);
+  const eligibleDrivers = drivers
+    .filter((driver) => (driver.participations?.[seasonId] || []).some((category) => normalizeCategoryId(category) === categoryId))
+    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  const openRaces = races.filter((race) => !getRaceResultForRace(raceResults, race.id));
+  const [selectedRaceId, setSelectedRaceId] = useState(openRaces[0]?.id || races[0]?.id || "");
+  const [form, setForm] = useState({ pseudo: "", winnerDriverId: "", poleDriverId: "", fastestDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "" });
+  const [status, setStatus] = useState("");
+  const activeRaceId = races.some((race) => String(race.id) === String(selectedRaceId)) ? selectedRaceId : openRaces[0]?.id || races[0]?.id || "";
+  const selectedRace = races.find((race) => String(race.id) === String(activeRaceId));
+  const raceClosed = selectedRace ? Boolean(getRaceResultForRace(raceResults, selectedRace.id)) : true;
+  const visiblePredictions = predictions.filter((prediction) => normalizeSeasonId(prediction.seasonId) === seasonId && normalizeCategoryId(prediction.categoryId) === categoryId);
+  const racePredictions = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(activeRaceId));
+  const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults).slice(0, 10);
+  const driverOptions = eligibleDrivers.length ? eligibleDrivers : drivers;
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setStatus("");
+    const response = await onSubmit?.({ ...form, raceId: activeRaceId, seasonId, categoryId });
+    setStatus(response?.message || "");
+    if (response?.ok) setForm({ pseudo: "", winnerDriverId: "", poleDriverId: "", fastestDriverId: "", podiumFirstDriverId: "", podiumSecondDriverId: "", podiumThirdDriverId: "" });
+  };
+
+  return (
+    <div style={styles.section}>
+      <Card title={`Pronos GP — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="🎮">
+        <form onSubmit={submit} style={styles.stack}>
+          <div style={styles.resultsInfo}>
+            <label style={styles.label}><span style={styles.labelText}>Course</span><select value={activeRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}{getRaceResultForRace(raceResults, race.id) ? " · fermé" : ""}</option>)}</select></label>
+            <Input label="Pseudo" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
+            <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{raceClosed ? "Pronos fermés" : "Pronos ouverts"}</strong></div>
+          </div>
+          {races.length === 0 ? <Empty text="Aucune course disponible pour cette saison." /> : (
+            <>
+              <div style={styles.formGrid}>
+                <PredictionSelect label="Vainqueur" value={form.winnerDriverId} onChange={(value) => update("winnerDriverId", value)} drivers={driverOptions} />
+                <PredictionSelect label="Poleman" value={form.poleDriverId} onChange={(value) => update("poleDriverId", value)} drivers={driverOptions} />
+                <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
+              </div>
+              <div style={styles.formGrid}>
+                <PredictionSelect label="Podium P1" value={form.podiumFirstDriverId} onChange={(value) => update("podiumFirstDriverId", value)} drivers={driverOptions} />
+                <PredictionSelect label="Podium P2" value={form.podiumSecondDriverId} onChange={(value) => update("podiumSecondDriverId", value)} drivers={driverOptions} />
+                <PredictionSelect label="Podium P3" value={form.podiumThirdDriverId} onChange={(value) => update("podiumThirdDriverId", value)} drivers={driverOptions} />
+              </div>
+              <button type="submit" disabled={isSaving || raceClosed || !onSubmit} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : "Envoyer mon prono"}</button>
+              {status && <p style={styles.mutedSmall}>{status}</p>}
+            </>
+          )}
+        </form>
+      </Card>
+      <div style={styles.twoColumns}>
+        <Card title="Classement pronos" icon="🏆">
+          <PredictionLeaderboard leaderboard={leaderboard} />
+        </Card>
+        <Card title={selectedRace ? `Pronos envoyés — ${selectedRace.name}` : "Pronos envoyés"} icon="📋">
+          <PredictionSummary predictions={racePredictions} drivers={drivers} teams={teams} raceResults={raceResults} />
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function PredictionSelect({ label, value, onChange, drivers = [] }) {
+  return <label style={styles.label}><span style={styles.labelText}>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} style={styles.resultsSelect}><option value="">Choisir un pilote</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>;
+}
+
+function PredictionLeaderboard({ leaderboard }) {
+  if (!leaderboard.length) return <Empty text="Aucun score pour le moment." />;
+  return <div style={styles.stack}>{leaderboard.map((row, index) => <div key={row.pseudo} style={styles.itemBox}><div><strong>#{index + 1} {row.pseudo}</strong><p style={styles.mutedSmall}>{row.entries} prono{row.entries > 1 ? "s" : ""}</p></div><span style={styles.points}>{row.score}</span></div>)}</div>;
+}
+
+function PredictionSummary({ predictions = [], drivers = [], teams = [], raceResults = [] }) {
+  if (!predictions.length) return <Empty text="Aucun prono envoyé pour cette course." />;
+  return <div style={styles.stack}>{predictions.map((prediction) => {
+    const score = scoreRacePrediction(prediction, raceResults);
+    return (
+      <div key={prediction.id} style={styles.publicRaceCard}>
+        <div style={styles.publicRaceHeader}>
+          <div><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "Date inconnue"}</p></div>
+          <span style={score.scored ? styles.badgeGreen : styles.badgeDark}>{score.scored ? `${score.score} pts` : "En attente"}</span>
+        </div>
+        <div style={styles.raceStatsGrid}>
+          <RaceStat label="Vainqueur" value={driverName(drivers, prediction.winnerDriverId)} />
+          <RaceStat label="Poleman" value={driverName(drivers, prediction.poleDriverId)} />
+          <RaceStat label="Meilleur tour" value={driverName(drivers, prediction.fastestDriverId)} />
+          <RaceStat label="Podium" value={[prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].map((id) => driverName(drivers, id)).join(" · ")} />
+        </div>
+        <p style={styles.mutedSmall}>{score.details}</p>
+        <div style={styles.titleBadgeRow}>{[prediction.winnerDriverId, prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].filter(Boolean).slice(0, 4).map((driverId) => {
+          const driver = drivers.find((item) => idsEqual(item.id, driverId));
+          const team = driver ? getDriverSeasonTeam(driver, prediction.seasonId, teams) : null;
+          return driver ? <span key={`${prediction.id}-${driverId}`} style={styles.titleBadge}>{team?.name ? `${team.name} · ` : ""}{driver.name}</span> : null;
+        })}</div>
+      </div>
+    );
+  })}</div>;
 }
 
 function SpecialEditionsPage({ editions = [], drivers = [] }) {
@@ -3714,6 +3926,77 @@ function RaceAwardTable({ title, icon, rows = [], empty }) {
 
 function AwardDriverIdentity({ driver, team }) {
   return <DriverIdentity driver={{ ...driver, avatar: "" }} teamColor={team?.color} teamLogo={team?.logo} showRetired={false} />;
+}
+
+function GamesAdminPanel({ predictions = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId }) {
+  const categoryId = normalizeCategoryId(selectedCategoryId);
+  const seasonId = normalizeSeasonId(selectedSeasonId);
+  const seasonRaces = races.filter((race) => normalizeCategoryId(race.categoryId) === categoryId && normalizeSeasonId(race.seasonId) === seasonId).sort((a, b) => Number(a.round) - Number(b.round));
+  const visiblePredictions = predictions.filter((prediction) => normalizeCategoryId(prediction.categoryId) === categoryId && normalizeSeasonId(prediction.seasonId) === seasonId);
+  const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults);
+  const raceCounts = seasonRaces.map((race) => ({ race, count: visiblePredictions.filter((prediction) => String(prediction.raceId) === String(race.id)).length })).sort((a, b) => b.count - a.count);
+  const topRace = raceCounts[0];
+
+  return (
+    <div style={styles.section}>
+      <Card title="Jeux — Pronos GP" icon="🎮">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+        </div>
+        <div style={styles.statsGrid}>
+          <Stat label="Pronos" value={visiblePredictions.length} />
+          <Stat label="Joueurs" value={new Set(visiblePredictions.map((prediction) => prediction.pseudo.trim().toLowerCase()).filter(Boolean)).size} />
+          <Stat label="Courses" value={seasonRaces.length} />
+          <Stat label="Course la plus jouée" value={topRace?.count ? `${topRace.race.name} (${topRace.count})` : "—"} />
+        </div>
+      </Card>
+      <div style={styles.twoColumns}>
+        <Card title="Classement joueurs" icon="🏆">
+          <PredictionLeaderboard leaderboard={leaderboard} />
+        </Card>
+        <Card title="Pronos par course" icon="📋">
+          <div style={styles.stack}>
+            {seasonRaces.map((race) => {
+              const count = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(race.id)).length;
+              const closed = Boolean(getRaceResultForRace(raceResults, race.id));
+              return <div key={race.id} style={styles.itemBox}><div><strong>R{race.round} · {race.name}</strong><p style={styles.mutedSmall}>{closed ? "Résultat validé" : "Ouvert"} · {formatRaceDate(race.startAt)}</p></div><span style={closed ? styles.badgeGreen : styles.badgeDark}>{count} prono{count > 1 ? "s" : ""}</span></div>;
+            })}
+            {seasonRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}
+          </div>
+        </Card>
+      </div>
+      <Card title="Toutes les participations" icon="🧾">
+        <PredictionAdminTable predictions={visiblePredictions} races={seasonRaces} drivers={drivers} raceResults={raceResults} />
+      </Card>
+    </div>
+  );
+}
+
+function PredictionAdminTable({ predictions = [], races = [], drivers = [], raceResults = [] }) {
+  if (!predictions.length) return <Empty text="Aucun prono enregistré sur cette sélection." />;
+  return (
+    <div style={styles.tableWrap}>
+      <table style={{ ...styles.table, minWidth: 980 }}>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>Vainqueur</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Podium</th><th style={styles.th}>Score</th></tr></thead>
+        <tbody>{predictions.map((prediction) => {
+          const race = races.find((item) => String(item.id) === String(prediction.raceId));
+          const score = scoreRacePrediction(prediction, raceResults);
+          return (
+            <tr key={prediction.id} style={styles.tr}>
+              <td style={styles.td}><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "—"}</p></td>
+              <td style={styles.td}>{race ? `R${race.round} · ${race.name}` : prediction.raceId}</td>
+              <td style={styles.td}>{driverName(drivers, prediction.winnerDriverId)}</td>
+              <td style={styles.td}>{driverName(drivers, prediction.poleDriverId)}</td>
+              <td style={styles.td}>{driverName(drivers, prediction.fastestDriverId)}</td>
+              <td style={styles.td}>{[prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].map((id) => driverName(drivers, id)).join(" · ")}</td>
+              <td style={{ ...styles.td, ...styles.points }}>{score.scored ? score.score : "—"}</td>
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </div>
+  );
 }
 
 function PositionPicker({ drivers, positionOrder, onPick }) {
