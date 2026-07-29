@@ -577,6 +577,10 @@ function getDevelopmentCoef(entry) {
     + (entry?.turboEnabled ? (Number(entry?.turbo) || 0) * coefficients.turbo : 0)
   );
 }
+function formatDevelopmentValue(value) {
+  const rounded = Math.round(Number(value) * 100) / 100;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(2).replace(/0+$/, "").replace(/\.$/, "");
+}
 function getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId) {
   return entries
     .filter((entry) => normalizeSeasonId(entry.seasonId) === normalizeSeasonId(selectedSeasonId) && normalizeCategoryId(entry.categoryId) === normalizeCategoryId(selectedCategoryId))
@@ -2957,10 +2961,41 @@ function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, 
       <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
         <DevelopmentChart teams={teams} entries={selectedEntries} />
       </Card>
+      <Card title="Classement développement" icon="🏁">
+        <DevelopmentBarChart rows={latestByTeam} />
+      </Card>
       <div className="urtt-development-cards" style={styles.developmentCards}>
         {latestByTeam.map(({ team, entry }) => <DevelopmentTeamCard key={team.id} team={team} entry={entry} previous={getPreviousDevelopmentEntry(selectedEntries, entry)} />)}
       </div>
       {latestByTeam.length === 0 && <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />}
+    </div>
+  );
+}
+
+function DevelopmentBarChart({ rows = [] }) {
+  const maxValue = Math.max(1, ...rows.map(({ entry }) => getDevelopmentCoef(entry)));
+  if (!rows.length) return <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />;
+
+  return (
+    <div style={styles.developmentBarChart}>
+      {rows.map(({ team, entry }, index) => {
+        const value = getDevelopmentCoef(entry);
+        const width = `${Math.max(8, (value / maxValue) * 100)}%`;
+        return (
+          <div key={team.id} style={styles.developmentBarRow}>
+            <div style={styles.developmentBarTrack}>
+              <div style={{ ...styles.developmentBarFill, width, background: team.color || "#dc2626" }}>
+                <span style={styles.developmentBarRank}>#{index + 1}</span>
+                <span style={styles.developmentBarName}>{team.name}</span>
+                <strong style={styles.developmentBarValue}>{formatDevelopmentValue(value)}</strong>
+              </div>
+              <div style={styles.developmentBarLogoSlot}>
+                {team.logo ? <img src={team.logo} alt={team.name} style={styles.developmentBarLogo} /> : <span style={{ ...styles.developmentBarFallback, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</span>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -4321,6 +4356,16 @@ const styles = {
   developmentChart: { width: "100%", minHeight: 340, background: "#09090b", border: "1px solid #27272a", borderRadius: 18 },
   developmentLegend: { display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" },
   developmentLegendItem: { display: "inline-flex", gap: 6, alignItems: "center", color: "#f4f4f5", fontWeight: 900, background: "#18181b", border: "1px solid #27272a", borderRadius: 999, padding: "6px 9px" },
+  developmentBarChart: { display: "grid", gap: 8, background: "#09090b", border: "1px solid #3f3f46", borderRadius: 18, padding: 14, overflow: "hidden" },
+  developmentBarRow: { minHeight: 34, display: "grid", alignItems: "center" },
+  developmentBarTrack: { position: "relative", minHeight: 34, background: "#18181b", border: "1px solid #27272a", borderRadius: 8, overflow: "hidden" },
+  developmentBarFill: { minHeight: 34, display: "grid", gridTemplateColumns: "42px minmax(0, 1fr) auto", alignItems: "center", gap: 8, padding: "0 52px 0 10px", color: "#09090b", fontWeight: 950, textShadow: "0 1px rgba(255,255,255,.35)", boxSizing: "border-box", transition: "width .25s ease" },
+  developmentBarRank: { fontSize: 12, opacity: .8 },
+  developmentBarName: { whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", textTransform: "uppercase" },
+  developmentBarValue: { color: "#09090b", whiteSpace: "nowrap" },
+  developmentBarLogoSlot: { position: "absolute", right: 6, top: "50%", transform: "translateY(-50%)", width: 42, height: 28, display: "grid", placeItems: "center" },
+  developmentBarLogo: { maxWidth: 40, maxHeight: 28, objectFit: "contain", filter: "drop-shadow(0 2px 4px rgba(0,0,0,.5))" },
+  developmentBarFallback: { width: 32, height: 24, borderRadius: 6, display: "grid", placeItems: "center", color: "white", fontSize: 10, fontWeight: 950, border: "1px solid rgba(255,255,255,.4)" },
   developmentCards: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 260px), 1fr))", gap: 16 },
   developmentCard: { background: "#101827", border: "1px solid #1f2937", borderRadius: 18, padding: 16, display: "grid", gap: 14, boxShadow: "0 18px 42px rgba(0,0,0,.22)" },
   developmentCardHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 },
