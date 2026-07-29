@@ -2991,7 +2991,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
-        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
+        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -3181,7 +3181,7 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function PredictionsPage({ races = [], drivers = [], teams = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], predictionControls = [], onSubmit, isSaving }) {
+function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingDrivers = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], predictionControls = [], onSubmit, isSaving }) {
   const categoryId = normalizeCategoryId(selectedCategoryId);
   const seasonId = normalizeSeasonId(selectedSeasonId);
   const eligibleDrivers = drivers
@@ -3198,18 +3198,23 @@ function PredictionsPage({ races = [], drivers = [], teams = [], selectedSeasonI
   const racePredictions = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(activeRaceId));
   const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults).slice(0, 10);
   const driverOptions = eligibleDrivers.length ? eligibleDrivers : drivers;
+  const defaultOrder = (currentRankingDrivers.length ? currentRankingDrivers : driverOptions).slice(0, 20).map((driver) => String(driver.id));
+  const formOrder = (form.predictedOrder || []).map(String).filter((driverId) => defaultOrder.includes(driverId));
+  const predictionOrder = formOrder.length === defaultOrder.length ? formOrder : defaultOrder;
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const updateOrder = (positionIndex, driverId) => setForm((current) => {
-    const nextOrder = [...(current.predictedOrder || [])];
-    const existingIndex = nextOrder.findIndex((item) => idsEqual(item, driverId));
-    if (existingIndex >= 0 && existingIndex !== positionIndex) nextOrder[existingIndex] = "";
-    nextOrder[positionIndex] = driverId;
+  const setPredictionOrder = (nextOrder) => setForm((current) => ({ ...current, predictedOrder: nextOrder.map(String) }));
+  const movePredictionDriver = (fromIndex, toIndex) => setForm((current) => {
+    const currentOrder = (current.predictedOrder || []).map(String).filter((driverId) => defaultOrder.includes(driverId));
+    const nextOrder = [...(currentOrder.length === defaultOrder.length ? currentOrder : defaultOrder)];
+    if (toIndex < 0 || toIndex >= nextOrder.length) return current;
+    const [driverId] = nextOrder.splice(fromIndex, 1);
+    nextOrder.splice(toIndex, 0, driverId);
     return { ...current, predictedOrder: nextOrder };
   });
   const submit = async (event) => {
     event.preventDefault();
     setStatus("");
-    const predictedOrder = (form.predictedOrder || []).slice(0, 20);
+    const predictedOrder = predictionOrder.slice(0, 20);
     const response = await onSubmit?.({
       ...form,
       predictedOrder,
@@ -3240,7 +3245,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], selectedSeasonI
                 <PredictionSelect label="Poleman" value={form.poleDriverId} onChange={(value) => update("poleDriverId", value)} drivers={driverOptions} />
                 <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
               </div>
-              <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} order={form.predictedOrder || []} onPick={updateOrder} />
+              <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} teams={teams} seasonId={seasonId} order={predictionOrder} defaultOrder={defaultOrder} onMove={movePredictionDriver} onSetOrder={setPredictionOrder} />
               <button type="submit" disabled={isSaving || raceClosed || !onSubmit} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : "Envoyer mon prono"}</button>
               {status && <p style={styles.mutedSmall}>{status}</p>}
             </>
@@ -3263,23 +3268,65 @@ function PredictionSelect({ label, value, onChange, drivers = [] }) {
   return <label style={styles.label}><span style={styles.labelText}>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} style={styles.resultsSelect}><option value="">Choisir un pilote</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>;
 }
 
-function PredictionOrderPicker({ drivers = [], order = [], onPick }) {
-  const positions = Array.from({ length: Math.min(20, drivers.length || 20) }, (_, index) => index);
+function PredictionOrderPicker({ drivers = [], teams = [], seasonId, order = [], defaultOrder = [], onMove, onSetOrder }) {
+  const [dragIndex, setDragIndex] = useState(null);
+  const driverMap = new Map(drivers.map((driver) => [String(driver.id), driver]));
+  const orderedDriverIds = order.filter((driverId) => driverMap.has(String(driverId)));
+  const missingDriverIds = drivers.map((driver) => String(driver.id)).filter((driverId) => !orderedDriverIds.includes(driverId));
+  const fullOrder = [...orderedDriverIds, ...missingDriverIds].slice(0, 20);
+  const move = (fromIndex, toIndex) => {
+    if (toIndex < 0 || toIndex >= fullOrder.length) return;
+    onMove?.(fromIndex, toIndex);
+  };
+  const randomize = () => {
+    const shuffled = [...fullOrder];
+    for (let index = shuffled.length - 1; index > 0; index -= 1) {
+      const randomIndex = Math.floor(Math.random() * (index + 1));
+      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
+    }
+    onSetOrder?.(shuffled);
+  };
+  const reset = () => onSetOrder?.(defaultOrder.length ? defaultOrder : drivers.map((driver) => String(driver.id)).slice(0, 20));
+  const dropOn = (targetIndex) => {
+    if (dragIndex === null || dragIndex === targetIndex) return;
+    move(dragIndex, targetIndex);
+    setDragIndex(null);
+  };
+
   return (
-    <div style={styles.quickResultBox}>
-      <span style={styles.labelText}>Classement prédit</span>
-      <div style={styles.positionGrid}>
-        {positions.map((positionIndex) => {
-          const selectedId = order[positionIndex] || "";
-          const usedIds = new Set(order.filter((driverId, driverIndex) => driverId && driverIndex !== positionIndex).map(String));
+    <div style={styles.predictionOrderBox}>
+      <div style={styles.predictionOrderHeader}>
+        <div>
+          <strong>Classement prédit</strong>
+          <p style={styles.mutedSmall}>Déplace les pilotes pour construire ton top 20.</p>
+        </div>
+        <div style={styles.actions}>
+          <button type="button" onClick={reset} style={styles.editButton}>Classement actuel</button>
+          <button type="button" onClick={randomize} style={styles.secondaryButton}>Mélanger</button>
+        </div>
+      </div>
+      <div style={styles.predictionOrderList}>
+        {fullOrder.map((driverId, index) => {
+          const driver = driverMap.get(String(driverId));
+          const team = driver ? getDriverSeasonTeam(driver, seasonId, teams) : null;
           return (
-            <label key={positionIndex} style={styles.positionPick}>
-              <span>P{positionIndex + 1}</span>
-              <select value={selectedId} onChange={(event) => onPick(positionIndex, event.target.value)} style={styles.resultsSelect}>
-                <option value="">Choisir</option>
-                {drivers.filter((driver) => !usedIds.has(String(driver.id))).map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
-              </select>
-            </label>
+            <div
+              key={driverId}
+              draggable
+              onDragStart={() => setDragIndex(index)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={() => dropOn(index)}
+              onDragEnd={() => setDragIndex(null)}
+              style={{ ...styles.predictionOrderRow, ...(dragIndex === index ? styles.predictionOrderRowDragging : {}) }}
+            >
+              <span style={styles.predictionPosition}>P{index + 1}</span>
+              {driver ? <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /> : <strong>Pilote inconnu</strong>}
+              <div style={styles.predictionMoveButtons}>
+                <button type="button" onClick={() => move(index, index - 1)} disabled={index === 0} style={styles.editButton}>↑</button>
+                <button type="button" onClick={() => move(index, index + 1)} disabled={index === fullOrder.length - 1} style={styles.editButton}>↓</button>
+                <span style={styles.predictionDragHandle}>≡</span>
+              </div>
+            </div>
           );
         })}
       </div>
@@ -4916,6 +4963,14 @@ const styles = {
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
   resultsSelect: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 14, outline: "none", fontWeight: 700 },
   quickResultBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 12 },
+  predictionOrderBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 14 },
+  predictionOrderHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  predictionOrderList: { display: "grid", gap: 8 },
+  predictionOrderRow: { background: "#18181b", border: "1px solid #2f2f36", borderRadius: 14, padding: "10px 12px", display: "grid", gridTemplateColumns: "54px minmax(0, 1fr) auto", alignItems: "center", gap: 10, cursor: "grab" },
+  predictionOrderRowDragging: { opacity: .55, borderColor: "#a855f7", boxShadow: "0 0 18px rgba(168,85,247,.28)" },
+  predictionPosition: { color: "#f87171", fontWeight: 950, fontSize: 16 },
+  predictionMoveButtons: { display: "flex", alignItems: "center", gap: 6 },
+  predictionDragHandle: { color: "#a1a1aa", fontSize: 20, fontWeight: 950, padding: "0 4px" },
   positionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 10, marginTop: 10 },
   positionPick: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", alignItems: "center", gap: 8, color: "#f4f4f5", fontWeight: 900 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
