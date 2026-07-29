@@ -742,6 +742,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     let podiums = 0;
     let poles = 0;
     let fastestLaps = 0;
+    let hatTricks = 0;
     seasonResults.forEach((result) => {
       const entry = result.entries.find((item) => idsEqual(item.driverId, driver.id));
       if (!entry) return;
@@ -750,6 +751,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
       podiums += Number(entry.position) <= 3 ? 1 : 0;
       poles += entry.pole ? 1 : 0;
       fastestLaps += entry.fastestLap ? 1 : 0;
+      hatTricks += Number(entry.position) === 1 && entry.pole && entry.fastestLap ? 1 : 0;
     });
     const standingsMap = seasonResults.reduce((map, result) => {
       result.entries.forEach((entry) => {
@@ -782,8 +784,8 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     const manualTeamTitle = matchingTitles.find((title) => title.teamId);
     const driverChampion = manualDriverTitle ? idsEqual(manualDriverTitle.driverId, driver.id) : positionIndex === 0 && points > 0;
     const constructorChampion = participatesInActiveCategory && (manualTeamTitle ? idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId) : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
-    return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps };
-  }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps);
+    return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps, hatTricks };
+  }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps || row.hatTricks);
 }
 function getTeamSeasonBreakdown(team, drivers, raceResults) {
   return getSeasonOptions().map((season) => {
@@ -2390,6 +2392,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
       podiums: 0,
       poles: 0,
       fastestLaps: 0,
+      hatTricks: 0,
       points: 0,
       resultCounts: {},
     };
@@ -2430,11 +2433,13 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
         const podium = position <= 3 ? 1 : 0;
         const pole = entry.pole ? 1 : 0;
         const fastest = entry.fastestLap ? 1 : 0;
+        const hatTrick = position === 1 && entry.pole && entry.fastestLap ? 1 : 0;
         driver.points += points;
         driver.wins += win;
         driver.podiums += podium;
         driver.poles += pole;
         driver.fastestLaps += fastest;
+        driver.hatTricks += hatTrick;
         if (Number.isFinite(position) && position > 0) {
           driver.resultCounts[position] = (driver.resultCounts[position] || 0) + 1;
         }
@@ -2521,6 +2526,7 @@ function sortByTitlesAndResults(a, b) {
     (Number(b.podiums) || 0) - (Number(a.podiums) || 0) ||
     (Number(b.poles) || 0) - (Number(a.poles) || 0) ||
     (Number(b.fastestLaps) || 0) - (Number(a.fastestLaps) || 0) ||
+    (Number(b.hatTricks) || 0) - (Number(a.hatTricks) || 0) ||
     (Number(b.points) || 0) - (Number(a.points) || 0) ||
     compareResultCounts(a, b)
   );
@@ -2541,7 +2547,7 @@ function buildCumulativeStats(statsBySeason) {
     getSeasonOptions().forEach((season) => {
       if (!isSeasonIncluded(season.id, selectedSeason.id)) return;
       (statsBySeason[season.id] || []).forEach((item) => {
-        const current = map.get(item.id) || { ...item, driverTitles: 0, teamTitles: 0, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, points: 0, resultCounts: {} };
+        const current = map.get(item.id) || { ...item, driverTitles: 0, teamTitles: 0, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, hatTricks: 0, points: 0, resultCounts: {} };
         map.set(item.id, {
           ...current,
           ...item,
@@ -2551,6 +2557,7 @@ function buildCumulativeStats(statsBySeason) {
           podiums: current.podiums + item.podiums,
           poles: current.poles + item.poles,
           fastestLaps: current.fastestLaps + item.fastestLaps,
+          hatTricks: (Number(current.hatTricks) || 0) + (Number(item.hatTricks) || 0),
           points: current.points + item.points,
           resultCounts: mergeResultCounts(current.resultCounts, item.resultCounts),
         });
@@ -3788,12 +3795,12 @@ function DriverTable({ drivers, detailed = false, raceDetails = false, compactRa
   const [sortConfig, setSortConfig] = useState(null);
   const sortedDrivers = sortStatRows(drivers, sortConfig);
   const updateSort = (key) => setSortConfig((current) => ({ key, direction: current?.key === key && current.direction === "desc" ? "asc" : "desc" }));
-  const records = buildRecordMap(drivers, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "points"]);
+  const records = buildRecordMap(drivers, ["driverTitles", "teamTitles", "wins", "podiums", "poles", "fastestLaps", "hatTricks", "points"]);
   return (
     <div style={styles.tableWrap}>
       <table className={`urtt-standings-table urtt-driver-standings${compactRaceDetails ? " urtt-compact-race-table" : ""}`} style={{ ...styles.table, minWidth: raceDetails ? Math.max(compactRaceDetails ? 720 : 950, (compactRaceDetails ? 430 : 650) + races.length * (compactRaceDetails ? 42 : 105)) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label="Titre P." sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre C." sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
-        <tbody>{sortedDrivers.map((driver, index) => { const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); const showRetired = Boolean(detailed); return <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} /></button> : <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} />}</td><td style={styles.td}>{showRetired && driver.retired ? "Retraité" : driver.teamName || team?.name || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={driver.driverTitles || 0} record={isRecordValue(records, "driverTitles", driver.driverTitles)} /></td><td style={styles.td}><RecordValue value={driver.teamTitles || 0} record={isRecordValue(records, "teamTitles", driver.teamTitles)} /></td><td style={styles.td}><RecordValue value={driver.wins} record={isRecordValue(records, "wins", driver.wins)} /></td><td style={styles.td}><RecordValue value={driver.podiums} record={isRecordValue(records, "podiums", driver.podiums)} /></td><td style={styles.td}><RecordValue value={driver.poles} record={isRecordValue(records, "poles", driver.poles)} /></td><td style={styles.td}><RecordValue value={driver.fastestLaps} record={isRecordValue(records, "fastestLaps", driver.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={driver.points} record={isRecordValue(records, "points", driver.points)} /></td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>; })}</tbody>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label="Titre P." sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre C." sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="HT" sortKey="hatTricks" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
+        <tbody>{sortedDrivers.map((driver, index) => { const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); const showRetired = Boolean(detailed); return <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} /></button> : <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} />}</td><td style={styles.td}>{showRetired && driver.retired ? "Retraité" : driver.teamName || team?.name || "—"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={driver.driverTitles || 0} record={isRecordValue(records, "driverTitles", driver.driverTitles)} /></td><td style={styles.td}><RecordValue value={driver.teamTitles || 0} record={isRecordValue(records, "teamTitles", driver.teamTitles)} /></td><td style={styles.td}><RecordValue value={driver.wins} record={isRecordValue(records, "wins", driver.wins)} /></td><td style={styles.td}><RecordValue value={driver.podiums} record={isRecordValue(records, "podiums", driver.podiums)} /></td><td style={styles.td}><RecordValue value={driver.poles} record={isRecordValue(records, "poles", driver.poles)} /></td><td style={styles.td}><RecordValue value={driver.fastestLaps} record={isRecordValue(records, "fastestLaps", driver.fastestLaps)} /></td><td style={styles.td}><RecordValue value={driver.hatTricks || 0} record={isRecordValue(records, "hatTricks", driver.hatTricks)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={driver.points} record={isRecordValue(records, "points", driver.points)} /></td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>; })}</tbody>
       </table>
       {drivers.length === 0 && <Empty text="Aucun pilote à afficher." />}
     </div>
@@ -3888,7 +3895,7 @@ function TeamDetails({ team, drivers, raceResults, onClose }) {
 function SeasonBreakdownTable({ rows }) {
   const showPosition = rows.some((row) => row.position);
   const showTitles = rows.some((row) => row.driverChampion || row.constructorChampion);
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Saison</th>{showPosition && <th style={styles.th}>Position</th>}{showTitles && <th style={styles.th}>Titres</th>}<th style={styles.th}>Écurie</th><th style={styles.th}>Catégories</th><th style={styles.th}>Points</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th></tr></thead><tbody>{rows.map((row) => <tr key={row.seasonId} style={styles.tr}><td style={styles.td}>{seasonName(row.seasonId)}</td>{showPosition && <td style={{ ...styles.td, ...styles.points }}>{row.position ? `#${row.position}` : "—"}</td>}{showTitles && <td style={styles.td}><div style={styles.titleBadgeRow}>{row.driverChampion && <span style={styles.titleBadge}>🏆 Pilote</span>}{row.constructorChampion && <span style={styles.titleBadge}>🏆 Constructeur</span>}{!row.driverChampion && !row.constructorChampion && "—"}</div></td>}<td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans écurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "—"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée." />}</div>;
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Saison</th>{showPosition && <th style={styles.th}>Position</th>}{showTitles && <th style={styles.th}>Titres</th>}<th style={styles.th}>Écurie</th><th style={styles.th}>Catégories</th><th style={styles.th}>Points</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th><th style={styles.th}>HT</th></tr></thead><tbody>{rows.map((row) => <tr key={row.seasonId} style={styles.tr}><td style={styles.td}>{seasonName(row.seasonId)}</td>{showPosition && <td style={{ ...styles.td, ...styles.points }}>{row.position ? `#${row.position}` : "—"}</td>}{showTitles && <td style={styles.td}><div style={styles.titleBadgeRow}>{row.driverChampion && <span style={styles.titleBadge}>🏆 Pilote</span>}{row.constructorChampion && <span style={styles.titleBadge}>🏆 Constructeur</span>}{!row.driverChampion && !row.constructorChampion && "—"}</div></td>}<td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans écurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "—"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td><td style={styles.td}>{row.hatTricks || 0}</td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée." />}</div>;
 }
 
 function ParticipationEditor({ form, setForm, teams = [], selectedSeasonId = "S1", categoryOptions = CATEGORY_OPTIONS }) {
