@@ -3006,7 +3006,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${selectedSeasonId}`} drivers={seasonOnlyDrivers} teams={teams} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={selectedCategoryId} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -3381,9 +3381,9 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
   })}</div>;
 }
 
-function GuessDriverPage({ drivers = [], teams = [], selectedSeasonId, selectedCategoryId }) {
+function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId }) {
   const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  const targetDriver = getDailyDriverChallenge(playableDrivers, selectedSeasonId, selectedCategoryId);
+  const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
   const [guessId, setGuessId] = useState("");
   const [attempts, setAttempts] = useState([]);
   const [message, setMessage] = useState("");
@@ -3412,12 +3412,12 @@ function GuessDriverPage({ drivers = [], teams = [], selectedSeasonId, selectedC
 
   return (
     <div style={styles.section}>
-      <Card title={`Défi pilote — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="❓">
+      <Card title={`Défi pilote — ${selectedCategoryId}`} icon="❓">
         <div style={styles.guessHero}>
           <div>
             <p style={styles.kicker}>PILOTE MYSTÈRE DU JOUR</p>
             <h2 style={styles.gpDetailTitle}>{won ? targetDriver.name : "Qui est-ce ?"}</h2>
-            <p style={styles.mutedSmall}>Compare les indices après chaque essai. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
+            <p style={styles.mutedSmall}>Le pilote mystère est choisi parmi tous les pilotes {selectedCategoryId} visibles dans les stats cumulées. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
           </div>
           <div style={styles.statsGrid}>
             <Stat label="Essais" value={attempts.length} />
@@ -3438,13 +3438,13 @@ function GuessDriverPage({ drivers = [], teams = [], selectedSeasonId, selectedC
         {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name} en {attempts.length} essai{attempts.length > 1 ? "s" : ""}.</span></div>}
       </Card>
       <Card title="Indices" icon="📊">
-        <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} selectedSeasonId={selectedSeasonId} />
+        <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} />
       </Card>
     </div>
   );
 }
 
-function GuessDriverTable({ guesses = [], target, teams = [], selectedSeasonId }) {
+function GuessDriverTable({ guesses = [], target, teams = [] }) {
   if (!guesses.length) return <Empty text="Fais un premier essai pour afficher les indices." />;
   const statColumns = [
     { key: "points", label: "Points" },
@@ -3460,8 +3460,8 @@ function GuessDriverTable({ guesses = [], target, teams = [], selectedSeasonId }
       <table style={{ ...styles.table, minWidth: 900 }}>
         <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
         <tbody>{[...guesses].reverse().map((guess) => {
-          const team = getDriverSeasonTeam(guess, selectedSeasonId, teams);
-          const targetTeam = getDriverSeasonTeam(target, selectedSeasonId, teams);
+          const team = teams.find((item) => idsEqual(item.id, guess.teamId)) || null;
+          const targetTeam = teams.find((item) => idsEqual(item.id, target.teamId)) || null;
           return (
             <tr key={guess.id} style={styles.tr}>
               <td style={styles.td}><GuessCell correct={idsEqual(guess.id, target.id)}><DriverIdentity driver={guess} teamColor={team?.color} teamLogo={team?.logo} /></GuessCell></td>
