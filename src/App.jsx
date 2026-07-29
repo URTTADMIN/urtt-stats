@@ -674,6 +674,7 @@ function mapRacePredictionFromDb(prediction) {
   const storedOrder = Array.isArray(prediction.predicted_order) ? prediction.predicted_order : [];
   return {
     id: prediction.id,
+    userId: prediction.user_id || "",
     pseudo: prediction.pseudo || "",
     raceId: prediction.race_id,
     seasonId: normalizeSeasonId(prediction.season_id),
@@ -691,6 +692,7 @@ function mapRacePredictionFromDb(prediction) {
 function mapRacePredictionToDb(prediction) {
   const predictedOrder = Array.isArray(prediction.predictedOrder) ? prediction.predictedOrder.filter(Boolean).map((driverId) => Number(driverId)) : [];
   return {
+    user_id: prediction.userId || null,
     pseudo: String(prediction.pseudo || "").trim(),
     race_id: Number(prediction.raceId),
     season_id: normalizeSeasonId(prediction.seasonId),
@@ -702,6 +704,29 @@ function mapRacePredictionToDb(prediction) {
     podium_second_driver_id: prediction.podiumSecondDriverId ? Number(prediction.podiumSecondDriverId) : null,
     podium_third_driver_id: prediction.podiumThirdDriverId ? Number(prediction.podiumThirdDriverId) : null,
     predicted_order: predictedOrder,
+  };
+}
+function mapPlayerProfileFromDb(profile) {
+  return {
+    userId: profile.user_id || "",
+    pseudo: profile.pseudo || "",
+    discordName: profile.discord_name || "",
+    createdAt: profile.created_at || "",
+    lastSeenAt: profile.last_seen_at || "",
+  };
+}
+function mapGuessDriverResultFromDb(result) {
+  return {
+    id: result.id,
+    userId: result.user_id || "",
+    pseudo: result.pseudo || "",
+    discordName: result.discord_name || "",
+    categoryId: normalizeCategoryId(result.category_id),
+    challengeDay: result.challenge_day || "",
+    driverId: result.driver_id || "",
+    attempts: Number(result.attempts || 0),
+    won: Boolean(result.won),
+    createdAt: result.created_at || "",
   };
 }
 function mapPredictionControlFromDb(control) {
@@ -758,10 +783,32 @@ function getPredictionLeaderboard(predictions = [], raceResults = []) {
 }
 function getDailyDriverChallenge(drivers = [], seasonId = "", categoryId = "") {
   if (!drivers.length) return null;
-  const dayKey = Math.floor(Date.now() / 86400000);
+  const dayKey = getDailyChallengeDay();
   const seed = `${dayKey}-${normalizeSeasonId(seasonId)}-${normalizeCategoryId(categoryId)}`;
   const hash = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0);
   return drivers[hash % drivers.length];
+}
+function getDailyChallengeDay(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+function getPreviousChallengeDay(day) {
+  const date = new Date(`${day}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return getDailyChallengeDay(date);
+}
+function getGuessDriverStreak(results = [], userId = "", categoryId = "") {
+  if (!userId) return 0;
+  const wonDays = new Set(results
+    .filter((result) => String(result.userId) === String(userId) && result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
+    .map((result) => result.challengeDay)
+    .filter(Boolean));
+  let day = getDailyChallengeDay();
+  let streak = 0;
+  while (wonDays.has(day)) {
+    streak += 1;
+    day = getPreviousChallengeDay(day);
+  }
+  return streak;
 }
 function compareGuessValue(guessValue, targetValue) {
   const guessNumber = Number(guessValue) || 0;
@@ -1272,6 +1319,8 @@ export default function URTTAdminPanel() {
   const [developmentEntries, setDevelopmentEntries] = useState([]);
   const [racePredictions, setRacePredictions] = useState([]);
   const [predictionControls, setPredictionControls] = useState([]);
+  const [playerProfile, setPlayerProfile] = useState(null);
+  const [guessDriverResults, setGuessDriverResults] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
@@ -1293,6 +1342,8 @@ export default function URTTAdminPanel() {
   const [adminGlobalSearch, setAdminGlobalSearch] = useState("");
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSavingPrediction, setIsSavingPrediction] = useState(false);
+  const [isSavingPlayerAccount, setIsSavingPlayerAccount] = useState(false);
+  const [isSavingGuessResult, setIsSavingGuessResult] = useState(false);
   const [supabaseErrors, setSupabaseErrors] = useState([]);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [titleDriverId, setTitleDriverId] = useState("");
@@ -1306,10 +1357,32 @@ export default function URTTAdminPanel() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAdminUser(session?.user || null);
+      if (!session?.user) setPlayerProfile(null);
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    async function loadPlayerProfile() {
+      if (!adminUser?.id) return;
+      const { data, error } = await supabase
+        .from("player_profiles")
+        .select("*")
+        .eq("user_id", adminUser.id)
+        .maybeSingle();
+
+      if (error) {
+        if (error.code !== "42P01") console.error("Erreur profil joueur:", error);
+        setPlayerProfile(null);
+        return;
+      }
+
+      setPlayerProfile(data ? mapPlayerProfileFromDb(data) : null);
+    }
+
+    loadPlayerProfile();
+  }, [adminUser]);
 
   useEffect(() => {
     async function loadAdminPermissions() {
@@ -1354,6 +1427,7 @@ export default function URTTAdminPanel() {
         { data: developmentData, error: developmentError },
         { data: racePredictionsData, error: racePredictionsError },
         { data: predictionControlsData, error: predictionControlsError },
+        { data: guessDriverResultsData, error: guessDriverResultsError },
         { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
@@ -1372,6 +1446,7 @@ export default function URTTAdminPanel() {
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("race_predictions").select("*").order("created_at", { ascending: false }),
         supabase.from("race_prediction_controls").select("*").order("race_id", { ascending: true }),
+        supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
         supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
@@ -1392,6 +1467,7 @@ export default function URTTAdminPanel() {
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
         racePredictionsError && racePredictionsError.code !== "42P01" && `race_predictions: ${racePredictionsError.message}`,
         predictionControlsError && predictionControlsError.code !== "42P01" && `race_prediction_controls: ${predictionControlsError.message}`,
+        guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
         adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
@@ -1418,6 +1494,7 @@ export default function URTTAdminPanel() {
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
       setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
+      setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
@@ -1439,6 +1516,8 @@ export default function URTTAdminPanel() {
     : selectedSeasonId;
   const adminCategoryOptions = useMemo(() => getAdminCategoryOptions(adminPermissions), [adminPermissions]);
   const adminPageOptions = useMemo(() => getAdminPageOptions(adminUser, adminPermissions), [adminUser, adminPermissions]);
+  const userCanOpenAdmin = (user) => Boolean(user && (isPermissionsOwner(user) || adminPermissionRows.some((row) => row.userEmail.trim().toLowerCase() === user.email?.trim().toLowerCase())));
+  const canOpenAdmin = userCanOpenAdmin(adminUser);
   const visibleAdminPage = adminPageOptions.some((page) => page.id === adminPage) ? adminPage : adminPageOptions[0]?.id || "dashboard";
   const adminSelectedCategoryId = hasAdminCategoryAccess(adminPermissions, selectedCategoryId) ? selectedCategoryId : adminCategoryOptions[0]?.id || selectedCategoryId;
   const effectiveDevelopmentCategoryId = isDevelopmentCategory(adminSelectedCategoryId) ? adminSelectedCategoryId : adminCategoryOptions.find((category) => isDevelopmentCategory(category.id))?.id || "F1";
@@ -2444,8 +2523,69 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
   }
 
+  async function savePlayerProfile(user, profile) {
+    const pseudo = String(profile.pseudo || "").trim();
+    const discordName = String(profile.discordName || "").trim();
+    if (!user?.id) return { ok: false, message: "Connecte-toi avant de créer ton profil." };
+    if (!pseudo) return { ok: false, message: "Ajoute un pseudo public." };
+    if (!discordName) return { ok: false, message: "Ajoute ton nom Discord." };
+
+    setIsSavingPlayerAccount(true);
+    const { data, error } = await supabase
+      .from("player_profiles")
+      .upsert({ user_id: user.id, pseudo, discord_name: discordName, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" })
+      .select()
+      .single();
+    setIsSavingPlayerAccount(false);
+
+    if (error) {
+      console.error("Erreur profil joueur:", error);
+      const message = error.code === "42P01"
+        ? "La table player_profiles n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : error.code === "23505"
+          ? "Ce pseudo est déjà utilisé."
+          : "Impossible d'enregistrer le profil joueur.";
+      return { ok: false, message };
+    }
+
+    const savedProfile = mapPlayerProfileFromDb(data);
+    setPlayerProfile(savedProfile);
+    return { ok: true, message: "Compte joueur prêt." };
+  }
+
+  async function signUpPlayerAccount({ email, password, pseudo, discordName }) {
+    setIsSavingPlayerAccount(true);
+    const { data, error } = await supabase.auth.signUp({ email: String(email || "").trim(), password });
+    setIsSavingPlayerAccount(false);
+
+    if (error) return { ok: false, message: error.message || "Impossible de créer le compte." };
+    if (!data.user) return { ok: false, message: "Compte créé, vérifie tes emails avant de te connecter." };
+
+    setAdminUser(data.user);
+    const profileResult = await savePlayerProfile(data.user, { pseudo, discordName });
+    if (!profileResult.ok) return profileResult;
+    return { ok: true, message: data.session ? "Compte créé et connecté." : "Compte créé. Si Supabase demande une validation email, reconnecte-toi après validation." };
+  }
+
+  async function loginPlayerAccount({ email, password }) {
+    setIsSavingPlayerAccount(true);
+    const { data, error } = await supabase.auth.signInWithPassword({ email: String(email || "").trim(), password });
+    setIsSavingPlayerAccount(false);
+    if (error) return { ok: false, message: "Email ou mot de passe incorrect." };
+    setAdminUser(data.user);
+    return { ok: true, message: "Connexion réussie." };
+  }
+
+  async function logoutPlayerAccount() {
+    await supabase.auth.signOut();
+    setAdminUser(null);
+    setPlayerProfile(null);
+    setIsAdminPreview(false);
+    setView("front");
+  }
+
   async function saveRacePrediction(prediction) {
-    if (!prediction.pseudo?.trim()) return { ok: false, message: "Ajoute un pseudo pour envoyer ton prono." };
+    if (!adminUser?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
     const selectedRace = allCalendarRaces.find((race) => String(race.id) === String(prediction.raceId));
     const seasonDrivers = drivers.filter((driver) => (driver.participations?.[normalizeSeasonId(prediction.seasonId)] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(prediction.categoryId)));
@@ -2458,7 +2598,7 @@ export default function URTTAdminPanel() {
     setIsSavingPrediction(true);
     const { data, error } = await supabase
       .from("race_predictions")
-      .insert(mapRacePredictionToDb({ ...prediction, raceName: selectedRace?.name || "", predictedOrder }))
+      .insert(mapRacePredictionToDb({ ...prediction, userId: adminUser.id, pseudo: playerProfile.pseudo, raceName: selectedRace?.name || "", predictedOrder }))
       .select()
       .single();
     setIsSavingPrediction(false);
@@ -2476,6 +2616,41 @@ export default function URTTAdminPanel() {
     const savedPrediction = mapRacePredictionFromDb(data);
     setRacePredictions((current) => [savedPrediction, ...current]);
     return { ok: true, message: "Prono envoyé ! Il sera scoré quand le résultat sera validé." };
+  }
+
+  async function saveGuessDriverWin({ categoryId, challengeDay, driverId, attempts }) {
+    if (!adminUser?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
+    setIsSavingGuessResult(true);
+    const { data, error } = await supabase
+      .from("guess_driver_results")
+      .upsert({
+        user_id: adminUser.id,
+        pseudo: playerProfile.pseudo,
+        discord_name: playerProfile.discordName || "",
+        category_id: normalizeCategoryId(categoryId),
+        challenge_day: challengeDay,
+        driver_id: Number(driverId),
+        attempts: Number(attempts || 0),
+        won: true,
+      }, { onConflict: "user_id,category_id,challenge_day" })
+      .select()
+      .single();
+    setIsSavingGuessResult(false);
+
+    if (error) {
+      console.error("Erreur défi pilote:", error);
+      const message = error.code === "42P01"
+        ? "La table guess_driver_results n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : "Impossible d'enregistrer le défi pilote.";
+      return { ok: false, message };
+    }
+
+    const savedResult = mapGuessDriverResultFromDb(data);
+    setGuessDriverResults((current) => {
+      const withoutSameDay = current.filter((result) => !(String(result.userId) === String(savedResult.userId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
+      return [savedResult, ...withoutSameDay];
+    });
+    return { ok: true, message: "Défi enregistré dans ton compte." };
   }
 
   async function toggleRacePredictionClosed(raceId, closed) {
@@ -2566,15 +2741,23 @@ export default function URTTAdminPanel() {
           onSavePrediction={saveRacePrediction}
           isSavingPrediction={isSavingPrediction}
           adminUser={adminUser}
+          playerProfile={playerProfile}
+          guessDriverResults={guessDriverResults}
+          onPlayerLogin={loginPlayerAccount}
+          onPlayerSignup={signUpPlayerAccount}
+          onPlayerLogout={logoutPlayerAccount}
+          onSaveGuessDriverWin={saveGuessDriverWin}
+          isSavingPlayerAccount={isSavingPlayerAccount}
+          isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
           onOpenAdmin={() => {
             setIsAdminPreview(false);
             setLoginError("");
-            setView(adminUser ? "admin" : "login");
+            setView(canOpenAdmin ? "admin" : "login");
           }}
         />
       )}
-      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } setAdminUser(data.user); setIsAdminPreview(false); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
+      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } if (!userCanOpenAdmin(data.user)) { await supabase.auth.signOut(); setAdminUser(null); setLoginError("Ce compte n'a pas accès au panel admin."); return; } setAdminUser(data.user); setIsAdminPreview(false); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
         <AdminLayout
           active={visibleAdminPage}
@@ -2941,7 +3124,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -2978,6 +3161,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         </div>
         <div style={styles.publicSessionBox}>
           {adminUser?.email && <span style={styles.sessionBadge}>Vous êtes connecté sur : <strong>{adminUser.email}</strong></span>}
+          <PlayerAccountBox user={adminUser} profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
           <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
         </div>
       </header>
@@ -3005,11 +3189,60 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
-        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={selectedCategoryId} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} />}
+        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${adminUser?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} user={adminUser} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
+    </div>
+  );
+}
+
+function PlayerAccountBox({ user, profile, onLogin, onSignup, onLogout, isSaving }) {
+  const [open, setOpen] = useState(false);
+  const [mode, setMode] = useState("login");
+  const [form, setForm] = useState({ email: "", password: "", pseudo: "", discordName: "" });
+  const [status, setStatus] = useState("");
+  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const submit = async (event) => {
+    event.preventDefault();
+    setStatus("");
+    const response = mode === "signup" ? await onSignup?.(form) : await onLogin?.(form);
+    setStatus(response?.message || "");
+    if (response?.ok) setOpen(false);
+  };
+
+  return (
+    <div style={styles.accountBox}>
+      {profile?.pseudo ? <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span> : user?.email ? <span style={styles.sessionBadge}>Profil joueur à compléter</span> : null}
+      <div style={styles.headerActions}>
+        <button type="button" onClick={() => setOpen(true)} style={styles.secondaryButton}>{user ? "Compte" : "Connexion"}</button>
+        {user && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
+      </div>
+      {open && (
+        <div style={styles.detailOverlay} onMouseDown={() => setOpen(false)}>
+          <form onSubmit={submit} style={{ ...styles.feedbackModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
+            <div style={styles.publicRaceHeader}>
+              <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "Créer un compte" : "Connexion"}</h2></div>
+              <button type="button" onClick={() => setOpen(false)} style={styles.secondaryButton}>Fermer</button>
+            </div>
+            <div style={styles.feedbackChoice}>
+              <button type="button" onClick={() => setMode("login")} style={{ ...styles.feedbackChoiceButton, ...(mode === "login" ? styles.feedbackChoiceActive : {}) }}>Connexion</button>
+              <button type="button" onClick={() => setMode("signup")} style={{ ...styles.feedbackChoiceButton, ...(mode === "signup" ? styles.feedbackChoiceActive : {}) }}>Inscription</button>
+            </div>
+            <Input label="Email" type="email" value={form.email} onChange={(value) => update("email", value)} />
+            <Input label="Mot de passe" type="password" value={form.password} onChange={(value) => update("password", value)} />
+            {mode === "signup" && (
+              <>
+                <Input label="Pseudo public" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
+                <Input label="Nom Discord" value={form.discordName} onChange={(value) => update("discordName", value)} />
+              </>
+            )}
+            <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Patiente..." : mode === "signup" ? "Créer mon compte" : "Se connecter"}</button>
+            {status && <p style={styles.mutedSmall}>{status}</p>}
+          </form>
+        </div>
+      )}
     </div>
   );
 }
@@ -3196,7 +3429,7 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingDrivers = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], predictionControls = [], onSubmit, isSaving }) {
+function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingDrivers = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], predictionControls = [], playerProfile = null, onSubmit, isSaving }) {
   const categoryId = normalizeCategoryId(selectedCategoryId);
   const seasonId = normalizeSeasonId(selectedSeasonId);
   const eligibleDrivers = drivers
@@ -3204,7 +3437,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
     .sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const openRaces = races.filter((race) => !isPredictionClosedForRace(raceResults, predictionControls, race.id));
   const [selectedRaceId, setSelectedRaceId] = useState(openRaces[0]?.id || races[0]?.id || "");
-  const [form, setForm] = useState({ pseudo: "", poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
+  const [form, setForm] = useState({ poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
   const [status, setStatus] = useState("");
   const activeRaceId = races.some((race) => String(race.id) === String(selectedRaceId)) ? selectedRaceId : openRaces[0]?.id || races[0]?.id || "";
   const selectedRace = races.find((race) => String(race.id) === String(activeRaceId));
@@ -3242,7 +3475,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
       categoryId,
     });
     setStatus(response?.message || "");
-    if (response?.ok) setForm({ pseudo: "", poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
+    if (response?.ok) setForm({ poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
   };
 
   return (
@@ -3251,7 +3484,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
         <form onSubmit={submit} style={styles.stack}>
           <div style={styles.resultsInfo}>
             <label style={styles.label}><span style={styles.labelText}>Course</span><select value={activeRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}{isPredictionClosedForRace(raceResults, predictionControls, race.id) ? " · fermé" : ""}</option>)}</select></label>
-            <Input label="Pseudo" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
+            <div style={styles.raceStat}><span style={styles.mutedSmall}>Joueur</span><strong>{playerProfile?.pseudo || "Connexion requise"}</strong></div>
             <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{raceClosed ? "Pronos fermés" : "Pronos ouverts"}</strong></div>
           </div>
           {races.length === 0 ? <Empty text="Aucune course disponible pour cette saison." /> : (
@@ -3261,7 +3494,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
                 <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
               </div>
               <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} teams={teams} seasonId={seasonId} order={predictionOrder} defaultOrder={defaultOrder} onMove={movePredictionDriver} onSetOrder={setPredictionOrder} />
-              <button type="submit" disabled={isSaving || raceClosed || !onSubmit} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : "Envoyer mon prono"}</button>
+              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : "Envoyer mon prono"}</button>
               {status && <p style={styles.mutedSmall}>{status}</p>}
             </>
           )}
@@ -3381,19 +3614,26 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
   })}</div>;
 }
 
-function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId }) {
+function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, user = null, profile = null, results = [], onSaveWin, isSaving = false }) {
   const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
+  const challengeDay = getDailyChallengeDay();
+  const savedToday = results.some((result) => String(result.userId) === String(user?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
+  const streak = getGuessDriverStreak(results, user?.id || "", selectedCategoryId);
   const [guessId, setGuessId] = useState("");
   const [attempts, setAttempts] = useState([]);
   const [message, setMessage] = useState("");
   const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
-  const won = targetDriver && attempts.some((driverId) => idsEqual(driverId, targetDriver.id));
+  const won = targetDriver && (savedToday || attempts.some((driverId) => idsEqual(driverId, targetDriver.id)));
   const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
 
-  function submitGuess(event) {
+  async function submitGuess(event) {
     event.preventDefault();
     setMessage("");
+    if (!user?.id || !profile?.pseudo) {
+      setMessage("Connecte-toi avec ton compte joueur pour enregistrer ta série.");
+      return;
+    }
     if (!guessId) {
       setMessage("Choisis un pilote.");
       return;
@@ -3402,8 +3642,13 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId }) {
       setMessage("Tu as déjà tenté ce pilote.");
       return;
     }
-    setAttempts((current) => [...current, guessId]);
+    const nextAttempts = [...attempts, guessId];
+    setAttempts(nextAttempts);
     setGuessId("");
+    if (targetDriver && idsEqual(guessId, targetDriver.id) && !savedToday) {
+      const response = await onSaveWin?.({ categoryId: selectedCategoryId, challengeDay, driverId: targetDriver.id, attempts: nextAttempts.length });
+      setMessage(response?.message || "");
+    }
   }
 
   if (!targetDriver) {
@@ -3422,8 +3667,10 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId }) {
           <div style={styles.statsGrid}>
             <Stat label="Essais" value={attempts.length} />
             <Stat label="Pilotes possibles" value={playableDrivers.length} />
+            <Stat label="Série" value={streak} />
           </div>
         </div>
+        {!profile?.pseudo && <div style={styles.previewNotice}><strong>Compte requis</strong><span>Connecte-toi pour garder ta série et relier ton défi à ton pseudo Discord.</span></div>}
         <form onSubmit={submitGuess} style={styles.resultsInfo}>
           <label style={styles.label}>
             <span style={styles.labelText}>Ton essai</span>
@@ -3432,10 +3679,10 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId }) {
               {remainingDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
             </select>
           </label>
-          <button type="submit" disabled={won} style={styles.fullButton}>{won ? "Trouvé" : "Valider l'essai"}</button>
+          <button type="submit" disabled={won || isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : won ? "Trouvé" : "Valider l'essai"}</button>
         </form>
         {message && <p style={styles.mutedSmall}>{message}</p>}
-        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name} en {attempts.length} essai{attempts.length > 1 ? "s" : ""}.</span></div>}
+        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name}{attempts.length ? ` en ${attempts.length} essai${attempts.length > 1 ? "s" : ""}` : ""}. Série actuelle : {streak}.</span></div>}
       </Card>
       <Card title="Indices" icon="📊">
         <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} />
@@ -4948,6 +5195,7 @@ const styles = {
   publicPage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 45%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicSessionBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 },
+  accountBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 },
   sessionBadge: { background: "rgba(24, 24, 27, .92)", border: "1px solid #3f3f46", color: "#e4e4e7", borderRadius: 999, padding: "9px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" },
   publicMain: { width: "100%", maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
