@@ -1,5 +1,6 @@
 ﻿import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
+import { useRef } from "react";
 
 const POINTS_SYSTEM = [30, 25, 22, 20, 18, 16, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const F2_SEASONS_3_AND_4_POINTS_SYSTEM = [20, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -729,7 +730,7 @@ function isRecordValue(records, key, value) {
   return numericValue > 0 && numericValue === records[key];
 }
 function RecordValue({ value, record }) {
-  return <span style={record ? styles.recordValue : undefined}>{value}</span>;
+  return <span className={`urtt-stat-value${record ? " urtt-record-value" : ""}`} style={record ? styles.recordValue : undefined}>{value}</span>;
 }
 function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "", seasonTitles = [], allDrivers = []) {
   const activeCategoryId = selectedCategoryId ? normalizeCategoryId(selectedCategoryId) : "";
@@ -868,6 +869,91 @@ export default function URTTAdminPanel() {
       * { box-sizing: border-box; }
       button, select, input { font: inherit; }
       .urtt-card, .urtt-stat-card { min-width: 0; }
+      .urtt-public-title {
+        cursor: pointer;
+        user-select: none;
+      }
+      .urtt-champion-mode {
+        background:
+          radial-gradient(circle at 18% 0%, rgba(168, 85, 247, .38), transparent 34%),
+          radial-gradient(circle at 82% 12%, rgba(220, 38, 38, .26), transparent 30%),
+          radial-gradient(circle at 50% 88%, rgba(59, 130, 246, .16), transparent 34%),
+          #09090b !important;
+      }
+      .urtt-champion-mode::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background:
+          linear-gradient(rgba(255,255,255,.045) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+        background-size: 42px 42px;
+        mask-image: radial-gradient(circle at center, black, transparent 78%);
+      }
+      .urtt-champion-mode > * {
+        position: relative;
+        z-index: 1;
+      }
+      .urtt-champion-mode .urtt-public-title {
+        animation: urttChampionTitle 1.7s ease-in-out infinite alternate;
+        color: #fff !important;
+        text-shadow: 0 0 12px rgba(168, 85, 247, .95), 0 0 28px rgba(220, 38, 38, .68);
+      }
+      .urtt-champion-mode .urtt-card,
+      .urtt-champion-mode .urtt-stat-card {
+        animation: urttChampionCard 2.4s ease-in-out infinite;
+        border-color: rgba(168, 85, 247, .78) !important;
+      }
+      .urtt-champion-mode .urtt-stat-value,
+      .urtt-champion-mode .urtt-record-value {
+        animation: urttChampionValue 1.25s ease-in-out infinite alternate;
+        font-weight: 950;
+      }
+      .urtt-champion-banner {
+        max-width: 1280px;
+        margin: 0 auto 10px;
+        padding: 0 28px;
+      }
+      .urtt-champion-banner-inner {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 12px 14px;
+        border: 1px solid rgba(168, 85, 247, .7);
+        border-radius: 18px;
+        background: linear-gradient(90deg, rgba(88, 28, 135, .72), rgba(127, 29, 29, .56));
+        box-shadow: 0 0 24px rgba(168, 85, 247, .28);
+      }
+      .urtt-champion-banner strong {
+        letter-spacing: .12em;
+        font-size: 13px;
+      }
+      .urtt-champion-banner button {
+        border: 1px solid rgba(255,255,255,.2);
+        background: rgba(9,9,11,.7);
+        color: white;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-weight: 900;
+        cursor: pointer;
+      }
+      @keyframes urttChampionTitle {
+        from { transform: translateX(0); filter: saturate(1); }
+        45% { transform: translateX(1px) skewX(-1deg); }
+        55% { transform: translateX(-1px) skewX(1deg); }
+        to { transform: translateX(0); filter: saturate(1.45); }
+      }
+      @keyframes urttChampionCard {
+        0%, 100% { box-shadow: 0 18px 40px rgba(0,0,0,.32), 0 0 0 rgba(168,85,247,0); }
+        50% { box-shadow: 0 22px 52px rgba(0,0,0,.44), 0 0 24px rgba(168,85,247,.28); }
+      }
+      @keyframes urttChampionValue {
+        from { text-shadow: 0 0 0 rgba(168,85,247,0); }
+        to { text-shadow: 0 0 10px rgba(168,85,247,.95), 0 0 18px rgba(220,38,38,.55); }
+      }
       @media (max-width: 760px) {
         .urtt-public-header {
           padding: 24px 14px 12px !important;
@@ -2681,6 +2767,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [championMode, setChampionMode] = useState(false);
+  const championClicksRef = useRef([]);
   const categoryColor = getCategoryColor(selectedCategoryId);
   const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
   const publicPages = PUBLIC_PAGE_OPTIONS
@@ -2692,12 +2780,22 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
+  const handleChampionTitleClick = () => {
+    const now = Date.now();
+    const recentClicks = [...championClicksRef.current.filter((time) => now - time < 1800), now];
+    if (recentClicks.length >= 7) {
+      setChampionMode(true);
+      championClicksRef.current = [];
+      return;
+    }
+    championClicksRef.current = recentClicks;
+  };
   return (
-    <div className="urtt-public-page" style={styles.publicPage}>
+    <div className={`urtt-public-page${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
       <header className="urtt-public-header" style={styles.publicHeader}>
         <div>
           <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <h1 className="urtt-public-title" style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
+          <h1 className="urtt-public-title" onClick={handleChampionTitleClick} style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
           <p className="urtt-public-subtitle" style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <div style={styles.publicSessionBox}>
@@ -2705,6 +2803,14 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
         </div>
       </header>
+      {championMode && (
+        <div className="urtt-champion-banner">
+          <div className="urtt-champion-banner-inner">
+            <strong>CHAMPION MODE ACTIVÉ</strong>
+            <button type="button" onClick={() => setChampionMode(false)}>Désactiver</button>
+          </div>
+        </div>
+      )}
       <nav className="urtt-public-nav" style={styles.publicNav}>
         <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
         <select value={seasonSelectValue} onChange={(event) => setSelectedSeasonId(event.target.value)} disabled={!seasonOptions.length} style={styles.seasonSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
