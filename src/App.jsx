@@ -14,6 +14,7 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
+const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const ADMIN_PAGE_OPTIONS = [
   { id: "dashboard", icon: "🏠", label: "Dashboard" },
   { id: "supabase", icon: "🗄️", label: "Supabase" },
@@ -675,6 +676,7 @@ function mapRacePredictionFromDb(prediction) {
   return {
     id: prediction.id,
     userId: prediction.user_id || "",
+    playerId: prediction.player_id || "",
     pseudo: prediction.pseudo || "",
     raceId: prediction.race_id,
     seasonId: normalizeSeasonId(prediction.season_id),
@@ -693,6 +695,7 @@ function mapRacePredictionToDb(prediction) {
   const predictedOrder = Array.isArray(prediction.predictedOrder) ? prediction.predictedOrder.filter(Boolean).map((driverId) => Number(driverId)) : [];
   return {
     user_id: prediction.userId || null,
+    player_id: prediction.playerId ? Number(prediction.playerId) : null,
     pseudo: String(prediction.pseudo || "").trim(),
     race_id: Number(prediction.raceId),
     season_id: normalizeSeasonId(prediction.seasonId),
@@ -708,6 +711,7 @@ function mapRacePredictionToDb(prediction) {
 }
 function mapPlayerProfileFromDb(profile) {
   return {
+    id: profile.id || profile.user_id || "",
     userId: profile.user_id || "",
     pseudo: profile.pseudo || "",
     discordName: profile.discord_name || "",
@@ -719,6 +723,7 @@ function mapGuessDriverResultFromDb(result) {
   return {
     id: result.id,
     userId: result.user_id || "",
+    playerId: result.player_id || "",
     pseudo: result.pseudo || "",
     discordName: result.discord_name || "",
     categoryId: normalizeCategoryId(result.category_id),
@@ -799,7 +804,7 @@ function getPreviousChallengeDay(day) {
 function getGuessDriverStreak(results = [], userId = "", categoryId = "") {
   if (!userId) return 0;
   const wonDays = new Set(results
-    .filter((result) => String(result.userId) === String(userId) && result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
+    .filter((result) => (String(result.playerId || "") === String(userId) || String(result.userId || "") === String(userId)) && result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
     .map((result) => result.challengeDay)
     .filter(Boolean));
   let day = getDailyChallengeDay();
@@ -1357,7 +1362,6 @@ export default function URTTAdminPanel() {
 
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAdminUser(session?.user || null);
-      if (!session?.user) setPlayerProfile(null);
     });
 
     return () => listener.subscription.unsubscribe();
@@ -1365,24 +1369,32 @@ export default function URTTAdminPanel() {
 
   useEffect(() => {
     async function loadPlayerProfile() {
-      if (!adminUser?.id) return;
+      const storedPlayerId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY);
+      if (!storedPlayerId) return;
       const { data, error } = await supabase
-        .from("player_profiles")
+        .from("player_accounts")
         .select("*")
-        .eq("user_id", adminUser.id)
+        .eq("id", storedPlayerId)
         .maybeSingle();
 
       if (error) {
         if (error.code !== "42P01") console.error("Erreur profil joueur:", error);
+        window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
         setPlayerProfile(null);
         return;
       }
 
-      setPlayerProfile(data ? mapPlayerProfileFromDb(data) : null);
+      if (!data) {
+        window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
+        setPlayerProfile(null);
+        return;
+      }
+
+      setPlayerProfile(mapPlayerProfileFromDb(data));
     }
 
     loadPlayerProfile();
-  }, [adminUser]);
+  }, []);
 
   useEffect(() => {
     async function loadAdminPermissions() {
@@ -2523,17 +2535,18 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
   }
 
-  async function savePlayerProfile(user, profile) {
+  async function savePlayerProfile(profile) {
     const pseudo = String(profile.pseudo || "").trim();
     const discordName = String(profile.discordName || "").trim();
-    if (!user?.id) return { ok: false, message: "Connecte-toi avant de créer ton profil." };
+    const accessCode = String(profile.accessCode || "").trim();
     if (!pseudo) return { ok: false, message: "Ajoute un pseudo public." };
     if (!discordName) return { ok: false, message: "Ajoute ton nom Discord." };
+    if (accessCode.length < 4) return { ok: false, message: "Choisis un code secret d'au moins 4 caractères." };
 
     setIsSavingPlayerAccount(true);
     const { data, error } = await supabase
-      .from("player_profiles")
-      .upsert({ user_id: user.id, pseudo, discord_name: discordName, last_seen_at: new Date().toISOString() }, { onConflict: "user_id" })
+      .from("player_accounts")
+      .insert({ pseudo, discord_name: discordName, access_code: accessCode, last_seen_at: new Date().toISOString() })
       .select()
       .single();
     setIsSavingPlayerAccount(false);
@@ -2541,7 +2554,7 @@ export default function URTTAdminPanel() {
     if (error) {
       console.error("Erreur profil joueur:", error);
       const message = error.code === "42P01"
-        ? "La table player_profiles n'existe pas encore. Lance la commande SQL fournie par Codex."
+        ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex."
         : error.code === "23505"
           ? "Ce pseudo est déjà utilisé."
           : "Impossible d'enregistrer le profil joueur.";
@@ -2549,43 +2562,42 @@ export default function URTTAdminPanel() {
     }
 
     const savedProfile = mapPlayerProfileFromDb(data);
+    window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
     setPlayerProfile(savedProfile);
     return { ok: true, message: "Compte joueur prêt." };
   }
 
-  async function signUpPlayerAccount({ email, password, pseudo, discordName }) {
-    setIsSavingPlayerAccount(true);
-    const { data, error } = await supabase.auth.signUp({ email: String(email || "").trim(), password });
-    setIsSavingPlayerAccount(false);
-
-    if (error) return { ok: false, message: error.message || "Impossible de créer le compte." };
-    if (!data.user) return { ok: false, message: "Compte créé, vérifie tes emails avant de te connecter." };
-
-    setAdminUser(data.user);
-    const profileResult = await savePlayerProfile(data.user, { pseudo, discordName });
-    if (!profileResult.ok) return profileResult;
-    return { ok: true, message: data.session ? "Compte créé et connecté." : "Compte créé. Si Supabase demande une validation email, reconnecte-toi après validation." };
+  async function signUpPlayerAccount({ pseudo, discordName, accessCode }) {
+    return savePlayerProfile({ pseudo, discordName, accessCode });
   }
 
-  async function loginPlayerAccount({ email, password }) {
+  async function loginPlayerAccount({ pseudo, accessCode }) {
+    const safePseudo = String(pseudo || "").trim();
+    const safeAccessCode = String(accessCode || "").trim();
+    if (!safePseudo || !safeAccessCode) return { ok: false, message: "Entre ton pseudo et ton code secret." };
     setIsSavingPlayerAccount(true);
-    const { data, error } = await supabase.auth.signInWithPassword({ email: String(email || "").trim(), password });
+    const { data, error } = await supabase
+      .from("player_accounts")
+      .select("*")
+      .eq("pseudo", safePseudo)
+      .eq("access_code", safeAccessCode)
+      .maybeSingle();
     setIsSavingPlayerAccount(false);
-    if (error) return { ok: false, message: "Email ou mot de passe incorrect." };
-    setAdminUser(data.user);
+    if (error) return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de connecter le compte joueur." };
+    if (!data) return { ok: false, message: "Pseudo ou code secret incorrect." };
+    const savedProfile = mapPlayerProfileFromDb(data);
+    window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
+    setPlayerProfile(savedProfile);
     return { ok: true, message: "Connexion réussie." };
   }
 
   async function logoutPlayerAccount() {
-    await supabase.auth.signOut();
-    setAdminUser(null);
+    window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
     setPlayerProfile(null);
-    setIsAdminPreview(false);
-    setView("front");
   }
 
   async function saveRacePrediction(prediction) {
-    if (!adminUser?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
+    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
     const selectedRace = allCalendarRaces.find((race) => String(race.id) === String(prediction.raceId));
     const seasonDrivers = drivers.filter((driver) => (driver.participations?.[normalizeSeasonId(prediction.seasonId)] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(prediction.categoryId)));
@@ -2598,7 +2610,7 @@ export default function URTTAdminPanel() {
     setIsSavingPrediction(true);
     const { data, error } = await supabase
       .from("race_predictions")
-      .insert(mapRacePredictionToDb({ ...prediction, userId: adminUser.id, pseudo: playerProfile.pseudo, raceName: selectedRace?.name || "", predictedOrder }))
+      .insert(mapRacePredictionToDb({ ...prediction, playerId: playerProfile.id, pseudo: playerProfile.pseudo, raceName: selectedRace?.name || "", predictedOrder }))
       .select()
       .single();
     setIsSavingPrediction(false);
@@ -2619,12 +2631,12 @@ export default function URTTAdminPanel() {
   }
 
   async function saveGuessDriverWin({ categoryId, challengeDay, driverId, attempts }) {
-    if (!adminUser?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
+    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
     setIsSavingGuessResult(true);
     const { data, error } = await supabase
       .from("guess_driver_results")
       .upsert({
-        user_id: adminUser.id,
+        player_id: Number(playerProfile.id),
         pseudo: playerProfile.pseudo,
         discord_name: playerProfile.discordName || "",
         category_id: normalizeCategoryId(categoryId),
@@ -2632,7 +2644,7 @@ export default function URTTAdminPanel() {
         driver_id: Number(driverId),
         attempts: Number(attempts || 0),
         won: true,
-      }, { onConflict: "user_id,category_id,challenge_day" })
+      }, { onConflict: "player_id,category_id,challenge_day" })
       .select()
       .single();
     setIsSavingGuessResult(false);
@@ -2647,7 +2659,7 @@ export default function URTTAdminPanel() {
 
     const savedResult = mapGuessDriverResultFromDb(data);
     setGuessDriverResults((current) => {
-      const withoutSameDay = current.filter((result) => !(String(result.userId) === String(savedResult.userId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
+      const withoutSameDay = current.filter((result) => !(String(result.playerId) === String(savedResult.playerId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
       return [savedResult, ...withoutSameDay];
     });
     return { ok: true, message: "Défi enregistré dans ton compte." };
@@ -3161,7 +3173,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         </div>
         <div style={styles.publicSessionBox}>
           {adminUser?.email && <span style={styles.sessionBadge}>Vous êtes connecté sur : <strong>{adminUser.email}</strong></span>}
-          <PlayerAccountBox user={adminUser} profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
+          <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
           <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
         </div>
       </header>
@@ -3190,7 +3202,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${adminUser?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} user={adminUser} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -3198,10 +3210,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   );
 }
 
-function PlayerAccountBox({ user, profile, onLogin, onSignup, onLogout, isSaving }) {
+function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("login");
-  const [form, setForm] = useState({ email: "", password: "", pseudo: "", discordName: "" });
+  const [form, setForm] = useState({ pseudo: "", discordName: "", accessCode: "" });
   const [status, setStatus] = useState("");
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const submit = async (event) => {
@@ -3214,10 +3226,10 @@ function PlayerAccountBox({ user, profile, onLogin, onSignup, onLogout, isSaving
 
   return (
     <div style={styles.accountBox}>
-      {profile?.pseudo ? <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span> : user?.email ? <span style={styles.sessionBadge}>Profil joueur à compléter</span> : null}
+      {profile?.pseudo && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span>}
       <div style={styles.headerActions}>
-        <button type="button" onClick={() => setOpen(true)} style={styles.secondaryButton}>{user ? "Compte" : "Connexion"}</button>
-        {user && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
+        <button type="button" onClick={() => setOpen(true)} style={styles.secondaryButton}>{profile ? "Compte" : "Connexion"}</button>
+        {profile && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
       {open && (
         <div style={styles.detailOverlay} onMouseDown={() => setOpen(false)}>
@@ -3230,11 +3242,10 @@ function PlayerAccountBox({ user, profile, onLogin, onSignup, onLogout, isSaving
               <button type="button" onClick={() => setMode("login")} style={{ ...styles.feedbackChoiceButton, ...(mode === "login" ? styles.feedbackChoiceActive : {}) }}>Connexion</button>
               <button type="button" onClick={() => setMode("signup")} style={{ ...styles.feedbackChoiceButton, ...(mode === "signup" ? styles.feedbackChoiceActive : {}) }}>Inscription</button>
             </div>
-            <Input label="Email" type="email" value={form.email} onChange={(value) => update("email", value)} />
-            <Input label="Mot de passe" type="password" value={form.password} onChange={(value) => update("password", value)} />
+            <Input label="Pseudo" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
+            <Input label="Code secret" type="password" value={form.accessCode} onChange={(value) => update("accessCode", value)} />
             {mode === "signup" && (
               <>
-                <Input label="Pseudo public" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
                 <Input label="Nom Discord" value={form.discordName} onChange={(value) => update("discordName", value)} />
               </>
             )}
@@ -3614,12 +3625,12 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
   })}</div>;
 }
 
-function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, user = null, profile = null, results = [], onSaveWin, isSaving = false }) {
+function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], onSaveWin, isSaving = false }) {
   const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
   const challengeDay = getDailyChallengeDay();
-  const savedToday = results.some((result) => String(result.userId) === String(user?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
-  const streak = getGuessDriverStreak(results, user?.id || "", selectedCategoryId);
+  const savedToday = results.some((result) => String(result.playerId) === String(profile?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
+  const streak = getGuessDriverStreak(results, profile?.id || "", selectedCategoryId);
   const [guessId, setGuessId] = useState("");
   const [attempts, setAttempts] = useState([]);
   const [message, setMessage] = useState("");
@@ -3630,7 +3641,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, user = 
   async function submitGuess(event) {
     event.preventDefault();
     setMessage("");
-    if (!user?.id || !profile?.pseudo) {
+    if (!profile?.id || !profile?.pseudo) {
       setMessage("Connecte-toi avec ton compte joueur pour enregistrer ta série.");
       return;
     }
