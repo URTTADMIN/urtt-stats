@@ -42,6 +42,7 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "editions", label: "Hors Saison" },
   { id: "development", label: "Développement" },
   { id: "predictions", label: "Pronos" },
+  { id: "guess-driver", label: "Défi pilote" },
   { id: "world", label: "Carte" },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
@@ -754,6 +755,19 @@ function getPredictionLeaderboard(predictions = [], raceResults = []) {
     map.set(key, { ...current, pseudo: current.pseudo || prediction.pseudo, score: current.score + scored.score, entries: current.entries + 1 });
   });
   return Array.from(map.values()).sort((a, b) => b.score - a.score || a.pseudo.localeCompare(b.pseudo, "fr"));
+}
+function getDailyDriverChallenge(drivers = [], seasonId = "", categoryId = "") {
+  if (!drivers.length) return null;
+  const dayKey = Math.floor(Date.now() / 86400000);
+  const seed = `${dayKey}-${normalizeSeasonId(seasonId)}-${normalizeCategoryId(categoryId)}`;
+  const hash = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return drivers[hash % drivers.length];
+}
+function compareGuessValue(guessValue, targetValue) {
+  const guessNumber = Number(guessValue) || 0;
+  const targetNumber = Number(targetValue) || 0;
+  if (guessNumber === targetNumber) return "correct";
+  return targetNumber > guessNumber ? "higher" : "lower";
 }
 function createSeasonMapFromCalendar(calendarRaces, selectedCategoryId = "F1") {
   const map = createEmptySeasonMap();
@@ -2992,6 +3006,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${selectedSeasonId}`} drivers={seasonOnlyDrivers} teams={teams} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       <FeedbackWidget />
@@ -3364,6 +3379,109 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
       </div>
     );
   })}</div>;
+}
+
+function GuessDriverPage({ drivers = [], teams = [], selectedSeasonId, selectedCategoryId }) {
+  const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  const targetDriver = getDailyDriverChallenge(playableDrivers, selectedSeasonId, selectedCategoryId);
+  const [guessId, setGuessId] = useState("");
+  const [attempts, setAttempts] = useState([]);
+  const [message, setMessage] = useState("");
+  const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
+  const won = targetDriver && attempts.some((driverId) => idsEqual(driverId, targetDriver.id));
+  const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
+
+  function submitGuess(event) {
+    event.preventDefault();
+    setMessage("");
+    if (!guessId) {
+      setMessage("Choisis un pilote.");
+      return;
+    }
+    if (attempts.some((driverId) => idsEqual(driverId, guessId))) {
+      setMessage("Tu as déjà tenté ce pilote.");
+      return;
+    }
+    setAttempts((current) => [...current, guessId]);
+    setGuessId("");
+  }
+
+  if (!targetDriver) {
+    return <Card title="Défi pilote" icon="❓"><Empty text="Aucun pilote disponible pour cette saison/catégorie." /></Card>;
+  }
+
+  return (
+    <div style={styles.section}>
+      <Card title={`Défi pilote — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="❓">
+        <div style={styles.guessHero}>
+          <div>
+            <p style={styles.kicker}>PILOTE MYSTÈRE DU JOUR</p>
+            <h2 style={styles.gpDetailTitle}>{won ? targetDriver.name : "Qui est-ce ?"}</h2>
+            <p style={styles.mutedSmall}>Compare les indices après chaque essai. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
+          </div>
+          <div style={styles.statsGrid}>
+            <Stat label="Essais" value={attempts.length} />
+            <Stat label="Pilotes possibles" value={playableDrivers.length} />
+          </div>
+        </div>
+        <form onSubmit={submitGuess} style={styles.resultsInfo}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Ton essai</span>
+            <select value={guessId} onChange={(event) => setGuessId(event.target.value)} disabled={won} style={styles.resultsSelect}>
+              <option value="">Choisir un pilote</option>
+              {remainingDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+            </select>
+          </label>
+          <button type="submit" disabled={won} style={styles.fullButton}>{won ? "Trouvé" : "Valider l'essai"}</button>
+        </form>
+        {message && <p style={styles.mutedSmall}>{message}</p>}
+        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name} en {attempts.length} essai{attempts.length > 1 ? "s" : ""}.</span></div>}
+      </Card>
+      <Card title="Indices" icon="📊">
+        <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} selectedSeasonId={selectedSeasonId} />
+      </Card>
+    </div>
+  );
+}
+
+function GuessDriverTable({ guesses = [], target, teams = [], selectedSeasonId }) {
+  if (!guesses.length) return <Empty text="Fais un premier essai pour afficher les indices." />;
+  const statColumns = [
+    { key: "points", label: "Points" },
+    { key: "wins", label: "V" },
+    { key: "podiums", label: "Pod." },
+    { key: "poles", label: "Poles" },
+    { key: "fastestLaps", label: "MT" },
+    { key: "hatTricks", label: "HT" },
+  ];
+
+  return (
+    <div style={styles.tableWrap}>
+      <table style={{ ...styles.table, minWidth: 900 }}>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
+        <tbody>{[...guesses].reverse().map((guess) => {
+          const team = getDriverSeasonTeam(guess, selectedSeasonId, teams);
+          const targetTeam = getDriverSeasonTeam(target, selectedSeasonId, teams);
+          return (
+            <tr key={guess.id} style={styles.tr}>
+              <td style={styles.td}><GuessCell correct={idsEqual(guess.id, target.id)}><DriverIdentity driver={guess} teamColor={team?.color} teamLogo={team?.logo} /></GuessCell></td>
+              <td style={styles.td}><GuessCell correct={idsEqual(team?.id, targetTeam?.id)}>{team?.name || "—"}</GuessCell></td>
+              {statColumns.map((column) => <td key={column.key} style={styles.td}><GuessStatCell value={guess[column.key]} state={compareGuessValue(guess[column.key], target[column.key])} /></td>)}
+            </tr>
+          );
+        })}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function GuessCell({ correct, children }) {
+  return <div style={{ ...styles.guessCell, ...(correct ? styles.guessCellCorrect : styles.guessCellWrong) }}>{children}</div>;
+}
+
+function GuessStatCell({ value, state }) {
+  const marker = state === "correct" ? "✓" : state === "higher" ? "↑" : "↓";
+  return <div style={{ ...styles.guessCell, ...(state === "correct" ? styles.guessCellCorrect : styles.guessCellWrong) }}><strong>{value || 0}</strong><span>{marker}</span></div>;
 }
 
 function SpecialEditionsPage({ editions = [], drivers = [] }) {
@@ -4971,6 +5089,10 @@ const styles = {
   predictionPosition: { color: "#f87171", fontWeight: 950, fontSize: 16 },
   predictionMoveButtons: { display: "flex", alignItems: "center", gap: 6 },
   predictionDragHandle: { color: "#a1a1aa", fontSize: 20, fontWeight: 950, padding: "0 4px" },
+  guessHero: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, .8fr)", gap: 18, alignItems: "center", marginBottom: 16 },
+  guessCell: { minHeight: 52, borderRadius: 14, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, fontWeight: 950 },
+  guessCellCorrect: { background: "rgba(34,197,94,.18)", border: "1px solid rgba(34,197,94,.55)", color: "#bbf7d0" },
+  guessCellWrong: { background: "rgba(127,29,29,.22)", border: "1px solid rgba(248,113,113,.45)", color: "#fecaca" },
   positionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 10, marginTop: 10 },
   positionPick: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", alignItems: "center", gap: 8, color: "#f4f4f5", fontWeight: 900 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
