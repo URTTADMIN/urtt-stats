@@ -27,6 +27,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "editions", icon: "🏁", label: "Hors Saison" },
   { id: "development", icon: "📈", label: "Développement" },
   { id: "games", icon: "🎮", label: "Jeux" },
+  { id: "player-accounts", icon: "👤", label: "Comptes" },
   { id: "results", icon: "🏆", label: "Résultats" },
   { id: "race-awards", icon: "⚡", label: "Poles / MT" },
   { id: "permissions", icon: "🔐", label: "Permissions" },
@@ -116,6 +117,7 @@ function getAdminCategoryOptions(permissions) {
 function hasAdminPageAccess(permissions, pageId, user) {
   if (isPermissionsOwner(user)) return true;
   if (pageId === "permissions") return isPermissionsOwner(user);
+  if (pageId === "player-accounts") return isPermissionsOwner(user);
   return normalizeAllowedPages(permissions?.allowedPages).includes(pageId);
 }
 function getAdminPageOptions(user, permissions) {
@@ -1350,6 +1352,7 @@ export default function URTTAdminPanel() {
   const [racePredictions, setRacePredictions] = useState([]);
   const [predictionControls, setPredictionControls] = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
+  const [playerAccounts, setPlayerAccounts] = useState([]);
   const [guessDriverResults, setGuessDriverResults] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
@@ -1464,6 +1467,7 @@ export default function URTTAdminPanel() {
         { data: developmentData, error: developmentError },
         { data: racePredictionsData, error: racePredictionsError },
         { data: predictionControlsData, error: predictionControlsError },
+        { data: playerAccountsData, error: playerAccountsError },
         { data: guessDriverResultsData, error: guessDriverResultsError },
         { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
@@ -1483,6 +1487,7 @@ export default function URTTAdminPanel() {
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("race_predictions").select("*").order("created_at", { ascending: false }),
         supabase.from("race_prediction_controls").select("*").order("race_id", { ascending: true }),
+        supabase.from("player_accounts").select("*").order("created_at", { ascending: false }),
         supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
         supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
@@ -1504,6 +1509,7 @@ export default function URTTAdminPanel() {
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
         racePredictionsError && racePredictionsError.code !== "42P01" && `race_predictions: ${racePredictionsError.message}`,
         predictionControlsError && predictionControlsError.code !== "42P01" && `race_prediction_controls: ${predictionControlsError.message}`,
+        playerAccountsError && playerAccountsError.code !== "42P01" && `player_accounts: ${playerAccountsError.message}`,
         guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
         adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
@@ -1531,6 +1537,7 @@ export default function URTTAdminPanel() {
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
       setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
+      setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb));
       setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
@@ -2877,6 +2884,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "permissions" && (
@@ -4526,6 +4534,76 @@ function AwardDriverIdentity({ driver, team }) {
   return <DriverIdentity driver={{ ...driver, avatar: "" }} teamColor={team?.color} teamLogo={team?.logo} showRetired={false} />;
 }
 
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [] }) {
+  if (!isPermissionsOwner(adminUser)) {
+    return <div style={styles.section}><Card title="Comptes utilisateurs" icon="👤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
+  }
+
+  const formatAccountDate = (value) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+  };
+
+  const rows = accounts.map((account) => {
+    const accountPredictions = predictions.filter((prediction) => idsEqual(prediction.playerId, account.id));
+    const accountGuessResults = guessResults.filter((result) => idsEqual(result.playerId, account.id));
+    return {
+      ...account,
+      predictionsCount: accountPredictions.length,
+      guessCount: accountGuessResults.length,
+      guessWins: accountGuessResults.filter((result) => result.won).length,
+      guessScore: accountGuessResults.reduce((total, result) => total + Number(result.score || 0), 0),
+    };
+  });
+
+  return (
+    <div style={styles.section}>
+      <Card title="Comptes utilisateurs" icon="👤">
+        <div style={styles.statsGrid}>
+          <Stat label="Comptes" value={rows.length} />
+          <Stat label="Pronos envoyés" value={predictions.length} />
+          <Stat label="Devine le pilote" value={guessResults.length} />
+          <Stat label="Connecté sur" value={adminUser?.email || "—"} />
+        </div>
+        <p style={styles.mutedSmall}>Cette page est réservée à {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rôles admin ne peuvent pas y accéder.</p>
+      </Card>
+      <Card title="Liste des comptes" icon="👥">
+        <div style={styles.tableWrap}>
+          <table style={{ ...styles.table, minWidth: 860 }}>
+            <thead>
+              <tr style={styles.tableHead}>
+                <th style={styles.th}>Pseudo</th>
+                <th style={styles.th}>Discord</th>
+                <th style={styles.th}>Créé le</th>
+                <th style={styles.th}>Dernière activité</th>
+                <th style={styles.th}>Pronos</th>
+                <th style={styles.th}>Devine</th>
+                <th style={styles.th}>Points</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((account) => (
+                <tr key={account.id} style={styles.tr}>
+                  <td style={styles.td}><strong>{account.pseudo || "—"}</strong><p style={styles.mutedSmall}>ID {account.id}</p></td>
+                  <td style={styles.td}>{account.discordName || "—"}</td>
+                  <td style={styles.td}>{formatAccountDate(account.createdAt)}</td>
+                  <td style={styles.td}>{formatAccountDate(account.lastSeenAt)}</td>
+                  <td style={styles.td}>{account.predictionsCount}</td>
+                  <td style={styles.td}>{account.guessCount} essais · {account.guessWins} win</td>
+                  <td style={{ ...styles.td, ...styles.points }}>{account.guessScore}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistré." />}
+      </Card>
+    </div>
+  );
+}
+
 function GamesAdminPanel({ predictions = [], predictionControls = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId, onToggleClosed, onDeletePrediction, isSaving }) {
   const categoryId = normalizeCategoryId(selectedCategoryId);
   const seasonId = normalizeSeasonId(selectedSeasonId);
@@ -4646,7 +4724,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
     });
   };
   const togglePage = (pageId) => {
-    if (pageId === "permissions") return;
+    if (["permissions", "player-accounts"].includes(pageId)) return;
     setForm((current) => {
       const currentPages = current.allowedPages || [];
       const nextPages = currentPages.includes(pageId)
@@ -4657,7 +4735,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
   };
   const editRow = (row) => {
     setEditingId(row.id);
-    setForm({ userEmail: row.userEmail, role: row.role, allowedCategories: [...row.allowedCategories], allowedPages: row.allowedPages.filter((pageId) => pageId !== "permissions") });
+    setForm({ userEmail: row.userEmail, role: row.role, allowedCategories: [...row.allowedCategories], allowedPages: row.allowedPages.filter((pageId) => !["permissions", "player-accounts"].includes(pageId)) });
   };
   const cancelEdit = () => {
     setEditingId(null);
@@ -4682,7 +4760,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
         </div>
         <p style={{ ...styles.labelText, marginTop: 18 }}>Pages accessibles</p>
         <div style={styles.permissionPageGrid}>
-          {ADMIN_PAGE_OPTIONS.filter((page) => page.id !== "permissions").map((page) => (
+          {ADMIN_PAGE_OPTIONS.filter((page) => !["permissions", "player-accounts"].includes(page.id)).map((page) => (
             <label key={page.id} style={{ ...styles.permissionPagePill, background: selectedPages.includes(page.id) ? "rgba(124,58,237,.22)" : "#18181b", borderColor: selectedPages.includes(page.id) ? "#7c3aed" : "#3f3f46" }}>
               <input type="checkbox" checked={selectedPages.includes(page.id)} onChange={() => togglePage(page.id)} />
               <span>{page.icon}</span>
@@ -4702,7 +4780,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
             <div key={row.id || row.userEmail} style={styles.itemBox}>
               <div>
                 <strong>{row.userEmail}</strong>
-                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")} · {row.allowedPages.filter((pageId) => pageId !== "permissions").map((pageId) => ADMIN_PAGE_OPTIONS.find((page) => page.id === pageId)?.label || pageId).join(", ")}</p>
+                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")} · {row.allowedPages.filter((pageId) => !["permissions", "player-accounts"].includes(pageId)).map((pageId) => ADMIN_PAGE_OPTIONS.find((page) => page.id === pageId)?.label || pageId).join(", ")}</p>
               </div>
               <div style={styles.actions}>
                 <button type="button" onClick={() => editRow(row)} style={styles.editButton}>Modifier</button>
