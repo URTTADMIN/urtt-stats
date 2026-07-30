@@ -3212,7 +3212,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [championMode, setChampionMode] = useState(false);
+  const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
+  const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
   const championClicksRef = useRef([]);
+  const pendingPublicNavigationRef = useRef(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
   const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
   const publicPages = PUBLIC_PAGE_OPTIONS
@@ -3224,6 +3227,35 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
+  useEffect(() => {
+    if (!guessDriverInProgress) return undefined;
+    const warnBeforeLeave = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+      return "";
+    };
+    window.addEventListener("beforeunload", warnBeforeLeave);
+    return () => window.removeEventListener("beforeunload", warnBeforeLeave);
+  }, [guessDriverInProgress]);
+  const requestPublicNavigation = (callback) => {
+    if (activePublicPage === "guess-driver" && guessDriverInProgress) {
+      pendingPublicNavigationRef.current = callback;
+      setShowGuessExitPrompt(true);
+      return;
+    }
+    callback?.();
+  };
+  const confirmGuessDriverExit = () => {
+    const pendingNavigation = pendingPublicNavigationRef.current;
+    pendingPublicNavigationRef.current = null;
+    setShowGuessExitPrompt(false);
+    setGuessDriverInProgress(false);
+    pendingNavigation?.();
+  };
+  const cancelGuessDriverExit = () => {
+    pendingPublicNavigationRef.current = null;
+    setShowGuessExitPrompt(false);
+  };
   const handleChampionTitleClick = () => {
     const now = Date.now();
     const recentClicks = [...championClicksRef.current.filter((time) => now - time < 1800), now];
@@ -3245,7 +3277,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         <div style={styles.publicSessionBox}>
           {adminUser?.email && <span style={styles.sessionBadge}>Vous êtes connecté sur : <strong>{adminUser.email}</strong></span>}
           <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
-          <button onClick={onOpenAdmin} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
+          <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
         </div>
       </header>
       {championMode && (
@@ -3257,11 +3289,11 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         </div>
       )}
       <nav className="urtt-public-nav" style={styles.publicNav}>
-        <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-        <select value={seasonSelectValue} onChange={(event) => setSelectedSeasonId(event.target.value)} disabled={!seasonOptions.length} style={styles.seasonSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
+        <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+        <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.seasonSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
         {publicPages.map((key) => {
           const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-          return <button key={key} onClick={() => setPublicPage(key)} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{label}</button>;
+          return <button key={key} onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{label}</button>;
         })}
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
@@ -3273,9 +3305,26 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
+      {showGuessExitPrompt && (
+        <div style={styles.detailOverlay} onMouseDown={cancelGuessDriverExit}>
+          <div style={{ ...styles.feedbackModal, maxWidth: 520 }} onMouseDown={(event) => event.stopPropagation()}>
+            <div style={styles.gpDetailHeader}>
+              <div>
+                <p style={styles.kicker}>DEVINE LE PILOTE</p>
+                <h2 style={styles.gpDetailTitle}>Abandonner la tentative ?</h2>
+              </div>
+            </div>
+            <p style={styles.muted}>Si tu quittes cette page sans trouver le pilote, ta tentative sera considérée comme un abandon et tu ne marqueras aucun point.</p>
+            <div style={styles.actions}>
+              <button type="button" onClick={cancelGuessDriverExit} style={styles.secondaryButton}>Rester sur le jeu</button>
+              <button type="button" onClick={confirmGuessDriverExit} style={styles.dangerButton}>Quitter sans point</button>
+            </div>
+          </div>
+        </div>
+      )}
       <FeedbackWidget playerProfile={playerProfile} />
     </div>
   );
@@ -3697,7 +3746,7 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
   })}</div>;
 }
 
-function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], onSaveWin, isSaving = false }) {
+function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], onSaveWin, isSaving = false, onProgressChange }) {
   const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
   const challengeDay = getDailyChallengeDay();
@@ -3710,6 +3759,10 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
   const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
   const won = targetDriver && (savedToday || attempts.some((driverId) => idsEqual(driverId, targetDriver.id)));
   const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
+  useEffect(() => {
+    onProgressChange?.(Boolean(profile?.id && attempts.length > 0 && !won));
+    return () => onProgressChange?.(false);
+  }, [attempts.length, won, profile?.id, onProgressChange]);
 
   async function submitGuess(event) {
     event.preventDefault();
