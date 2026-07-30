@@ -3276,7 +3276,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
-      <FeedbackWidget />
+      <FeedbackWidget playerProfile={playerProfile} />
     </div>
   );
 }
@@ -5018,7 +5018,7 @@ function MiniCountList({ counts, empty }) {
   return <div style={styles.stack}>{entries.map(([name, count]) => <div key={name} style={styles.itemBox}><strong>{name}</strong><span style={styles.badgeGreen}>{count}</span></div>)}</div>;
 }
 function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "—"}</strong></div>; }
-function FeedbackWidget() {
+function FeedbackWidget({ playerProfile = null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState("Suggestion");
   const [title, setTitle] = useState("");
@@ -5040,7 +5040,17 @@ function FeedbackWidget() {
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, title, content, pageUrl: window.location.href }),
+        body: JSON.stringify({
+          type,
+          title,
+          content,
+          pageUrl: window.location.href,
+          player: playerProfile ? {
+            id: playerProfile.id,
+            pseudo: playerProfile.pseudo,
+            discordName: playerProfile.discordName,
+          } : null,
+        }),
       });
 
       if (!response.ok) throw new Error("Feedback failed");
@@ -5062,6 +5072,7 @@ function FeedbackWidget() {
         <div style={styles.detailOverlay} onClick={() => setIsOpen(false)}>
           <form onSubmit={sendFeedback} style={styles.feedbackModal} onClick={(event) => event.stopPropagation()}>
             <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>RETOUR SITE</p><h2 style={styles.gpDetailTitle}>Suggestion ou bug</h2></div><button type="button" onClick={() => setIsOpen(false)} style={styles.secondaryButton}>Fermer</button></div>
+            <p style={styles.mutedSmall}>Compte : {playerProfile?.pseudo ? <strong>{playerProfile.pseudo}{playerProfile.discordName ? ` · ${playerProfile.discordName}` : ""}</strong> : "non connecté"}</p>
             <div style={styles.feedbackChoice}>{["Suggestion", "Bug"].map((item) => <button key={item} type="button" onClick={() => setType(item)} style={{ ...styles.feedbackChoiceButton, ...(type === item ? styles.feedbackChoiceActive : {}) }}>{item}</button>)}</div>
             <Input label="Titre" value={title} onChange={setTitle} />
             <label style={styles.label}><span style={styles.labelText}>Contenu</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} style={styles.textarea} /></label>

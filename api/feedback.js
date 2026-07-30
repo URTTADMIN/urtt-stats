@@ -21,10 +21,29 @@ export default async function handler(request, response) {
   const title = cleanText(request.body?.title, MAX_TITLE_LENGTH);
   const content = cleanText(request.body?.content, MAX_CONTENT_LENGTH);
   const pageUrl = cleanText(request.body?.pageUrl, 300);
+  const player = request.body?.player || null;
+  const playerPseudo = cleanText(player?.pseudo, 80);
+  const playerDiscord = cleanText(player?.discordName, 80);
+  const playerId = cleanText(player?.id, 80);
 
   if (!title || !content) {
     return response.status(400).json({ error: "Title and content are required" });
   }
+
+  const fields = [];
+  if (playerPseudo || playerDiscord || playerId) {
+    fields.push({
+      name: "Compte joueur",
+      value: [
+        playerPseudo && `Pseudo : ${playerPseudo}`,
+        playerDiscord && `Discord : ${playerDiscord}`,
+        playerId && `ID : ${playerId}`,
+      ].filter(Boolean).join("\n"),
+    });
+  } else {
+    fields.push({ name: "Compte joueur", value: "Non connecté" });
+  }
+  if (pageUrl) fields.push({ name: "Page", value: pageUrl });
 
   const discordResponse = await fetch(webhookUrl, {
     method: "POST",
@@ -36,7 +55,7 @@ export default async function handler(request, response) {
           title: `[${type}] ${title}`,
           description: content,
           color: type === "Bug" ? 0xdc2626 : 0x2563eb,
-          fields: pageUrl ? [{ name: "Page", value: pageUrl }] : [],
+          fields,
           timestamp: new Date().toISOString(),
         },
       ],
