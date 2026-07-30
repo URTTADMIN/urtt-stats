@@ -2599,6 +2599,8 @@ export default function URTTAdminPanel() {
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
+    const alreadySubmitted = racePredictions.some((existingPrediction) => String(existingPrediction.playerId) === String(playerProfile.id) && String(existingPrediction.raceId) === String(prediction.raceId));
+    if (alreadySubmitted) return { ok: false, message: "Tu as déjà envoyé un prono pour cette course." };
     const selectedRace = allCalendarRaces.find((race) => String(race.id) === String(prediction.raceId));
     const seasonDrivers = drivers.filter((driver) => (driver.participations?.[normalizeSeasonId(prediction.seasonId)] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(prediction.categoryId)));
     const requiredPositionCount = Math.min(20, seasonDrivers.length || 20);
@@ -2619,6 +2621,8 @@ export default function URTTAdminPanel() {
       console.error("Erreur prono:", error);
       const message = error.code === "42P01"
         ? "La table race_predictions n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : error.code === "23505"
+          ? "Tu as déjà envoyé un prono pour cette course."
         : error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
           ? "Supabase bloque l'envoi du prono. Vérifie les policies RLS de race_predictions."
           : "Impossible d'envoyer le prono pour le moment.";
@@ -3485,6 +3489,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
   const raceClosed = selectedRace ? isPredictionClosedForRace(raceResults, predictionControls, selectedRace.id) : true;
   const visiblePredictions = predictions.filter((prediction) => normalizeSeasonId(prediction.seasonId) === seasonId && normalizeCategoryId(prediction.categoryId) === categoryId);
   const racePredictions = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(activeRaceId));
+  const playerAlreadySubmitted = Boolean(playerProfile?.id) && racePredictions.some((prediction) => String(prediction.playerId) === String(playerProfile.id));
   const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults).slice(0, 10);
   const driverOptions = eligibleDrivers.length ? eligibleDrivers : drivers;
   const defaultOrder = (currentRankingDrivers.length ? currentRankingDrivers : driverOptions).slice(0, 20).map((driver) => String(driver.id));
@@ -3535,7 +3540,7 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
                 <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
               </div>
               <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} teams={teams} seasonId={seasonId} order={predictionOrder} defaultOrder={defaultOrder} onMove={movePredictionDriver} onSetOrder={setPredictionOrder} />
-              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : "Envoyer mon prono"}</button>
+              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo || playerAlreadySubmitted} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : playerAlreadySubmitted ? "Prono déjà envoyé" : "Envoyer mon prono"}</button>
               {status && <p style={styles.mutedSmall}>{status}</p>}
             </>
           )}

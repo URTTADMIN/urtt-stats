@@ -32,6 +32,21 @@ add column if not exists player_id bigint references public.player_accounts(id) 
 create index if not exists race_predictions_player_id_idx
 on public.race_predictions(player_id);
 
+do $$
+begin
+  if not exists (
+    select 1
+    from public.race_predictions
+    where player_id is not null
+    group by player_id, race_id
+    having count(*) > 1
+  ) then
+    create unique index if not exists race_predictions_one_player_per_race_idx
+    on public.race_predictions(player_id, race_id)
+    where player_id is not null;
+  end if;
+end $$;
+
 drop policy if exists "Public can create race predictions" on public.race_predictions;
 create policy "Public can create race predictions"
 on public.race_predictions
