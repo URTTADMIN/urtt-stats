@@ -2883,6 +2883,8 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
       ...driver,
       teamId: seasonTeamId,
       teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
+      baseDriverTitles: Number(driver.driverTitles) || 0,
+      baseTeamTitles: Number(driver.teamTitles) || 0,
       driverTitles: 0,
       teamTitles: 0,
       wins: 0,
@@ -3040,12 +3042,13 @@ function buildCumulativeStats(statsBySeason) {
     getSeasonOptions().forEach((season) => {
       if (!isSeasonIncluded(season.id, selectedSeason.id)) return;
       (statsBySeason[season.id] || []).forEach((item) => {
-        const current = map.get(item.id) || { ...item, driverTitles: 0, teamTitles: 0, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, hatTricks: 0, points: 0, resultCounts: {} };
+        const hasManualTitleTotals = item.baseDriverTitles !== undefined || item.baseTeamTitles !== undefined;
+        const current = map.get(item.id) || { ...item, driverTitles: hasManualTitleTotals ? Number(item.baseDriverTitles) || 0 : 0, teamTitles: hasManualTitleTotals ? Number(item.baseTeamTitles) || 0 : 0, wins: 0, podiums: 0, poles: 0, fastestLaps: 0, hatTricks: 0, points: 0, resultCounts: {} };
         map.set(item.id, {
           ...current,
           ...item,
-          driverTitles: current.driverTitles + (Number(item.driverTitles) || 0),
-          teamTitles: current.teamTitles + (Number(item.teamTitles) || 0),
+          driverTitles: hasManualTitleTotals ? current.driverTitles : current.driverTitles + (Number(item.driverTitles) || 0),
+          teamTitles: hasManualTitleTotals ? current.teamTitles : current.teamTitles + (Number(item.teamTitles) || 0),
           wins: current.wins + item.wins,
           podiums: current.podiums + item.podiums,
           poles: current.poles + item.poles,
