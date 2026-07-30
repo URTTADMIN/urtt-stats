@@ -3491,9 +3491,8 @@ function PoleToDnfAnimation({ onDone }) {
   return (
     <div className="urtt-pole-dnf-overlay" aria-live="polite">
       <div className="urtt-pole-dnf-card">
-        <p className="urtt-pole-dnf-kicker">Saison 12 · Thibaut</p>
+        <p className="urtt-pole-dnf-kicker">Saison 12 · Monaco · Thibaut</p>
         <h2 className="urtt-pole-dnf-title">POLE TO DNF</h2>
-        <p className="urtt-pole-dnf-subtitle">Explosion finale incluse</p>
       </div>
     </div>
   );
