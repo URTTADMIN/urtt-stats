@@ -3800,6 +3800,9 @@ function GuessDriverLeaderboard({ leaderboard = [] }) {
 function GuessDriverTable({ guesses = [], target, teams = [] }) {
   if (!guesses.length) return <Empty text="Fais un premier essai pour afficher les indices." />;
   const statColumns = [
+    { key: "seasons", label: "Saisons" },
+    { key: "driverTitles", label: "Titre P." },
+    { key: "teamTitles", label: "Titre C." },
     { key: "points", label: "Points" },
     { key: "wins", label: "V" },
     { key: "podiums", label: "Pod." },
@@ -3810,7 +3813,7 @@ function GuessDriverTable({ guesses = [], target, teams = [] }) {
 
   return (
     <div style={styles.tableWrap}>
-      <table style={{ ...styles.table, minWidth: 900 }}>
+      <table style={{ ...styles.table, minWidth: 1120 }}>
         <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
         <tbody>{[...guesses].reverse().map((guess) => {
           const team = teams.find((item) => idsEqual(item.id, guess.teamId)) || null;
