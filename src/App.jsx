@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { useRef } from "react";
 
@@ -2963,14 +2963,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
 
     if (seasonTitle?.driverId) {
       driverChampionIds.add(String(seasonTitle.driverId));
-    } else if (seasonDriverStats[0]?.points > 0) {
-      driverChampionIds.add(String(seasonDriverStats[0].id));
     }
 
     if (seasonTitle?.teamId) {
       constructorChampionTeamIds.add(String(seasonTitle.teamId));
-    } else if (seasonTeamStats[0]?.points > 0) {
-      constructorChampionTeamIds.add(String(seasonTeamStats[0].id));
     }
 
     seasonDriverStats = seasonDriverStats.map((driver) => ({
