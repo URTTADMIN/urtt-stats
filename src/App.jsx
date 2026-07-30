@@ -730,6 +730,7 @@ function mapGuessDriverResultFromDb(result) {
     challengeDay: result.challenge_day || "",
     driverId: result.driver_id || "",
     attempts: Number(result.attempts || 0),
+    score: Number(result.score || getGuessDriverScore(result.attempts || 0)),
     won: Boolean(result.won),
     createdAt: result.created_at || "",
   };
@@ -801,6 +802,10 @@ function getPreviousChallengeDay(day) {
   date.setUTCDate(date.getUTCDate() - 1);
   return getDailyChallengeDay(date);
 }
+function getGuessDriverScore(attempts = 0) {
+  const attemptCount = Math.max(1, Number(attempts) || 1);
+  return Math.max(1, 11 - attemptCount);
+}
 function getGuessDriverStreak(results = [], userId = "", categoryId = "") {
   if (!userId) return 0;
   const wonDays = new Set(results
@@ -814,6 +819,26 @@ function getGuessDriverStreak(results = [], userId = "", categoryId = "") {
     day = getPreviousChallengeDay(day);
   }
   return streak;
+}
+function getGuessDriverLeaderboard(results = [], categoryId = "") {
+  const map = new Map();
+  results
+    .filter((result) => result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
+    .forEach((result) => {
+      const key = result.playerId ? `player-${result.playerId}` : result.pseudo.trim().toLowerCase();
+      if (!key) return;
+      const score = Number(result.score || getGuessDriverScore(result.attempts)) || 0;
+      const current = map.get(key) || { pseudo: result.pseudo, discordName: result.discordName, score: 0, wins: 0, bestAttempts: Number(result.attempts) || 0 };
+      map.set(key, {
+        ...current,
+        pseudo: current.pseudo || result.pseudo,
+        discordName: current.discordName || result.discordName,
+        score: current.score + score,
+        wins: current.wins + 1,
+        bestAttempts: current.bestAttempts ? Math.min(current.bestAttempts, Number(result.attempts) || current.bestAttempts) : Number(result.attempts) || 0,
+      });
+    });
+  return Array.from(map.values()).sort((a, b) => b.score - a.score || b.wins - a.wins || a.bestAttempts - b.bestAttempts || a.pseudo.localeCompare(b.pseudo, "fr"));
 }
 function compareGuessValue(guessValue, targetValue) {
   const guessNumber = Number(guessValue) || 0;
@@ -2636,6 +2661,7 @@ export default function URTTAdminPanel() {
 
   async function saveGuessDriverWin({ categoryId, challengeDay, driverId, attempts }) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
+    const score = getGuessDriverScore(attempts);
     setIsSavingGuessResult(true);
     const { data, error } = await supabase
       .from("guess_driver_results")
@@ -2647,6 +2673,7 @@ export default function URTTAdminPanel() {
         challenge_day: challengeDay,
         driver_id: Number(driverId),
         attempts: Number(attempts || 0),
+        score,
         won: true,
       }, { onConflict: "player_id,category_id,challenge_day" })
       .select()
@@ -2666,7 +2693,7 @@ export default function URTTAdminPanel() {
       const withoutSameDay = current.filter((result) => !(String(result.playerId) === String(savedResult.playerId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
       return [savedResult, ...withoutSameDay];
     });
-    return { ok: true, message: "Défi enregistré dans ton compte." };
+    return { ok: true, message: `Défi enregistré : +${savedResult.score} pts.` };
   }
 
   async function toggleRacePredictionClosed(raceId, closed) {
@@ -3665,6 +3692,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
   const challengeDay = getDailyChallengeDay();
   const savedToday = results.some((result) => String(result.playerId) === String(profile?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
   const streak = getGuessDriverStreak(results, profile?.id || "", selectedCategoryId);
+  const leaderboard = getGuessDriverLeaderboard(results, selectedCategoryId).slice(0, 10);
   const [guessId, setGuessId] = useState("");
   const [attempts, setAttempts] = useState([]);
   const [message, setMessage] = useState("");
@@ -3713,8 +3741,10 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
             <Stat label="Essais" value={attempts.length} />
             <Stat label="Pilotes possibles" value={playableDrivers.length} />
             <Stat label="Série" value={streak} />
+            <Stat label="Points si trouvé" value={getGuessDriverScore(Math.max(1, attempts.length + 1))} />
           </div>
         </div>
+        <p style={styles.mutedSmall}>Barème : 10 pts au 1er essai, puis -1 pt par essai supplémentaire, minimum 1 pt.</p>
         {!profile?.pseudo && <div style={styles.previewNotice}><strong>Compte requis</strong><span>Connecte-toi pour garder ta série et relier ton défi à ton pseudo Discord.</span></div>}
         <form onSubmit={submitGuess} style={styles.resultsInfo}>
           <label style={styles.label}>
@@ -3732,6 +3762,26 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
       <Card title="Indices" icon="📊">
         <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} />
       </Card>
+      <Card title={`Classement Défi pilote — ${selectedCategoryId}`} icon="🏆">
+        <GuessDriverLeaderboard leaderboard={leaderboard} />
+      </Card>
+    </div>
+  );
+}
+
+function GuessDriverLeaderboard({ leaderboard = [] }) {
+  if (!leaderboard.length) return <Empty text="Aucun score enregistré pour le moment." />;
+  return (
+    <div style={styles.stack}>
+      {leaderboard.map((row, index) => (
+        <div key={`${row.pseudo}-${index}`} style={styles.itemBox}>
+          <div>
+            <strong>#{index + 1} {row.pseudo}</strong>
+            <p style={styles.mutedSmall}>{row.wins} défi{row.wins > 1 ? "s" : ""} réussi{row.wins > 1 ? "s" : ""}{row.bestAttempts ? ` · meilleur : ${row.bestAttempts} essai${row.bestAttempts > 1 ? "s" : ""}` : ""}</p>
+          </div>
+          <span style={styles.points}>{row.score} pts</span>
+        </div>
+      ))}
     </div>
   );
 }

@@ -71,6 +71,7 @@ create table if not exists public.guess_driver_results (
   challenge_day date not null,
   driver_id bigint not null,
   attempts integer not null default 0,
+  score integer not null default 1,
   won boolean not null default true,
   created_at timestamptz not null default now(),
   unique(player_id, category_id, challenge_day)
@@ -83,7 +84,14 @@ alter table public.guess_driver_results
 add column if not exists user_id uuid references auth.users(id) on delete cascade;
 
 alter table public.guess_driver_results
+add column if not exists score integer not null default 1;
+
+alter table public.guess_driver_results
 alter column user_id drop not null;
+
+update public.guess_driver_results
+set score = greatest(1, 11 - greatest(1, coalesce(attempts, 1)))
+where won is true and (score is null or score <= 1);
 
 do $$
 begin
