@@ -1189,6 +1189,115 @@ export default function URTTAdminPanel() {
         font-weight: 950;
         letter-spacing: .12em;
       }
+      .urtt-heartbreak-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 7000;
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: radial-gradient(circle at center, rgba(168, 85, 247, .18), transparent 34%), rgba(0, 0, 0, .74);
+        animation: urttHeartbreakFade 3.5s ease-in-out forwards;
+      }
+      .urtt-heartbreak-card {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        place-items: center;
+        gap: 10px;
+        padding: 30px 36px;
+        border: 2px solid rgba(168, 85, 247, .9);
+        border-radius: 28px;
+        background: linear-gradient(135deg, rgba(24,24,27,.96), rgba(88,28,135,.82));
+        box-shadow: 0 0 52px rgba(168,85,247,.4), 0 0 90px rgba(220,38,38,.28);
+        animation: urttHeartbreakCard 3.5s ease-in-out forwards;
+      }
+      .urtt-heartbreak-kicker {
+        margin: 0;
+        color: #c084fc;
+        letter-spacing: .24em;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+      .urtt-heartbreak-title {
+        margin: 0;
+        color: white;
+        font-size: clamp(40px, 8vw, 116px);
+        line-height: .92;
+        text-align: center;
+        text-shadow: 0 0 18px rgba(168,85,247,.9), 0 0 42px rgba(220,38,38,.7);
+        animation: urttHeartbreakText 3.5s ease-in-out forwards;
+      }
+      .urtt-heartbreak-subtitle {
+        margin: 0;
+        color: #fecaca;
+        font-weight: 950;
+        letter-spacing: .12em;
+      }
+      .urtt-confetti {
+        position: absolute;
+        top: -12vh;
+        width: 10px;
+        height: 18px;
+        border-radius: 3px;
+        background: var(--confetti-color);
+        left: var(--confetti-left);
+        transform: rotate(var(--confetti-rotate));
+        opacity: .95;
+        animation: urttReverseConfetti 3.5s ease-in-out forwards;
+        animation-delay: var(--confetti-delay);
+      }
+      .urtt-trophy-card {
+        position: relative;
+        display: grid;
+        place-items: center;
+        gap: 12px;
+        animation: urttTrophyCard 3.4s cubic-bezier(.2,.9,.2,1) forwards;
+      }
+      .urtt-trophy {
+        font-size: clamp(86px, 16vw, 210px);
+        line-height: 1;
+        filter: drop-shadow(0 0 28px rgba(250,204,21,.8));
+        animation: urttTrophyEscape 3.4s cubic-bezier(.2,.8,.18,1) forwards;
+      }
+      @keyframes urttHeartbreakFade {
+        0% { opacity: 0; }
+        10%, 86% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+      @keyframes urttHeartbreakCard {
+        0% { opacity: 0; transform: scale(.82); }
+        18%, 45% { opacity: 1; transform: scale(1); filter: saturate(1.2); }
+        58% { transform: scale(.96); filter: hue-rotate(40deg) saturate(1.8); border-color: rgba(220,38,38,.9); }
+        72% { transform: translateY(-8px) scale(1.02); }
+        100% { opacity: 0; transform: scale(1.16); }
+      }
+      @keyframes urttHeartbreakText {
+        0%, 40% { letter-spacing: .02em; color: white; }
+        58% { letter-spacing: .18em; color: #facc15; }
+        78%, 100% { letter-spacing: .08em; color: #fecaca; }
+      }
+      @keyframes urttReverseConfetti {
+        0% { transform: translateY(-10vh) rotate(var(--confetti-rotate)); opacity: 0; }
+        22% { transform: translateY(58vh) rotate(calc(var(--confetti-rotate) + 150deg)); opacity: 1; }
+        48% { transform: translateY(72vh) rotate(calc(var(--confetti-rotate) + 260deg)); opacity: 1; }
+        64% { transform: translateY(44vh) rotate(calc(var(--confetti-rotate) - 180deg)); opacity: .95; }
+        100% { transform: translateY(-24vh) rotate(calc(var(--confetti-rotate) - 520deg)); opacity: 0; }
+      }
+      @keyframes urttTrophyCard {
+        0% { opacity: 0; transform: scale(.7); }
+        16%, 78% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(1.05); }
+      }
+      @keyframes urttTrophyEscape {
+        0% { transform: translateY(18vh) scale(.45); opacity: 0; }
+        30% { transform: translateY(0) scale(1); opacity: 1; }
+        52% { transform: translateY(-2vh) scale(1.08) rotate(-2deg); }
+        63% { transform: translateX(-4px) scale(1.1) rotate(2deg); filter: drop-shadow(0 0 34px rgba(250,204,21,.95)); }
+        74% { transform: translateX(8px) scale(1.12) rotate(-2deg); filter: drop-shadow(0 0 34px rgba(220,38,38,.95)); }
+        100% { transform: translateX(92vw) translateY(-18vh) scale(.22) rotate(28deg); opacity: 0; filter: blur(5px) drop-shadow(0 0 40px rgba(220,38,38,.8)); }
+      }
       @keyframes urttPoleDnfOverlay {
         0% { opacity: 0; }
         10%, 84% { opacity: 1; }
@@ -3307,6 +3416,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
   const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
   const [poleDnfAnimationKey, setPoleDnfAnimationKey] = useState(0);
+  const [titleHeartbreakAnimation, setTitleHeartbreakAnimation] = useState(null);
   const championClicksRef = useRef([]);
   const pendingPublicNavigationRef = useRef(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
@@ -3355,8 +3465,16 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   };
   const handleStandingsDriverClick = (driver) => {
     const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
-    if (normalizeSeasonId(selectedSeasonId) === "S12" && String(fullDriver.name || "").trim().toLowerCase() === "thibaut") {
+    const seasonId = normalizeSeasonId(selectedSeasonId);
+    const driverName = String(fullDriver.name || "").trim().toLowerCase();
+    if (seasonId === "S12" && driverName === "thibaut") {
       setPoleDnfAnimationKey((current) => current + 1);
+    }
+    if (driverName === "kolti" && seasonId === "S7") {
+      setTitleHeartbreakAnimation({ type: "confetti", key: Date.now() });
+    }
+    if (driverName === "kolti" && seasonId === "S14") {
+      setTitleHeartbreakAnimation({ type: "trophy", key: Date.now() });
     }
   };
   const handleChampionTitleClick = () => {
@@ -3429,6 +3547,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         </div>
       )}
       {poleDnfAnimationKey > 0 && <PoleToDnfAnimation key={poleDnfAnimationKey} onDone={() => setPoleDnfAnimationKey(0)} />}
+      {titleHeartbreakAnimation && <TitleHeartbreakAnimation key={titleHeartbreakAnimation.key} type={titleHeartbreakAnimation.type} onDone={() => setTitleHeartbreakAnimation(null)} />}
       <FeedbackWidget playerProfile={playerProfile} />
     </div>
   );
@@ -3493,6 +3612,56 @@ function PoleToDnfAnimation({ onDone }) {
       <div className="urtt-pole-dnf-card">
         <p className="urtt-pole-dnf-kicker">Saison 12 · Monaco · Thibaut</p>
         <h2 className="urtt-pole-dnf-title">POLE TO DNF</h2>
+      </div>
+    </div>
+  );
+}
+
+function TitleHeartbreakAnimation({ type, onDone }) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => onDone?.(), type === "trophy" ? 3400 : 3500);
+    return () => window.clearTimeout(timer);
+  }, [type, onDone]);
+
+  const confettiColors = ["#facc15", "#a855f7", "#dc2626", "#ffffff", "#2563eb"];
+  const confetti = Array.from({ length: 34 }, (_, index) => ({
+    color: confettiColors[index % confettiColors.length],
+    left: `${4 + ((index * 13) % 92)}%`,
+    delay: `${(index % 9) * 0.045}s`,
+    rotate: `${(index * 37) % 180}deg`,
+  }));
+
+  if (type === "trophy") {
+    return (
+      <div className="urtt-heartbreak-overlay" aria-live="polite">
+        <div className="urtt-trophy-card">
+          <p className="urtt-heartbreak-kicker">Saison 14 · Kolti</p>
+          <div className="urtt-trophy">🏆</div>
+          <h2 className="urtt-heartbreak-title">SI PROCHE.</h2>
+          <p className="urtt-heartbreak-subtitle">Perdu dans la dernière course</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="urtt-heartbreak-overlay" aria-live="polite">
+      {confetti.map((item, index) => (
+        <span
+          key={index}
+          className="urtt-confetti"
+          style={{
+            "--confetti-color": item.color,
+            "--confetti-left": item.left,
+            "--confetti-delay": item.delay,
+            "--confetti-rotate": item.rotate,
+          }}
+        />
+      ))}
+      <div className="urtt-heartbreak-card">
+        <p className="urtt-heartbreak-kicker">Saison 7 · Kolti</p>
+        <h2 className="urtt-heartbreak-title">CÉLÉBRATION ANNULÉE</h2>
+        <p className="urtt-heartbreak-subtitle">Pas pour Kolti cette fois.</p>
       </div>
     </div>
   );
