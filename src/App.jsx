@@ -15,6 +15,7 @@ const CATEGORY_OPTIONS = [
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
+const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const ADMIN_PAGE_OPTIONS = [
   { id: "dashboard", icon: "🏠", label: "Dashboard" },
   { id: "supabase", icon: "🗄️", label: "Supabase" },
@@ -45,7 +46,14 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "development", label: "Développement" },
   { id: "predictions", label: "Pronos" },
   { id: "guess-driver", label: "Défi pilote" },
+  { id: "easter-eggs", label: "Livre secret" },
   { id: "world", label: "Carte" },
+];
+const EASTER_EGG_BOOK = [
+  { id: "kolti-s7", title: "Célébration annulée", hint: "Saison 7 · Classements · Kolti", unlockedText: "Kolti S7 : les confettis commencent, puis la célébration remonte et disparaît." },
+  { id: "kolti-s14", title: "Si proche", hint: "Saison 14 · Classements · Kolti", unlockedText: "Kolti S14 : le trophée arrive, tremble, puis s'échappe dans la dernière course." },
+  { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 · Classements · Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
+  { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE après une séquence cachée." },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
@@ -3417,6 +3425,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
   const [poleDnfAnimationKey, setPoleDnfAnimationKey] = useState(0);
   const [titleHeartbreakAnimation, setTitleHeartbreakAnimation] = useState(null);
+  const [unlockedEasterEggs, setUnlockedEasterEggs] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(EASTER_EGG_STORAGE_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  });
   const championClicksRef = useRef([]);
   const pendingPublicNavigationRef = useRef(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
@@ -3459,6 +3474,14 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     pendingPublicNavigationRef.current = null;
     setShowGuessExitPrompt(false);
   };
+  const unlockEasterEgg = (eggId) => {
+    setUnlockedEasterEggs((current) => {
+      if (current.includes(eggId)) return current;
+      const next = [...current, eggId];
+      window.localStorage.setItem(EASTER_EGG_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  };
   const openDriverDetails = (driver) => {
     const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
     setSelectedDriver(fullDriver);
@@ -3469,12 +3492,15 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     const driverName = String(fullDriver.name || "").trim().toLowerCase();
     if (seasonId === "S12" && driverName === "thibaut") {
       setPoleDnfAnimationKey((current) => current + 1);
+      unlockEasterEgg("thibaut-s12");
     }
     if (driverName === "kolti" && seasonId === "S7") {
       setTitleHeartbreakAnimation({ type: "confetti", key: Date.now() });
+      unlockEasterEgg("kolti-s7");
     }
     if (driverName === "kolti" && seasonId === "S14") {
       setTitleHeartbreakAnimation({ type: "trophy", key: Date.now() });
+      unlockEasterEgg("kolti-s14");
     }
   };
   const handleChampionTitleClick = () => {
@@ -3482,6 +3508,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     const recentClicks = [...championClicksRef.current.filter((time) => now - time < 1800), now];
     if (recentClicks.length >= 7) {
       setChampionMode(true);
+      unlockEasterEgg("urtt-stats-title");
       championClicksRef.current = [];
       return;
     }
@@ -3527,6 +3554,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
+        {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={unlockedEasterEggs} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       {showGuessExitPrompt && (
@@ -3662,6 +3690,42 @@ function TitleHeartbreakAnimation({ type, onDone }) {
         <p className="urtt-heartbreak-kicker">Saison 7 · Kolti</p>
         <h2 className="urtt-heartbreak-title">CÉLÉBRATION ANNULÉE</h2>
         <p className="urtt-heartbreak-subtitle">Pas pour Kolti cette fois.</p>
+      </div>
+    </div>
+  );
+}
+
+function EasterEggBookPage({ unlockedIds = [] }) {
+  const unlockedSet = new Set(unlockedIds);
+  const unlockedCount = EASTER_EGG_BOOK.filter((egg) => unlockedSet.has(egg.id)).length;
+
+  return (
+    <div style={styles.section}>
+      <Card title="Livre secret des easter eggs" icon="📖">
+        <div style={styles.statsGrid}>
+          <Stat label="Découverts" value={`${unlockedCount}/${EASTER_EGG_BOOK.length}`} />
+          <Stat label="Carrés cachés" value={EASTER_EGG_BOOK.length - unlockedCount} />
+          <Stat label="Mode" value="Collection" />
+        </div>
+        <p style={styles.mutedSmall}>Chaque carré se débloque quand tu déclenches l'easter egg correspondant sur le site.</p>
+      </Card>
+      <div style={styles.easterEggGrid}>
+        {EASTER_EGG_BOOK.map((egg, index) => {
+          const unlocked = unlockedSet.has(egg.id);
+          return (
+            <div key={egg.id} style={{ ...styles.easterEggSquare, ...(unlocked ? styles.easterEggUnlocked : styles.easterEggLocked) }}>
+              <div style={styles.easterEggSquareTop}>
+                <span style={styles.easterEggNumber}>#{index + 1}</span>
+                <span style={unlocked ? styles.badgeGreen : styles.badgeDark}>{unlocked ? "Débloqué" : "Caché"}</span>
+              </div>
+              <div style={styles.easterEggCenter}>
+                <strong style={styles.easterEggTitle}>{unlocked ? egg.title : "???"}</strong>
+                <p style={styles.mutedSmall}>{unlocked ? egg.hint : "Easter egg non découvert"}</p>
+              </div>
+              <p style={styles.easterEggText}>{unlocked ? egg.unlockedText : "Déclenche l'easter egg pour révéler cette page du livre."}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -5877,6 +5941,15 @@ const styles = {
   positionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 10, marginTop: 10 },
   positionPick: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", alignItems: "center", gap: 8, color: "#f4f4f5", fontWeight: 900 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
+  easterEggGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 16 },
+  easterEggSquare: { minHeight: 220, borderRadius: 20, padding: 18, display: "grid", gridTemplateRows: "auto 1fr auto", gap: 14, border: "1px solid #3f3f46", overflow: "hidden", position: "relative" },
+  easterEggUnlocked: { background: "linear-gradient(135deg, rgba(39,39,42,.98), rgba(76,29,149,.48))", borderColor: "rgba(168,85,247,.72)", boxShadow: "0 18px 40px rgba(0,0,0,.32), 0 0 28px rgba(168,85,247,.16)" },
+  easterEggLocked: { background: "linear-gradient(135deg, rgba(24,24,27,.98), rgba(9,9,11,.96))", borderStyle: "dashed", filter: "saturate(.62)" },
+  easterEggSquareTop: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 },
+  easterEggNumber: { color: "#a1a1aa", fontWeight: 950, letterSpacing: ".08em" },
+  easterEggCenter: { display: "grid", placeItems: "center", textAlign: "center", gap: 8 },
+  easterEggTitle: { color: "white", fontSize: 24, lineHeight: 1.08 },
+  easterEggText: { color: "#d4d4d8", margin: 0, lineHeight: 1.45, fontSize: 14 },
   feedbackButton: { position: "fixed", right: 22, bottom: 22, width: 58, height: 58, borderRadius: "50%", border: "2px solid rgba(255,255,255,.28)", background: "#2563eb", color: "white", fontSize: 24, fontWeight: 950, cursor: "pointer", zIndex: 45, boxShadow: "0 18px 42px rgba(37,99,235,.35)" },
   feedbackModal: { width: "min(620px, 100%)", maxHeight: "90vh", overflow: "auto", background: "#18181b", border: "1px solid #3f3f46", borderRadius: 26, padding: 20, display: "grid", gap: 14 },
   feedbackChoice: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
