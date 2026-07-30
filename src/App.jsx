@@ -1124,6 +1124,95 @@ export default function URTTAdminPanel() {
         font-weight: 900;
         cursor: pointer;
       }
+      .urtt-pole-dnf-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 7000;
+        pointer-events: none;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(255, 238, 0, .2), transparent 16%),
+          radial-gradient(circle at 50% 50%, rgba(220, 38, 38, .3), transparent 34%),
+          rgba(0, 0, 0, .72);
+        animation: urttPoleDnfOverlay 2.9s ease-in-out forwards;
+        overflow: hidden;
+      }
+      .urtt-pole-dnf-overlay::before,
+      .urtt-pole-dnf-overlay::after {
+        content: "";
+        position: absolute;
+        width: 26vmin;
+        height: 26vmin;
+        border-radius: 999px;
+        background: radial-gradient(circle, #fff 0 8%, #facc15 9% 22%, #f97316 23% 42%, #dc2626 43% 58%, transparent 60%);
+        filter: blur(.5px) drop-shadow(0 0 32px rgba(248, 113, 113, .9));
+        transform: scale(0);
+        opacity: 0;
+        animation: urttPoleDnfExplosion 2.9s ease-out forwards;
+      }
+      .urtt-pole-dnf-overlay::before { left: 14%; top: 24%; animation-delay: 1.68s; }
+      .urtt-pole-dnf-overlay::after { right: 13%; bottom: 18%; animation-delay: 1.82s; }
+      .urtt-pole-dnf-card {
+        position: relative;
+        display: grid;
+        gap: 10px;
+        place-items: center;
+        padding: 28px 34px;
+        border: 2px solid rgba(250, 204, 21, .9);
+        border-radius: 28px;
+        background: linear-gradient(135deg, rgba(24, 24, 27, .96), rgba(127, 29, 29, .82));
+        box-shadow: 0 0 42px rgba(250, 204, 21, .32), 0 0 92px rgba(220, 38, 38, .48);
+        animation: urttPoleDnfCard 2.9s cubic-bezier(.2, .9, .2, 1) forwards;
+      }
+      .urtt-pole-dnf-kicker {
+        margin: 0;
+        color: #facc15;
+        font-size: clamp(14px, 2vw, 22px);
+        letter-spacing: .26em;
+        font-weight: 950;
+        text-transform: uppercase;
+      }
+      .urtt-pole-dnf-title {
+        margin: 0;
+        color: white;
+        font-size: clamp(42px, 9vw, 128px);
+        line-height: .9;
+        font-weight: 950;
+        text-align: center;
+        text-shadow: 0 0 16px rgba(250, 204, 21, .95), 0 0 38px rgba(220, 38, 38, .9);
+        animation: urttPoleDnfText 2.9s ease-in-out forwards;
+      }
+      .urtt-pole-dnf-subtitle {
+        margin: 0;
+        color: #fecaca;
+        font-weight: 950;
+        letter-spacing: .12em;
+      }
+      @keyframes urttPoleDnfOverlay {
+        0% { opacity: 0; }
+        10%, 84% { opacity: 1; }
+        100% { opacity: 0; }
+      }
+      @keyframes urttPoleDnfCard {
+        0% { transform: scale(.72) rotate(-4deg); opacity: 0; }
+        16% { transform: scale(1.03) rotate(1deg); opacity: 1; }
+        35%, 55%, 75% { transform: translateX(-8px) rotate(-1deg); }
+        45%, 65% { transform: translateX(8px) rotate(1deg); }
+        86% { transform: scale(1.12) rotate(0); opacity: 1; filter: saturate(1.7); }
+        100% { transform: scale(1.42); opacity: 0; filter: brightness(2.2); }
+      }
+      @keyframes urttPoleDnfText {
+        0%, 28% { letter-spacing: .02em; }
+        52% { letter-spacing: .12em; color: #facc15; }
+        76% { letter-spacing: .03em; color: #fff; }
+        100% { letter-spacing: .22em; color: #fecaca; }
+      }
+      @keyframes urttPoleDnfExplosion {
+        0%, 55% { transform: scale(0); opacity: 0; }
+        70% { transform: scale(1.2); opacity: .95; }
+        100% { transform: scale(3.8); opacity: 0; }
+      }
       @keyframes urttChampionTitle {
         from { transform: translateX(0); filter: saturate(1); }
         45% { transform: translateX(1px) skewX(-1deg); }
@@ -3217,6 +3306,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [championMode, setChampionMode] = useState(false);
   const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
   const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
+  const [poleDnfAnimationKey, setPoleDnfAnimationKey] = useState(0);
   const championClicksRef = useRef([]);
   const pendingPublicNavigationRef = useRef(null);
   const categoryColor = getCategoryColor(selectedCategoryId);
@@ -3258,6 +3348,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const cancelGuessDriverExit = () => {
     pendingPublicNavigationRef.current = null;
     setShowGuessExitPrompt(false);
+  };
+  const openDriverDetails = (driver) => {
+    const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
+    setSelectedDriver(fullDriver);
+    if (normalizeSeasonId(selectedSeasonId) === "S12" && String(fullDriver.name || "").trim().toLowerCase() === "thibaut") {
+      setPoleDnfAnimationKey((current) => current + 1);
+    }
   };
   const handleChampionTitleClick = () => {
     const now = Date.now();
@@ -3302,7 +3399,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
-        {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={(driver) => setSelectedDriver(allDrivers.find((item) => item.id === driver.id) || driver)} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
+        {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
@@ -3328,6 +3425,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           </div>
         </div>
       )}
+      {poleDnfAnimationKey > 0 && <PoleToDnfAnimation key={poleDnfAnimationKey} onDone={() => setPoleDnfAnimationKey(0)} />}
       <FeedbackWidget playerProfile={playerProfile} />
     </div>
   );
@@ -3377,6 +3475,23 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
           </form>
         </div>
       )}
+    </div>
+  );
+}
+
+function PoleToDnfAnimation({ onDone }) {
+  useEffect(() => {
+    const timer = window.setTimeout(() => onDone?.(), 3000);
+    return () => window.clearTimeout(timer);
+  }, [onDone]);
+
+  return (
+    <div className="urtt-pole-dnf-overlay" aria-live="polite">
+      <div className="urtt-pole-dnf-card">
+        <p className="urtt-pole-dnf-kicker">Saison 12 · Thibaut</p>
+        <h2 className="urtt-pole-dnf-title">POLE TO DNF</h2>
+        <p className="urtt-pole-dnf-subtitle">Explosion finale incluse</p>
+      </div>
     </div>
   );
 }
