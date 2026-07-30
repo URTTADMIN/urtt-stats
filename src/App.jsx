@@ -722,6 +722,9 @@ function mapPlayerProfileFromDb(profile) {
   };
 }
 function mapGuessDriverResultFromDb(result) {
+  const attempts = Number(result.attempts || 0);
+  const savedScore = Number(result.score || 0);
+  const computedScore = result.won ? getGuessDriverScore(attempts) : 0;
   return {
     id: result.id,
     userId: result.user_id || "",
@@ -731,8 +734,8 @@ function mapGuessDriverResultFromDb(result) {
     categoryId: normalizeCategoryId(result.category_id),
     challengeDay: result.challenge_day || "",
     driverId: result.driver_id || "",
-    attempts: Number(result.attempts || 0),
-    score: Number(result.score || getGuessDriverScore(result.attempts || 0)),
+    attempts,
+    score: Math.max(savedScore, computedScore),
     won: Boolean(result.won),
     createdAt: result.created_at || "",
   };
@@ -829,7 +832,7 @@ function getGuessDriverLeaderboard(results = [], categoryId = "") {
     .forEach((result) => {
       const key = result.playerId ? `player-${result.playerId}` : result.pseudo.trim().toLowerCase();
       if (!key) return;
-      const score = Number(result.score || getGuessDriverScore(result.attempts)) || 0;
+      const score = Math.max(Number(result.score || 0), getGuessDriverScore(result.attempts));
       const current = map.get(key) || { pseudo: result.pseudo, discordName: result.discordName, score: 0, wins: 0, bestAttempts: Number(result.attempts) || 0 };
       map.set(key, {
         ...current,
