@@ -2691,6 +2691,36 @@ export default function URTTAdminPanel() {
     });
   }
 
+  async function deleteRacePrediction(predictionId) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de supprimer un prono." });
+      return;
+    }
+    if (!window.confirm("Supprimer ce prono ? Cette action est définitive.")) return;
+
+    setIsSavingPrediction(true);
+    const { error } = await supabase
+      .from("race_predictions")
+      .delete()
+      .eq("id", predictionId);
+    setIsSavingPrediction(false);
+
+    if (error) {
+      console.error("Erreur suppression prono:", error);
+      setPopup({
+        type: "error",
+        title: "Erreur Supabase",
+        message: error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
+          ? "Supabase bloque la suppression du prono. Vérifie les policies RLS de race_predictions."
+          : "Impossible de supprimer ce prono.",
+      });
+      return;
+    }
+
+    setRacePredictions((current) => current.filter((prediction) => String(prediction.id) !== String(predictionId)));
+    setPopup({ type: "success", title: "Prono supprimé", message: "Le prono a bien été retiré." });
+  }
+
   async function addSeason() {
     if (!adminUser) {
       setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les saisons." });
@@ -2815,7 +2845,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
-          {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} isSaving={isSavingPrediction} />}
+          {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "permissions" && (
@@ -4442,7 +4472,7 @@ function AwardDriverIdentity({ driver, team }) {
   return <DriverIdentity driver={{ ...driver, avatar: "" }} teamColor={team?.color} teamLogo={team?.logo} showRetired={false} />;
 }
 
-function GamesAdminPanel({ predictions = [], predictionControls = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId, onToggleClosed, isSaving }) {
+function GamesAdminPanel({ predictions = [], predictionControls = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId, onToggleClosed, onDeletePrediction, isSaving }) {
   const categoryId = normalizeCategoryId(selectedCategoryId);
   const seasonId = normalizeSeasonId(selectedSeasonId);
   const seasonRaces = races.filter((race) => normalizeCategoryId(race.categoryId) === categoryId && normalizeSeasonId(race.seasonId) === seasonId).sort((a, b) => Number(a.round) - Number(b.round));
@@ -4483,18 +4513,18 @@ function GamesAdminPanel({ predictions = [], predictionControls = [], races = []
         </Card>
       </div>
       <Card title="Toutes les participations" icon="🧾">
-        <PredictionAdminTable predictions={visiblePredictions} races={seasonRaces} drivers={drivers} raceResults={raceResults} />
+        <PredictionAdminTable predictions={visiblePredictions} races={seasonRaces} drivers={drivers} raceResults={raceResults} onDelete={onDeletePrediction} isSaving={isSaving} />
       </Card>
     </div>
   );
 }
 
-function PredictionAdminTable({ predictions = [], races = [], drivers = [], raceResults = [] }) {
+function PredictionAdminTable({ predictions = [], races = [], drivers = [], raceResults = [], onDelete, isSaving }) {
   if (!predictions.length) return <Empty text="Aucun prono enregistré sur cette sélection." />;
   return (
     <div style={styles.tableWrap}>
       <table style={{ ...styles.table, minWidth: 980 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Classement prédit</th><th style={styles.th}>Score</th></tr></thead>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Classement prédit</th><th style={styles.th}>Score</th><th style={styles.th}>Action</th></tr></thead>
         <tbody>{predictions.map((prediction) => {
           const race = races.find((item) => String(item.id) === String(prediction.raceId));
           const score = scoreRacePrediction(prediction, raceResults);
@@ -4507,6 +4537,7 @@ function PredictionAdminTable({ predictions = [], races = [], drivers = [], race
               <td style={styles.td}>{driverName(drivers, prediction.fastestDriverId)}</td>
               <td style={styles.td}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).map((id, index) => `P${index + 1} ${driverName(drivers, id)}`).join(" · ")}</td>
               <td style={{ ...styles.td, ...styles.points }}>{score.scored ? score.score : "—"}</td>
+              <td style={styles.td}><button type="button" onClick={() => onDelete?.(prediction.id)} disabled={isSaving || !onDelete} style={styles.dangerButton}>Supprimer</button></td>
             </tr>
           );
         })}</tbody>
