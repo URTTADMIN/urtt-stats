@@ -3352,6 +3352,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const openDriverDetails = (driver) => {
     const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
     setSelectedDriver(fullDriver);
+  };
+  const handleStandingsDriverClick = (driver) => {
+    const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
     if (normalizeSeasonId(selectedSeasonId) === "S12" && String(fullDriver.name || "").trim().toLowerCase() === "thibaut") {
       setPoleDnfAnimationKey((current) => current + 1);
     }
@@ -3398,7 +3401,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       </nav>
       <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
-        {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} />}
+        {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
@@ -3666,12 +3669,12 @@ function SeasonSummary({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams }) {
+function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, seasonOnlyDrivers, seasonOnlyTeams, races, raceResults, allDrivers, teams, onDriverClick }) {
   return (
     <div className="urtt-standings-page" style={styles.section}>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <div className="urtt-standings-grid" style={styles.standingsGrid}>
-        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} /></Card>
+        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={onDriverClick} /></Card>
         <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails compactRaceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
       </div>
     </div>
