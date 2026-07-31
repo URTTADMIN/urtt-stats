@@ -3061,6 +3061,7 @@ export default function URTTAdminPanel() {
           seasonOnlyTeams={seasonOnlyTeams}
           cumulativeDrivers={cumulativeDrivers}
           cumulativeTeams={cumulativeTeams}
+          guessDrivers={computed.globalDriverStats}
           races={currentSeasonRaces}
           countdownRaces={allCalendarRaces}
           calendarEvents={calendarEvents}
@@ -3463,7 +3464,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -3600,7 +3601,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={cumulativeDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={unlockedEasterEggs} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
@@ -4189,7 +4190,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
   }
 
   if (!targetDriver) {
-    return <Card title="Défi pilote" icon="❓"><Empty text="Aucun pilote disponible pour cette saison/catégorie." /></Card>;
+    return <Card title="Défi pilote" icon="❓"><Empty text="Aucun pilote disponible pour cette catégorie." /></Card>;
   }
 
   return (
@@ -4199,7 +4200,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
           <div>
             <p style={styles.kicker}>PILOTE MYSTÈRE DU JOUR</p>
             <h2 style={styles.gpDetailTitle}>{won ? targetDriver.name : "Qui est-ce ?"}</h2>
-            <p style={styles.mutedSmall}>Le pilote mystère est choisi parmi tous les pilotes {selectedCategoryId} visibles dans les stats cumulées. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
+            <p style={styles.mutedSmall}>Le pilote mystère est choisi parmi tous les pilotes {selectedCategoryId}, toutes saisons confondues. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
           </div>
           <div style={styles.statsGrid}>
             <Stat label="Essais" value={attempts.length} />
