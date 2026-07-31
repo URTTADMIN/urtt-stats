@@ -54,7 +54,7 @@ const EASTER_EGG_BOOK = [
   { id: "kolti-s14", title: "Si proche", hint: "Saison 14 · Classements · Kolti", unlockedText: "Kolti S14 : le trophée arrive, tremble, puis s'échappe dans la dernière course." },
   { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 · Classements · Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
   { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE après une séquence cachée." },
-  { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 · Stats pilotes · Etienne", unlockedText: "Etienne F2 : après 12 saisons en Formule 2, le papy quitte son nis." },
+  { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 · Stats pilotes · Etienne", unlockedText: "Etienne F2 : après 12 saisons en Formule 2, le papy quitte son nid." },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
@@ -5553,7 +5553,7 @@ function EtiennePapyAnimation() {
   return (
     <div className="urtt-etienne-papy-scene" aria-hidden="true">
       <div className="urtt-etienne-papy">👴</div>
-      <p className="urtt-etienne-papy-text">Après 12 saisons en Formule 2, le papy quitte son nis</p>
+      <p className="urtt-etienne-papy-text">Après 12 saisons en Formule 2, le papy quitte son nid</p>
     </div>
   );
 }
