@@ -54,12 +54,21 @@ const EASTER_EGG_BOOK = [
   { id: "kolti-s14", title: "Si proche", hint: "Saison 14 · Classements · Kolti", unlockedText: "Kolti S14 : le trophée arrive, tremble, puis s'échappe dans la dernière course." },
   { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 · Classements · Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
   { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE après une séquence cachée." },
+  { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 · Stats pilotes · Etienne", unlockedText: "Etienne F2 : après 12 saisons en Formule 2, le papy quitte son nis." },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
   { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
 ];
+
+function getEasterEggStorageKey(playerId = "") {
+  return playerId ? `${EASTER_EGG_STORAGE_KEY}:${playerId}` : EASTER_EGG_STORAGE_KEY;
+}
+
+function normalizeEasterEggIds(value) {
+  return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
+}
 
 function getSeasonOptions() {
   return runtimeSeasonOptions;
@@ -725,6 +734,7 @@ function mapPlayerProfileFromDb(profile) {
     userId: profile.user_id || "",
     pseudo: profile.pseudo || "",
     discordName: profile.discord_name || "",
+    unlockedEasterEggs: normalizeEasterEggIds(profile.unlocked_easter_eggs),
     createdAt: profile.created_at || "",
     lastSeenAt: profile.last_seen_at || "",
   };
@@ -1269,6 +1279,47 @@ export default function URTTAdminPanel() {
         filter: drop-shadow(0 0 28px rgba(250,204,21,.8));
         animation: urttTrophyEscape 3.4s cubic-bezier(.2,.8,.18,1) forwards;
       }
+      .urtt-etienne-papy-label {
+        margin: 6px 0 0;
+        color: #f97316;
+        font-weight: 950;
+        letter-spacing: .12em;
+        text-transform: uppercase;
+        text-shadow: 0 0 14px rgba(249, 115, 22, .65);
+      }
+      .urtt-etienne-papy-scene {
+        position: relative;
+        min-height: 86px;
+        margin: 8px 0 14px;
+        border: 1px solid rgba(249, 115, 22, .36);
+        border-radius: 18px;
+        overflow: hidden;
+        background:
+          linear-gradient(90deg, rgba(24,24,27,.94), rgba(67,20,7,.56), rgba(24,24,27,.94));
+        box-shadow: inset 0 0 24px rgba(249,115,22,.1), 0 12px 28px rgba(0,0,0,.24);
+      }
+      .urtt-etienne-papy {
+        position: absolute;
+        left: -64px;
+        bottom: 12px;
+        font-size: 42px;
+        filter: drop-shadow(0 0 12px rgba(249,115,22,.78));
+        animation: urttEtiennePapyWalk 6s ease-in-out infinite;
+      }
+      .urtt-etienne-papy-text {
+        position: absolute;
+        left: 18px;
+        right: 18px;
+        bottom: 12px;
+        margin: 0;
+        color: #fed7aa;
+        font-weight: 950;
+        letter-spacing: .04em;
+        white-space: nowrap;
+        overflow: hidden;
+        text-shadow: 0 0 14px rgba(249,115,22,.45);
+        animation: urttEtiennePapyText 4.6s steps(66, end) forwards;
+      }
       @keyframes urttHeartbreakFade {
         0% { opacity: 0; }
         10%, 86% { opacity: 1; }
@@ -1305,6 +1356,20 @@ export default function URTTAdminPanel() {
         63% { transform: translateX(-4px) scale(1.1) rotate(2deg); filter: drop-shadow(0 0 34px rgba(250,204,21,.95)); }
         74% { transform: translateX(8px) scale(1.12) rotate(-2deg); filter: drop-shadow(0 0 34px rgba(220,38,38,.95)); }
         100% { transform: translateX(92vw) translateY(-18vh) scale(.22) rotate(28deg); opacity: 0; filter: blur(5px) drop-shadow(0 0 40px rgba(220,38,38,.8)); }
+      }
+      @keyframes urttEtiennePapyWalk {
+        0% { transform: translateX(0) rotate(-4deg); opacity: 0; }
+        8% { opacity: 1; }
+        22% { transform: translateX(22vw) rotate(3deg); }
+        45% { transform: translateX(48vw) rotate(-3deg); }
+        68% { transform: translateX(72vw) rotate(3deg); }
+        92% { opacity: 1; }
+        100% { transform: translateX(calc(100vw + 100px)) rotate(-4deg); opacity: 0; }
+      }
+      @keyframes urttEtiennePapyText {
+        from { width: 0; opacity: 0; }
+        8% { opacity: 1; }
+        to { width: calc(100% - 36px); opacity: 1; }
       }
       @keyframes urttPoleDnfOverlay {
         0% { opacity: 0; }
@@ -2884,6 +2949,25 @@ export default function URTTAdminPanel() {
     setPlayerProfile(null);
   }
 
+  async function syncPlayerEasterEggs(eggIds) {
+    if (!playerProfile?.id) return false;
+    const unlockedEasterEggs = normalizeEasterEggIds(eggIds);
+    setPlayerProfile((current) => current ? { ...current, unlockedEasterEggs } : current);
+    setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, playerProfile.id) ? { ...account, unlockedEasterEggs } : account));
+
+    const { error } = await supabase
+      .from("player_accounts")
+      .update({ unlocked_easter_eggs: unlockedEasterEggs })
+      .eq("id", playerProfile.id);
+
+    if (error) {
+      console.error("Erreur synchro livre secret:", error);
+      return false;
+    }
+
+    return true;
+  }
+
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
@@ -3083,6 +3167,7 @@ export default function URTTAdminPanel() {
           onPlayerLogin={loginPlayerAccount}
           onPlayerSignup={signUpPlayerAccount}
           onPlayerLogout={logoutPlayerAccount}
+          onSyncEasterEggs={syncPlayerEasterEggs}
           onSaveGuessDriverWin={saveGuessDriverWin}
           isSavingPlayerAccount={isSavingPlayerAccount}
           isSavingGuessResult={isSavingGuessResult}
@@ -3464,7 +3549,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -3475,7 +3560,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [titleHeartbreakAnimation, setTitleHeartbreakAnimation] = useState(null);
   const [unlockedEasterEggs, setUnlockedEasterEggs] = useState(() => {
     try {
-      return JSON.parse(window.localStorage.getItem(EASTER_EGG_STORAGE_KEY) || "[]");
+      return normalizeEasterEggIds(JSON.parse(window.localStorage.getItem(EASTER_EGG_STORAGE_KEY) || "[]"));
     } catch {
       return [];
     }
@@ -3490,6 +3575,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     .map((page) => page.id);
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
+  const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
+  const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
@@ -3524,14 +3611,19 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   };
   const unlockEasterEgg = (eggId) => {
     setUnlockedEasterEggs((current) => {
-      if (current.includes(eggId)) return current;
-      const next = [...current, eggId];
-      window.localStorage.setItem(EASTER_EGG_STORAGE_KEY, JSON.stringify(next));
+      const base = normalizeEasterEggIds([...current, ...profileEasterEggs]);
+      if (base.includes(eggId)) return current;
+      const next = normalizeEasterEggIds([...base, eggId]);
+      window.localStorage.setItem(getEasterEggStorageKey(playerProfile?.id), JSON.stringify(next));
+      if (playerProfile?.id) onSyncEasterEggs?.(next);
       return next;
     });
   };
   const openDriverDetails = (driver) => {
     const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
+    if (normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(fullDriver.name) === "etienne") {
+      unlockEasterEgg("etienne-f2-papy");
+    }
     setSelectedDriver(fullDriver);
   };
   const handleStandingsDriverClick = (driver) => {
@@ -3602,7 +3694,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
-        {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={unlockedEasterEggs} />}
+        {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
       {showGuessExitPrompt && (
@@ -5444,13 +5536,24 @@ function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
 function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, specialEditions = [], allDrivers, onClose }) {
   const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId, seasonTitles, allDrivers);
   const specialRows = getDriverSpecialEditionRows(driver, specialEditions);
+  const isEtienneF2 = normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(driver.name) === "etienne";
   return (
     <div style={styles.detailOverlay} onClick={onClose}>
       <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
-        <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
+        <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2>{isEtienneF2 && <p className="urtt-etienne-papy-label">Papy de la F2</p>}</div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
+        {isEtienneF2 && <EtiennePapyAnimation />}
         <Card title="Stats par saison et catégorie" icon="👤"><SeasonBreakdownTable rows={rows} /></Card>
         <Card title="2,4H du Mans & Indy 300" icon="🏁"><SpecialEditionDriverTable rows={specialRows} /></Card>
       </div>
+    </div>
+  );
+}
+
+function EtiennePapyAnimation() {
+  return (
+    <div className="urtt-etienne-papy-scene" aria-hidden="true">
+      <div className="urtt-etienne-papy">👴</div>
+      <p className="urtt-etienne-papy-text">Après 12 saisons en Formule 2, le papy quitte son nis</p>
     </div>
   );
 }
