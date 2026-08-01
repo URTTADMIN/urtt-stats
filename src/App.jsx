@@ -70,6 +70,10 @@ function normalizeEasterEggIds(value) {
   return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
 }
 
+function normalizeIdList(value) {
+  return Array.isArray(value) ? [...new Set(value.map((item) => String(item || "")).filter(Boolean))] : [];
+}
+
 function readStoredEasterEggIds(playerId = "") {
   if (typeof window === "undefined") return [];
   const keys = [EASTER_EGG_STORAGE_KEY];
@@ -564,6 +568,7 @@ function mapSeasonTitleFromDb(title) {
     categoryId: normalizeCategoryId(title.category_id),
     driverId: title.driver_id || "",
     teamId: title.team_id || "",
+    constructorDriverIds: normalizeIdList(title.constructor_driver_ids),
   };
 }
 function mapSeasonTitleToDb(title) {
@@ -572,6 +577,7 @@ function mapSeasonTitleToDb(title) {
     category_id: normalizeCategoryId(title.categoryId),
     driver_id: title.driverId ? Number(title.driverId) : null,
     team_id: title.teamId ? Number(title.teamId) : null,
+    constructor_driver_ids: normalizeIdList(title.constructorDriverIds).map(Number),
   };
 }
 function mapDevelopmentFromDb(entry) {
@@ -1009,8 +1015,11 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     const championTeam = teamStandings[0];
     const manualDriverTitle = matchingTitles.find((title) => title.driverId);
     const manualTeamTitle = matchingTitles.find((title) => title.teamId);
+    const manualConstructorDriverIds = normalizeIdList(manualTeamTitle?.constructorDriverIds);
     const driverChampion = manualDriverTitle ? idsEqual(manualDriverTitle.driverId, driver.id) : positionIndex === 0 && points > 0;
-    const constructorChampion = participatesInActiveCategory && (manualTeamTitle ? idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId) : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
+    const constructorChampion = participatesInActiveCategory && (manualTeamTitle
+      ? (manualConstructorDriverIds.length ? manualConstructorDriverIds.some((driverId) => idsEqual(driverId, driver.id)) : idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId))
+      : championTeam?.points > 0 && idsEqual(championTeam.id, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId));
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps, hatTricks };
   }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps || row.hatTricks);
 }
@@ -1675,6 +1684,7 @@ export default function URTTAdminPanel() {
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [titleDriverId, setTitleDriverId] = useState("");
   const [titleTeamId, setTitleTeamId] = useState("");
+  const [constructorTitleDriverIds, setConstructorTitleDriverIds] = useState([]);
   setRuntimeSeasonOptions(seasonOptions);
 
   useEffect(() => {
@@ -2757,15 +2767,18 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Titres ajoutes", message: `${championDriver.name} et ${championTeam.name} ont ete mis a jour.` });
   }
 
-  async function saveSeasonTitle() {
+  async function saveSeasonTitle(overrides = {}) {
     if (!adminUser) {
       setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier les titres." });
       return;
     }
     if (!ensureAdminCategoryAccess(adminSelectedCategoryId)) return;
 
-    const championDriver = drivers.find((driver) => String(driver.id) === String(titleDriverId));
-    const championTeam = teams.find((team) => String(team.id) === String(titleTeamId));
+    const saveTitleDriverId = overrides.driverId ?? titleDriverId;
+    const saveTitleTeamId = overrides.teamId ?? titleTeamId;
+    const saveConstructorDriverIds = normalizeIdList(overrides.constructorDriverIds ?? constructorTitleDriverIds);
+    const championDriver = drivers.find((driver) => String(driver.id) === String(saveTitleDriverId));
+    const championTeam = teams.find((team) => String(team.id) === String(saveTitleTeamId));
 
     if (!championDriver || !championTeam) {
       setPopup({ type: "error", title: "Titre de saison incomplet", message: "Choisis un pilote champion et une ecurie championne." });
@@ -2777,14 +2790,21 @@ export default function URTTAdminPanel() {
       categoryId: adminSelectedCategoryId,
       driverId: championDriver.id,
       teamId: championTeam.id,
+      constructorDriverIds: saveConstructorDriverIds,
     };
     const existingTitle = seasonTitles.find((title) => normalizeSeasonId(title.seasonId) === normalizeSeasonId(payload.seasonId) && normalizeCategoryId(title.categoryId) === normalizeCategoryId(payload.categoryId));
-    const request = existingTitle
-      ? supabase.from("season_titles").update(mapSeasonTitleToDb(payload)).eq("id", existingTitle.id).select().single()
-      : supabase.from("season_titles").insert(mapSeasonTitleToDb(payload)).select().single();
+    const seasonTitlePayload = mapSeasonTitleToDb(payload);
+    const createRequest = (dbPayload) => existingTitle
+      ? supabase.from("season_titles").update(dbPayload).eq("id", existingTitle.id).select().single()
+      : supabase.from("season_titles").insert(dbPayload).select().single();
 
     setIsSaving(true);
-    const { data, error } = await request;
+    let { data, error } = await createRequest(seasonTitlePayload);
+    if (error?.code === "42703" && "constructor_driver_ids" in seasonTitlePayload) {
+      const fallbackPayload = { ...seasonTitlePayload };
+      delete fallbackPayload.constructor_driver_ids;
+      ({ data, error } = await createRequest(fallbackPayload));
+    }
     setIsSaving(false);
 
     if (error) {
@@ -2794,7 +2814,7 @@ export default function URTTAdminPanel() {
       return;
     }
 
-    const nextTitle = mapSeasonTitleFromDb(data);
+    const nextTitle = { ...mapSeasonTitleFromDb(data), constructorDriverIds: normalizeIdList(data.constructor_driver_ids || payload.constructorDriverIds) };
     setSeasonTitles((current) => {
       const withoutCurrent = current.filter((title) => !(normalizeSeasonId(title.seasonId) === nextTitle.seasonId && normalizeCategoryId(title.categoryId) === nextTitle.categoryId));
       return [...withoutCurrent, nextTitle];
@@ -3247,6 +3267,8 @@ export default function URTTAdminPanel() {
     setTitleDriverId={setTitleDriverId}
     titleTeamId={titleTeamId}
     setTitleTeamId={setTitleTeamId}
+    constructorTitleDriverIds={constructorTitleDriverIds}
+    setConstructorTitleDriverIds={setConstructorTitleDriverIds}
     selectedCategoryId={adminSelectedCategoryId}
     setSelectedCategoryId={setSelectedCategoryId}
     categoryOptions={adminCategoryOptions}
@@ -3390,11 +3412,12 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
     if (seasonTitle?.teamId) {
       constructorChampionTeamIds.add(String(seasonTitle.teamId));
     }
+    const constructorChampionDriverIds = new Set(normalizeIdList(seasonTitle?.constructorDriverIds));
 
     seasonDriverStats = seasonDriverStats.map((driver) => ({
       ...driver,
       driverTitles: driverChampionIds.has(String(driver.id)) ? 1 : 0,
-      teamTitles: constructorChampionTeamIds.has(String(driver.teamId)) ? 1 : 0,
+      teamTitles: constructorChampionDriverIds.size ? (constructorChampionDriverIds.has(String(driver.id)) ? 1 : 0) : (constructorChampionTeamIds.has(String(driver.teamId)) ? 1 : 0),
       seasons: 1,
     }));
     seasonTeamStats = seasonTeamStats.map((team) => ({
@@ -5813,6 +5836,8 @@ function TitlesPanel({
   setTitleDriverId,
   titleTeamId,
   setTitleTeamId,
+  constructorTitleDriverIds = [],
+  setConstructorTitleDriverIds,
   selectedCategoryId,
   setSelectedCategoryId,
   categoryOptions = CATEGORY_OPTIONS,
@@ -5827,6 +5852,22 @@ function TitlesPanel({
   const currentSeasonTitle = seasonTitles.find((title) => normalizeSeasonId(title.seasonId) === normalizeSeasonId(selectedSeasonId) && normalizeCategoryId(title.categoryId) === normalizeCategoryId(selectedCategoryId));
   const currentDriver = drivers.find((driver) => idsEqual(driver.id, currentSeasonTitle?.driverId));
   const currentTeam = teams.find((team) => idsEqual(team.id, currentSeasonTitle?.teamId));
+  const effectiveTitleDriverId = titleDriverId || currentSeasonTitle?.driverId || "";
+  const effectiveTitleTeamId = titleTeamId || currentSeasonTitle?.teamId || "";
+  const selectedConstructorDriverIds = normalizeIdList(constructorTitleDriverIds.length ? constructorTitleDriverIds : currentSeasonTitle?.constructorDriverIds);
+  const currentConstructorDrivers = normalizeIdList(currentSeasonTitle?.constructorDriverIds)
+    .map((driverId) => drivers.find((driver) => idsEqual(driver.id, driverId)))
+    .filter(Boolean);
+  const seasonCategoryDrivers = drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)));
+  const constructorCandidateDrivers = effectiveTitleTeamId
+    ? seasonCategoryDrivers.filter((driver) => idsEqual(driver.teamHistory?.[selectedSeasonId] || driver.teamId, effectiveTitleTeamId))
+    : seasonCategoryDrivers;
+  const toggleConstructorDriver = (driverId) => {
+    const safeId = String(driverId);
+    setConstructorTitleDriverIds?.(selectedConstructorDriverIds.includes(safeId)
+      ? selectedConstructorDriverIds.filter((id) => id !== safeId)
+      : [...selectedConstructorDriverIds, safeId]);
+  };
   return (
     <div style={{ display: "grid", gap: 24 }}>
       <div className="urtt-card">
@@ -5868,7 +5909,7 @@ function TitlesPanel({
             <select
               className="urtt-input"
               value={titleTeamId}
-              onChange={(e) => setTitleTeamId(e.target.value)}
+              onChange={(e) => { setTitleTeamId(e.target.value); setConstructorTitleDriverIds?.([]); }}
             >
               <option value="">Choisir une écurie</option>
 
@@ -5900,7 +5941,7 @@ function TitlesPanel({
         <div className="urtt-form-grid" style={{ marginTop: 24 }}>
           <div>
             <label className="urtt-label">Catégorie</label>
-            <select className="urtt-input" value={selectedCategoryId} onChange={(e) => setSelectedCategoryId(e.target.value)}>
+            <select className="urtt-input" value={selectedCategoryId} onChange={(e) => { setSelectedCategoryId(e.target.value); setConstructorTitleDriverIds?.([]); }}>
               {categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
           </div>
@@ -5913,13 +5954,48 @@ function TitlesPanel({
           </div>
         </div>
 
-        <button className="urtt-button" onClick={onSaveSeasonTitle} disabled={isSaving} style={{ marginTop: 24 }}>
+        <div className="urtt-form-grid" style={{ marginTop: 20 }}>
+          <div className="urtt-card" style={{ padding: 16 }}>
+            <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Titre pilote</h3>
+            <p style={styles.mutedSmall}>Un seul pilote peut recevoir le titre pilote.</p>
+            <select className="urtt-input" value={effectiveTitleDriverId} onChange={(e) => setTitleDriverId(e.target.value)} style={{ marginTop: 12 }}>
+              <option value="">Aucun champion pilote</option>
+              {seasonCategoryDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
+            </select>
+          </div>
+
+          <div className="urtt-card" style={{ padding: 16 }}>
+            <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Titre constructeur</h3>
+            <p style={styles.mutedSmall}>Choisis l'ecurie championne, puis les pilotes qui recoivent le titre constructeur.</p>
+            <select className="urtt-input" value={effectiveTitleTeamId} onChange={(e) => { setTitleTeamId(e.target.value); setConstructorTitleDriverIds?.([]); }} style={{ marginTop: 12 }}>
+              <option value="">Aucune ecurie championne</option>
+              {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
+            </select>
+          </div>
+        </div>
+
+        <div className="urtt-card" style={{ padding: 16, marginTop: 20 }}>
+          <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Pilotes titres constructeur</h3>
+          <p style={styles.mutedSmall}>F1 / FE : coche les pilotes concernes. F2 / F3 : tu peux en cocher autant que necessaire.</p>
+          <div style={{ ...styles.categoryCheckboxGrid, marginTop: 12 }}>
+            {constructorCandidateDrivers.map((driver) => (
+              <label key={driver.id} style={styles.checkboxPill}>
+                <input type="checkbox" checked={selectedConstructorDriverIds.includes(String(driver.id))} onChange={() => toggleConstructorDriver(driver.id)} />
+                {driver.name}
+              </label>
+            ))}
+            {constructorCandidateDrivers.length === 0 && <p style={styles.mutedSmall}>Choisis une ecurie championne ou inscris des pilotes sur cette saison/categorie.</p>}
+          </div>
+        </div>
+
+        <button className="urtt-button" onClick={() => onSaveSeasonTitle?.({ driverId: effectiveTitleDriverId, teamId: effectiveTitleTeamId, constructorDriverIds: selectedConstructorDriverIds })} disabled={isSaving} style={{ marginTop: 24 }}>
           {isSaving ? "Enregistrement..." : "Enregistrer le titre de saison"}
         </button>
 
         <div style={{ ...styles.itemBox, marginTop: 16 }}>
           <span>{seasonName(selectedSeasonId)} · {selectedCategoryId}</span>
-          <strong>{currentDriver?.name || "Aucun pilote"} / {currentTeam?.name || "Aucune ecurie"}</strong>
+          <strong>Pilote : {currentDriver?.name || "Aucun"} / Constructeur : {currentTeam?.name || "Aucune ecurie"}</strong>
+          <p style={styles.mutedSmall}>Pilotes constructeur : {currentConstructorDrivers.length ? currentConstructorDrivers.map((driver) => driver.name).join(", ") : "Non precise, attribution par ecurie"}</p>
         </div>
       </div>
 
