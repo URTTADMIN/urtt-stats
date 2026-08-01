@@ -70,6 +70,26 @@ function normalizeEasterEggIds(value) {
   return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
 }
 
+function readStoredEasterEggIds(playerId = "") {
+  if (typeof window === "undefined") return [];
+  const keys = [EASTER_EGG_STORAGE_KEY];
+  if (playerId) keys.push(getEasterEggStorageKey(playerId));
+  return normalizeEasterEggIds(keys.flatMap((key) => {
+    try {
+      return JSON.parse(window.localStorage.getItem(key) || "[]");
+    } catch {
+      return [];
+    }
+  }));
+}
+
+function writeStoredEasterEggIds(playerId = "", eggIds = []) {
+  if (typeof window === "undefined") return;
+  const normalizedEggIds = normalizeEasterEggIds(eggIds);
+  window.localStorage.setItem(EASTER_EGG_STORAGE_KEY, JSON.stringify(normalizedEggIds));
+  if (playerId) window.localStorage.setItem(getEasterEggStorageKey(playerId), JSON.stringify(normalizedEggIds));
+}
+
 function getSeasonOptions() {
   return runtimeSeasonOptions;
 }
@@ -1692,7 +1712,16 @@ export default function URTTAdminPanel() {
         return;
       }
 
-      setPlayerProfile(mapPlayerProfileFromDb(data));
+      const loadedProfile = mapPlayerProfileFromDb(data);
+      const unlockedEasterEggs = normalizeEasterEggIds([...loadedProfile.unlockedEasterEggs, ...readStoredEasterEggIds(loadedProfile.id)]);
+      const mergedProfile = { ...loadedProfile, unlockedEasterEggs };
+      writeStoredEasterEggIds(mergedProfile.id, unlockedEasterEggs);
+      setPlayerProfile(mergedProfile);
+      if (unlockedEasterEggs.length > loadedProfile.unlockedEasterEggs.length) {
+        supabase.from("player_accounts").update({ unlocked_easter_eggs: unlockedEasterEggs }).eq("id", mergedProfile.id).then(({ error: syncError }) => {
+          if (syncError && syncError.code !== "42703") console.error("Erreur synchro livre secret:", syncError);
+        });
+      }
     }
 
     loadPlayerProfile();
@@ -2914,8 +2943,11 @@ export default function URTTAdminPanel() {
       return { ok: false, message };
     }
 
-    const savedProfile = mapPlayerProfileFromDb(data);
+    const dbProfile = mapPlayerProfileFromDb(data);
+    const unlockedEasterEggs = normalizeEasterEggIds([...dbProfile.unlockedEasterEggs, ...readStoredEasterEggIds(dbProfile.id)]);
+    const savedProfile = { ...dbProfile, unlockedEasterEggs };
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
+    writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     setPlayerProfile(savedProfile);
     return { ok: true, message: "Compte joueur prêt." };
   }
@@ -2938,8 +2970,16 @@ export default function URTTAdminPanel() {
     setIsSavingPlayerAccount(false);
     if (error) return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de connecter le compte joueur." };
     if (!data) return { ok: false, message: "Pseudo ou code secret incorrect." };
-    const savedProfile = mapPlayerProfileFromDb(data);
+    const dbProfile = mapPlayerProfileFromDb(data);
+    const unlockedEasterEggs = normalizeEasterEggIds([...dbProfile.unlockedEasterEggs, ...readStoredEasterEggIds(dbProfile.id)]);
+    const savedProfile = { ...dbProfile, unlockedEasterEggs };
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
+    writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
+    if (unlockedEasterEggs.length > dbProfile.unlockedEasterEggs.length) {
+      supabase.from("player_accounts").update({ unlocked_easter_eggs: unlockedEasterEggs }).eq("id", savedProfile.id).then(({ error: syncError }) => {
+        if (syncError && syncError.code !== "42703") console.error("Erreur synchro livre secret:", syncError);
+      });
+    }
     setPlayerProfile(savedProfile);
     return { ok: true, message: "Connexion réussie." };
   }
@@ -3560,7 +3600,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [titleHeartbreakAnimation, setTitleHeartbreakAnimation] = useState(null);
   const [unlockedEasterEggs, setUnlockedEasterEggs] = useState(() => {
     try {
-      return normalizeEasterEggIds(JSON.parse(window.localStorage.getItem(EASTER_EGG_STORAGE_KEY) || "[]"));
+      return readStoredEasterEggIds();
     } catch {
       return [];
     }
@@ -3614,7 +3654,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       const base = normalizeEasterEggIds([...current, ...profileEasterEggs]);
       if (base.includes(eggId)) return current;
       const next = normalizeEasterEggIds([...base, eggId]);
-      window.localStorage.setItem(getEasterEggStorageKey(playerProfile?.id), JSON.stringify(next));
+      writeStoredEasterEggIds(playerProfile?.id, next);
       if (playerProfile?.id) onSyncEasterEggs?.(next);
       return next;
     });
@@ -6172,3 +6212,5 @@ const styles = {
   logoPreviewBox: { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 18, padding: 14 },
   errorBox: { background: "rgba(127,29,29,.35)", border: "1px solid #7f1d1d", borderRadius: 18, padding: 14, marginTop: 16 },
 };
+
+
