@@ -2801,7 +2801,8 @@ export default function URTTAdminPanel() {
 
     setIsSaving(true);
     let { data, error } = await createRequest(seasonTitlePayload);
-    if (error?.code === "42703" && "constructor_driver_ids" in seasonTitlePayload) {
+    const missingConstructorDriversColumn = error && "constructor_driver_ids" in seasonTitlePayload && (error.code === "42703" || error.code === "PGRST204" || String(error.message || "").includes("constructor_driver_ids"));
+    if (missingConstructorDriversColumn) {
       const fallbackPayload = { ...seasonTitlePayload };
       delete fallbackPayload.constructor_driver_ids;
       ({ data, error } = await createRequest(fallbackPayload));
@@ -2811,7 +2812,13 @@ export default function URTTAdminPanel() {
     if (error) {
       console.error("Erreur titre de saison:", error);
       const missingTable = error.code === "42P01";
-      setPopup({ type: "error", title: "Erreur Supabase", message: missingTable ? "La table season_titles n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible d'enregistrer le titre de saison." });
+      const requiredTeamId = error.code === "23502" && String(error.message || "").includes("team_id");
+      const message = missingTable
+        ? "La table season_titles n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : requiredTeamId
+          ? "Supabase bloque les titres sans constructeur. Lance la commande SQL pour autoriser team_id vide en F2/F3."
+          : "Impossible d'enregistrer le titre de saison.";
+      setPopup({ type: "error", title: "Erreur Supabase", message });
       return;
     }
 
