@@ -3300,8 +3300,10 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
       ...driver,
       teamId: seasonTeamId,
       teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
-      baseDriverTitles: Number(driver.driverTitles) || 0,
-      baseTeamTitles: Number(driver.teamTitles) || 0,
+      ...(activeCategoryId === "F1" ? {
+        baseDriverTitles: Number(driver.driverTitles) || 0,
+        baseTeamTitles: Number(driver.teamTitles) || 0,
+      } : {}),
       driverTitles: 0,
       teamTitles: 0,
       wins: 0,
@@ -4820,7 +4822,7 @@ function DriverForm({ form, setForm, teams, selectedSeasonId, categoryOptions = 
   const update = (key, value) => setForm({ ...form, [key]: value });
   const updateCrown = (key, value) => setForm({ ...form, tripleCrown: { ...form.tripleCrown, [key]: value } });
 
-  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraité</label><div style={styles.formGrid}><Input label="Titres pilote" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Titre F1</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 300</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> 2,4H du Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraité</label><div style={styles.formGrid}><Input label="Titres pilote F1" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie F1" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Titre F1</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 300</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> 2,4H du Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
 function AdminTeams({ teams, form, setForm, editingId, isSaving, onSave, onEdit, onDelete, onCancel }) {
