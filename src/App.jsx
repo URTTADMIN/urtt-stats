@@ -580,6 +580,9 @@ function mapSeasonTitleToDb(title) {
     constructor_driver_ids: normalizeIdList(title.constructorDriverIds).map(Number),
   };
 }
+function formatSupabaseError(error) {
+  return [error?.code, error?.message, error?.details, error?.hint].filter(Boolean).join(" - ");
+}
 function mapDevelopmentFromDb(entry) {
   return {
     id: entry.id,
@@ -2812,12 +2815,13 @@ export default function URTTAdminPanel() {
     if (error) {
       console.error("Erreur titre de saison:", error);
       const missingTable = error.code === "42P01";
-      const requiredTeamId = error.code === "23502" && String(error.message || "").includes("team_id");
+      const errorDetails = formatSupabaseError(error);
+      const requiredTeamId = error.code === "23502" && /team_id/i.test(`${error.message || ""} ${error.details || ""}`);
       const message = missingTable
         ? "La table season_titles n'existe pas encore. Lance la commande SQL fournie par Codex."
         : requiredTeamId
-          ? "Supabase bloque les titres sans constructeur. Lance la commande SQL pour autoriser team_id vide en F2/F3."
-          : "Impossible d'enregistrer le titre de saison.";
+          ? "Supabase bloque les titres sans constructeur : la colonne team_id est encore obligatoire. Lance la commande SQL pour autoriser team_id vide en F2/F3."
+          : `Impossible d'enregistrer le titre de saison.${errorDetails ? ` Detail Supabase : ${errorDetails}` : ""}`;
       setPopup({ type: "error", title: "Erreur Supabase", message });
       return;
     }
