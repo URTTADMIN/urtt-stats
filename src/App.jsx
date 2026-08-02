@@ -839,12 +839,33 @@ function getPredictionLeaderboard(predictions = [], raceResults = []) {
   });
   return Array.from(map.values()).sort((a, b) => b.score - a.score || a.pseudo.localeCompare(b.pseudo, "fr"));
 }
+const GUESS_DRIVER_RECENT_DAYS = 7;
+function getStableChallengeHash(seed = "") {
+  return Array.from(seed).reduce((hash, char) => {
+    const nextHash = hash ^ char.charCodeAt(0);
+    return Math.imul(nextHash, 16777619) >>> 0;
+  }, 2166136261);
+}
+function pickChallengeDriver(drivers = [], dayKey = "", seasonId = "", categoryId = "") {
+  if (!drivers.length) return null;
+  const seed = `${dayKey}-${normalizeSeasonId(seasonId)}-${normalizeCategoryId(categoryId)}`;
+  return drivers[getStableChallengeHash(seed) % drivers.length];
+}
 function getDailyDriverChallenge(drivers = [], seasonId = "", categoryId = "") {
   if (!drivers.length) return null;
   const dayKey = getDailyChallengeDay();
-  const seed = `${dayKey}-${normalizeSeasonId(seasonId)}-${normalizeCategoryId(categoryId)}`;
-  const hash = Array.from(seed).reduce((sum, char) => sum + char.charCodeAt(0), 0);
-  return drivers[hash % drivers.length];
+  const recentLimit = Math.min(GUESS_DRIVER_RECENT_DAYS, Math.max(0, drivers.length - 1));
+  const recentDriverIds = new Set();
+  let previousDay = dayKey;
+
+  for (let index = 0; index < recentLimit; index += 1) {
+    previousDay = getPreviousChallengeDay(previousDay);
+    const previousDriver = pickChallengeDriver(drivers, previousDay, seasonId, categoryId);
+    if (previousDriver) recentDriverIds.add(String(previousDriver.id));
+  }
+
+  const candidates = drivers.filter((driver) => !recentDriverIds.has(String(driver.id)));
+  return pickChallengeDriver(candidates.length ? candidates : drivers, dayKey, seasonId, categoryId);
 }
 function getDailyChallengeDay(date = new Date()) {
   return date.toISOString().slice(0, 10);
