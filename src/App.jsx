@@ -16,6 +16,7 @@ const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
+const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const ADMIN_PAGE_OPTIONS = [
   { id: "dashboard", icon: "🏠", label: "Dashboard" },
   { id: "supabase", icon: "🗄️", label: "Supabase" },
@@ -92,6 +93,30 @@ function writeStoredEasterEggIds(playerId = "", eggIds = []) {
   const normalizedEggIds = normalizeEasterEggIds(eggIds);
   window.localStorage.setItem(EASTER_EGG_STORAGE_KEY, JSON.stringify(normalizedEggIds));
   if (playerId) window.localStorage.setItem(getEasterEggStorageKey(playerId), JSON.stringify(normalizedEggIds));
+}
+
+function getGuessDriverAttemptsStorageKey(playerId = "", categoryId = "", challengeDay = "") {
+  return `${GUESS_DRIVER_ATTEMPTS_STORAGE_KEY}:${playerId || "guest"}:${normalizeCategoryId(categoryId)}:${challengeDay}`;
+}
+
+function readStoredGuessDriverAttempts(playerId = "", categoryId = "", challengeDay = "") {
+  if (typeof window === "undefined" || !playerId || !challengeDay) return [];
+  try {
+    return normalizeIdList(JSON.parse(window.localStorage.getItem(getGuessDriverAttemptsStorageKey(playerId, categoryId, challengeDay)) || "[]"));
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredGuessDriverAttempts(playerId = "", categoryId = "", challengeDay = "", attempts = []) {
+  if (typeof window === "undefined" || !playerId || !challengeDay) return;
+  const storageKey = getGuessDriverAttemptsStorageKey(playerId, categoryId, challengeDay);
+  const normalizedAttempts = normalizeIdList(attempts);
+  if (normalizedAttempts.length) {
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizedAttempts));
+  } else {
+    window.localStorage.removeItem(storageKey);
+  }
 }
 
 function getSeasonOptions() {
@@ -4342,14 +4367,24 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
   const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
   const challengeDay = getDailyChallengeDay();
   const savedToday = results.some((result) => String(result.playerId) === String(profile?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
+  const attemptStorageKey = getGuessDriverAttemptsStorageKey(profile?.id || "", selectedCategoryId, challengeDay);
   const streak = getGuessDriverStreak(results, profile?.id || "", selectedCategoryId);
   const leaderboard = getGuessDriverLeaderboard(results, selectedCategoryId).slice(0, 10);
   const [guessId, setGuessId] = useState("");
-  const [attempts, setAttempts] = useState([]);
+  const [attempts, setAttempts] = useState(() => readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay));
   const [message, setMessage] = useState("");
   const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
   const won = targetDriver && (savedToday || attempts.some((driverId) => idsEqual(driverId, targetDriver.id)));
   const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
+  useEffect(() => {
+    const storedAttempts = readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay);
+    setAttempts(storedAttempts);
+    setGuessId("");
+    setMessage(storedAttempts.length ? "Tes essais du jour ont été restaurés." : "");
+  }, [attemptStorageKey, profile?.id, selectedCategoryId, challengeDay]);
+  useEffect(() => {
+    if (savedToday) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, []);
+  }, [savedToday, profile?.id, selectedCategoryId, challengeDay]);
   useEffect(() => {
     onProgressChange?.(Boolean(profile?.id && attempts.length > 0 && !won));
     return () => onProgressChange?.(false);
@@ -4371,11 +4406,13 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
       return;
     }
     const nextAttempts = [...attempts, guessId];
+    writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, nextAttempts);
     setAttempts(nextAttempts);
     setGuessId("");
     if (targetDriver && idsEqual(guessId, targetDriver.id) && !savedToday) {
       const response = await onSaveWin?.({ categoryId: selectedCategoryId, challengeDay, driverId: targetDriver.id, attempts: nextAttempts.length });
       setMessage(response?.message || "");
+      if (response?.ok) writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, []);
     }
   }
 
