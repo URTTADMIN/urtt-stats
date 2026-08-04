@@ -5464,7 +5464,10 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
   const [selectedDay, setSelectedDay] = useState("");
   const [search, setSearch] = useState("");
   const categoryId = normalizeCategoryId(selectedCategoryId);
-  const days = Array.from(new Set(attempts.map((attempt) => attempt.challengeDay).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const days = Array.from(new Set([
+    ...attempts.map((attempt) => attempt.challengeDay),
+    ...results.map((result) => result.challengeDay),
+  ].filter(Boolean))).sort((a, b) => b.localeCompare(a));
   const filteredAttempts = attempts
     .filter((attempt) => normalizeCategoryId(attempt.categoryId) === categoryId)
     .filter((attempt) => !selectedDay || attempt.challengeDay === selectedDay)
@@ -5475,6 +5478,15 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
       return haystack.includes(search.trim().toLowerCase());
     })
     .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const filteredHistoricalResults = results
+    .filter((result) => normalizeCategoryId(result.categoryId) === categoryId)
+    .filter((result) => !selectedDay || result.challengeDay === selectedDay)
+    .filter((result) => {
+      const targetDriver = drivers.find((driver) => idsEqual(driver.id, result.driverId));
+      const haystack = `${result.pseudo} ${result.discordName} ${targetDriver?.name || ""}`.toLowerCase();
+      return haystack.includes(search.trim().toLowerCase());
+    })
+    .sort((a, b) => b.challengeDay.localeCompare(a.challengeDay) || Number(b.score || 0) - Number(a.score || 0) || Number(a.attempts || 0) - Number(b.attempts || 0));
   const successCount = filteredAttempts.filter((attempt) => attempt.correct).length;
   const activePlayers = new Set(filteredAttempts.map((attempt) => String(attempt.playerId)).filter(Boolean)).size;
   const groupedByPlayerDay = filteredAttempts.reduce((map, attempt) => {
@@ -5545,6 +5557,42 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
           </table>
         </div>
         {filteredAttempts.length === 0 && <Empty text="Aucun essai enregistré pour ce filtre." />}
+      </Card>
+      <Card title="Resultats historiques" icon="⏱">
+        <p style={styles.mutedSmall}>Ces lignes viennent de guess_driver_results : elles montrent les defis reussis, le score et le nombre d'essais, mais pas les mauvais pilotes tentes avant la creation de l'historique detaille.</p>
+        <div style={styles.tableWrap}>
+          <table style={{ ...styles.table, minWidth: 880 }}>
+            <thead>
+              <tr style={styles.tableHead}>
+                <th style={styles.th}>Jour</th>
+                <th style={styles.th}>Joueur</th>
+                <th style={styles.th}>Cat.</th>
+                <th style={styles.th}>Pilote trouve</th>
+                <th style={styles.th}>Essais</th>
+                <th style={styles.th}>Points</th>
+                <th style={styles.th}>Type</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistoricalResults.map((result) => {
+                const targetDriver = drivers.find((driver) => idsEqual(driver.id, result.driverId));
+                const hasDetailedAttempts = attempts.some((attempt) => String(attempt.playerId) === String(result.playerId) && attempt.challengeDay === result.challengeDay && normalizeCategoryId(attempt.categoryId) === normalizeCategoryId(result.categoryId));
+                return (
+                  <tr key={result.id} style={styles.tr}>
+                    <td style={styles.td}>{result.challengeDay || "—"}</td>
+                    <td style={styles.td}><strong>{result.pseudo || "—"}</strong><p style={styles.mutedSmall}>{result.discordName || "Discord —"}</p></td>
+                    <td style={styles.td}><span style={styles.titleBadge}>{result.categoryId}</span></td>
+                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}>{result.attempts || "—"}</td>
+                    <td style={{ ...styles.td, ...styles.points }}>{result.score || 0}</td>
+                    <td style={styles.td}><span style={hasDetailedAttempts ? styles.badgeGreen : styles.badgeDark}>{hasDetailedAttempts ? "Avec details" : "Resume seul"}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filteredHistoricalResults.length === 0 && <Empty text="Aucun resultat historique pour ce filtre." />}
       </Card>
     </div>
   );
