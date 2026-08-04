@@ -192,6 +192,9 @@ function getAdminPageOptions(user, permissions) {
 function isPermissionsOwner(user) {
   return user?.email?.trim().toLowerCase() === ADMIN_PERMISSIONS_OWNER_EMAIL;
 }
+function normalizeAdminEmail(email = "") {
+  return String(email || "").trim().toLowerCase();
+}
 function mapAdminPermissionRowFromDb(row) {
   return {
     id: row.id,
@@ -1736,6 +1739,51 @@ export default function URTTAdminPanel() {
   const [constructorTitleDriverIds, setConstructorTitleDriverIds] = useState([]);
   setRuntimeSeasonOptions(seasonOptions);
 
+  async function loadAdminPermissionForUser(user) {
+    const email = normalizeAdminEmail(user?.email);
+    if (!user || !email) return { canOpen: false, message: "Compte admin introuvable." };
+
+    if (isPermissionsOwner(user)) {
+      setAdminPermissions(defaultAdminPermissions);
+      return { canOpen: true, permissions: defaultAdminPermissions };
+    }
+
+    const cachedRow = adminPermissionRows.find((row) => normalizeAdminEmail(row.userEmail) === email);
+    if (cachedRow) {
+      const permissions = { role: cachedRow.role, allowedCategories: cachedRow.allowedCategories, allowedPages: cachedRow.allowedPages };
+      setAdminPermissions(permissions);
+      return { canOpen: true, permissions };
+    }
+
+    const { data, error } = await supabase
+      .from("admin_permissions")
+      .select("*")
+      .eq("user_email", email)
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erreur verification admin:", error);
+      const details = formatSupabaseError(error);
+      return {
+        canOpen: false,
+        message: error.code === "42P01"
+          ? "La table admin_permissions n'existe pas encore."
+          : `Impossible de verifier les permissions admin.${details ? ` Detail Supabase : ${details}` : ""}`,
+      };
+    }
+
+    if (!data) return { canOpen: false, message: "Ce compte existe dans Supabase Auth, mais il n'a pas de permissions admin dans le panel." };
+
+    const row = mapAdminPermissionRowFromDb(data);
+    const permissions = { role: row.role, allowedCategories: row.allowedCategories, allowedPages: row.allowedPages };
+    setAdminPermissions(permissions);
+    setAdminPermissionRows((current) => {
+      const withoutRow = current.filter((item) => !idsEqual(item.id, row.id) && normalizeAdminEmail(item.userEmail) !== email);
+      return [...withoutRow, row].sort((a, b) => a.userEmail.localeCompare(b.userEmail));
+    });
+    return { canOpen: true, permissions };
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setAdminUser(data.session?.user || null);
@@ -1922,7 +1970,7 @@ export default function URTTAdminPanel() {
     : selectedSeasonId;
   const adminCategoryOptions = useMemo(() => getAdminCategoryOptions(adminPermissions), [adminPermissions]);
   const adminPageOptions = useMemo(() => getAdminPageOptions(adminUser, adminPermissions), [adminUser, adminPermissions]);
-  const userCanOpenAdmin = (user) => Boolean(user && (isPermissionsOwner(user) || adminPermissionRows.some((row) => row.userEmail.trim().toLowerCase() === user.email?.trim().toLowerCase())));
+  const userCanOpenAdmin = (user) => Boolean(user && (isPermissionsOwner(user) || adminPermissionRows.some((row) => normalizeAdminEmail(row.userEmail) === normalizeAdminEmail(user.email))));
   const canOpenAdmin = userCanOpenAdmin(adminUser);
   const visibleAdminPage = adminPageOptions.some((page) => page.id === adminPage) ? adminPage : adminPageOptions[0]?.id || "dashboard";
   const adminSelectedCategoryId = hasAdminCategoryAccess(adminPermissions, selectedCategoryId) ? selectedCategoryId : adminCategoryOptions[0]?.id || selectedCategoryId;
@@ -1945,6 +1993,34 @@ export default function URTTAdminPanel() {
     setPopup({ type: "error", title: "Acces refuse", message: `Ton compte n'a pas les droits pour modifier la categorie ${normalizeCategoryId(categoryId)}.` });
     return false;
   };
+  async function handleAdminLogin(event) {
+    event.preventDefault();
+    setLoginError("");
+    const email = normalizeAdminEmail(adminEmail);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: adminPassword });
+
+    if (error) {
+      console.error("Erreur connexion admin:", error);
+      setLoginError(error.message?.toLowerCase().includes("invalid login credentials")
+        ? "Email ou mot de passe incorrect."
+        : `Connexion refusee par Supabase : ${error.message}`);
+      return;
+    }
+
+    const access = await loadAdminPermissionForUser(data.user);
+    if (!access.canOpen) {
+      await supabase.auth.signOut();
+      setAdminUser(null);
+      setLoginError(access.message || "Ce compte n'a pas acces au panel admin.");
+      return;
+    }
+
+    setAdminUser(data.user);
+    setIsAdminPreview(false);
+    setAdminPassword("");
+    setLoginError("");
+    setView("admin");
+  }
 
   async function saveDriver() {
     if (!adminUser) {
@@ -3297,7 +3373,7 @@ export default function URTTAdminPanel() {
           }}
         />
       )}
-      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={async (event) => { event.preventDefault(); const { data, error } = await supabase.auth.signInWithPassword({ email: adminEmail, password: adminPassword }); if (error) { setLoginError("Email ou mot de passe incorrect."); return; } if (!userCanOpenAdmin(data.user)) { await supabase.auth.signOut(); setAdminUser(null); setLoginError("Ce compte n'a pas accès au panel admin."); return; } setAdminUser(data.user); setIsAdminPreview(false); setAdminPassword(""); setLoginError(""); setView("admin"); }} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
+      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
         <AdminLayout
           active={visibleAdminPage}
