@@ -29,6 +29,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "editions", icon: "🏁", label: "Hors Saison" },
   { id: "development", icon: "📈", label: "Développement" },
   { id: "games", icon: "🎮", label: "Jeux" },
+  { id: "guess-attempts", icon: "🧩", label: "Essais défi" },
   { id: "player-accounts", icon: "👤", label: "Comptes" },
   { id: "results", icon: "🏆", label: "Résultats" },
   { id: "race-awards", icon: "⚡", label: "Poles / MT" },
@@ -813,6 +814,21 @@ function mapGuessDriverResultFromDb(result) {
     score: Math.max(savedScore, computedScore),
     won: Boolean(result.won),
     createdAt: result.created_at || "",
+  };
+}
+function mapGuessDriverAttemptFromDb(attempt) {
+  return {
+    id: attempt.id,
+    playerId: attempt.player_id || "",
+    pseudo: attempt.pseudo || "",
+    discordName: attempt.discord_name || "",
+    categoryId: normalizeCategoryId(attempt.category_id),
+    challengeDay: attempt.challenge_day || "",
+    targetDriverId: attempt.target_driver_id || "",
+    guessedDriverId: attempt.guessed_driver_id || "",
+    attemptNumber: Number(attempt.attempt_number || 0),
+    correct: Boolean(attempt.correct),
+    createdAt: attempt.created_at || "",
   };
 }
 function mapPredictionControlFromDb(control) {
@@ -1709,6 +1725,7 @@ export default function URTTAdminPanel() {
   const [playerProfile, setPlayerProfile] = useState(null);
   const [playerAccounts, setPlayerAccounts] = useState([]);
   const [guessDriverResults, setGuessDriverResults] = useState([]);
+  const [guessDriverAttempts, setGuessDriverAttempts] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
@@ -1879,6 +1896,7 @@ export default function URTTAdminPanel() {
         { data: predictionControlsData, error: predictionControlsError },
         { data: playerAccountsData, error: playerAccountsError },
         { data: guessDriverResultsData, error: guessDriverResultsError },
+        { data: guessDriverAttemptsData, error: guessDriverAttemptsError },
         { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
@@ -1899,6 +1917,7 @@ export default function URTTAdminPanel() {
         supabase.from("race_prediction_controls").select("*").order("race_id", { ascending: true }),
         supabase.from("player_accounts").select("*").order("created_at", { ascending: false }),
         supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
+        supabase.from("guess_driver_attempts").select("*").order("created_at", { ascending: false }),
         supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
@@ -1921,6 +1940,7 @@ export default function URTTAdminPanel() {
         predictionControlsError && predictionControlsError.code !== "42P01" && `race_prediction_controls: ${predictionControlsError.message}`,
         playerAccountsError && playerAccountsError.code !== "42P01" && `player_accounts: ${playerAccountsError.message}`,
         guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
+        guessDriverAttemptsError && guessDriverAttemptsError.code !== "42P01" && `guess_driver_attempts: ${guessDriverAttemptsError.message}`,
         adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
@@ -1949,6 +1969,7 @@ export default function URTTAdminPanel() {
       setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
       setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb));
       setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
+      setGuessDriverAttempts((guessDriverAttemptsData || []).map(mapGuessDriverAttemptFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
@@ -3237,6 +3258,46 @@ export default function URTTAdminPanel() {
     return { ok: true, message: `Défi enregistré : +${savedResult.score} pts.` };
   }
 
+  async function saveGuessDriverAttempt({ categoryId, challengeDay, targetDriverId, guessedDriverId, attemptNumber, correct }) {
+    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ton essai." };
+
+    const payload = {
+      player_id: Number(playerProfile.id),
+      pseudo: playerProfile.pseudo,
+      discord_name: playerProfile.discordName || "",
+      category_id: normalizeCategoryId(categoryId),
+      challenge_day: challengeDay,
+      target_driver_id: Number(targetDriverId),
+      guessed_driver_id: Number(guessedDriverId),
+      attempt_number: Number(attemptNumber || 1),
+      correct: Boolean(correct),
+    };
+
+    const { data, error } = await supabase
+      .from("guess_driver_attempts")
+      .upsert(payload, { onConflict: "player_id,category_id,challenge_day,guessed_driver_id" })
+      .select()
+      .single();
+
+    if (error) {
+      console.error("Erreur essai defi pilote:", error);
+      const details = formatSupabaseError(error);
+      const message = error.code === "42P01"
+        ? "La table guess_driver_attempts n'existe pas encore. Lance la commande SQL fournie par Codex."
+        : error.code === "42501" || error.message?.toLowerCase().includes("row-level security")
+          ? "Supabase bloque l'enregistrement des essais. Verifie les policies RLS de guess_driver_attempts."
+          : `Impossible d'enregistrer l'essai.${details ? ` Detail Supabase : ${details}` : ""}`;
+      return { ok: false, message };
+    }
+
+    const savedAttempt = mapGuessDriverAttemptFromDb(data);
+    setGuessDriverAttempts((current) => {
+      const withoutSameAttempt = current.filter((attempt) => !(String(attempt.playerId) === String(savedAttempt.playerId) && attempt.categoryId === savedAttempt.categoryId && attempt.challengeDay === savedAttempt.challengeDay && String(attempt.guessedDriverId) === String(savedAttempt.guessedDriverId)));
+      return [savedAttempt, ...withoutSameAttempt].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+    });
+    return { ok: true, attempt: savedAttempt };
+  }
+
   async function toggleRacePredictionClosed(raceId, closed) {
     setIsSavingPrediction(true);
     const { data, error } = await supabase
@@ -3358,11 +3419,13 @@ export default function URTTAdminPanel() {
           adminUser={adminUser}
           playerProfile={playerProfile}
           guessDriverResults={guessDriverResults}
+          guessDriverAttempts={guessDriverAttempts}
           onPlayerLogin={loginPlayerAccount}
           onPlayerSignup={signUpPlayerAccount}
           onPlayerLogout={logoutPlayerAccount}
           onSyncEasterEggs={syncPlayerEasterEggs}
           onSaveGuessDriverWin={saveGuessDriverWin}
+          onSaveGuessDriverAttempt={saveGuessDriverAttempt}
           isSavingPlayerAccount={isSavingPlayerAccount}
           isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
@@ -3422,6 +3485,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
+          {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
           {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
@@ -3748,7 +3812,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
@@ -3892,7 +3956,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} onSaveWin={onSaveGuessDriverWin} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
+        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} attemptsHistory={guessDriverAttempts} onSaveWin={onSaveGuessDriverWin} onSaveAttempt={onSaveGuessDriverAttempt} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
       </main>
@@ -4438,26 +4502,33 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
   })}</div>;
 }
 
-function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], onSaveWin, isSaving = false, onProgressChange }) {
+function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], attemptsHistory = [], onSaveWin, onSaveAttempt, isSaving = false, onProgressChange }) {
   const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
   const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
   const challengeDay = getDailyChallengeDay();
   const savedToday = results.some((result) => String(result.playerId) === String(profile?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
   const attemptStorageKey = getGuessDriverAttemptsStorageKey(profile?.id || "", selectedCategoryId, challengeDay);
+  const serverAttempts = attemptsHistory
+    .filter((attempt) => String(attempt.playerId) === String(profile?.id || "") && attempt.challengeDay === challengeDay && normalizeCategoryId(attempt.categoryId) === normalizeCategoryId(selectedCategoryId))
+    .sort((a, b) => (Number(a.attemptNumber) || 0) - (Number(b.attemptNumber) || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
+    .map((attempt) => String(attempt.guessedDriverId))
+    .filter(Boolean);
   const streak = getGuessDriverStreak(results, profile?.id || "", selectedCategoryId);
   const leaderboard = getGuessDriverLeaderboard(results, selectedCategoryId).slice(0, 10);
   const [guessId, setGuessId] = useState("");
-  const [attempts, setAttempts] = useState(() => readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay));
+  const [attempts, setAttempts] = useState(() => normalizeIdList([...readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay), ...serverAttempts]));
   const [message, setMessage] = useState("");
   const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
   const won = targetDriver && (savedToday || attempts.some((driverId) => idsEqual(driverId, targetDriver.id)));
   const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
   useEffect(() => {
     const storedAttempts = readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay);
-    setAttempts(storedAttempts);
+    const restoredAttempts = normalizeIdList([...storedAttempts, ...serverAttempts]);
+    setAttempts(restoredAttempts);
+    if (restoredAttempts.length) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, restoredAttempts);
     setGuessId("");
-    setMessage(storedAttempts.length ? "Tes essais du jour ont été restaurés." : "");
-  }, [attemptStorageKey, profile?.id, selectedCategoryId, challengeDay]);
+    setMessage(restoredAttempts.length ? "Tes essais du jour ont été restaurés." : "");
+  }, [attemptStorageKey, profile?.id, selectedCategoryId, challengeDay, serverAttempts.join(",")]);
   useEffect(() => {
     if (savedToday) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, []);
   }, [savedToday, profile?.id, selectedCategoryId, challengeDay]);
@@ -4482,10 +4553,23 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
       return;
     }
     const nextAttempts = [...attempts, guessId];
+    const isCorrect = targetDriver && idsEqual(guessId, targetDriver.id);
+    const saveAttemptResponse = await onSaveAttempt?.({
+      categoryId: selectedCategoryId,
+      challengeDay,
+      targetDriverId: targetDriver?.id,
+      guessedDriverId: guessId,
+      attemptNumber: nextAttempts.length,
+      correct: isCorrect,
+    });
+    if (saveAttemptResponse && !saveAttemptResponse.ok) {
+      setMessage(saveAttemptResponse.message || "Impossible d'enregistrer l'essai.");
+      return;
+    }
     writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, nextAttempts);
     setAttempts(nextAttempts);
     setGuessId("");
-    if (targetDriver && idsEqual(guessId, targetDriver.id) && !savedToday) {
+    if (isCorrect && !savedToday) {
       const response = await onSaveWin?.({ categoryId: selectedCategoryId, challengeDay, driverId: targetDriver.id, attempts: nextAttempts.length });
       setMessage(response?.message || "");
       if (response?.ok) writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, []);
@@ -5371,6 +5455,96 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
           </table>
         </div>
         {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistré." />}
+      </Card>
+    </div>
+  );
+}
+
+function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], drivers = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS }) {
+  const [selectedDay, setSelectedDay] = useState("");
+  const [search, setSearch] = useState("");
+  const categoryId = normalizeCategoryId(selectedCategoryId);
+  const days = Array.from(new Set(attempts.map((attempt) => attempt.challengeDay).filter(Boolean))).sort((a, b) => b.localeCompare(a));
+  const filteredAttempts = attempts
+    .filter((attempt) => normalizeCategoryId(attempt.categoryId) === categoryId)
+    .filter((attempt) => !selectedDay || attempt.challengeDay === selectedDay)
+    .filter((attempt) => {
+      const targetDriver = drivers.find((driver) => idsEqual(driver.id, attempt.targetDriverId));
+      const guessedDriver = drivers.find((driver) => idsEqual(driver.id, attempt.guessedDriverId));
+      const haystack = `${attempt.pseudo} ${attempt.discordName} ${targetDriver?.name || ""} ${guessedDriver?.name || ""}`.toLowerCase();
+      return haystack.includes(search.trim().toLowerCase());
+    })
+    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+  const successCount = filteredAttempts.filter((attempt) => attempt.correct).length;
+  const activePlayers = new Set(filteredAttempts.map((attempt) => String(attempt.playerId)).filter(Boolean)).size;
+  const groupedByPlayerDay = filteredAttempts.reduce((map, attempt) => {
+    const key = `${attempt.playerId}-${attempt.categoryId}-${attempt.challengeDay}`;
+    const current = map.get(key) || { attempts: 0, correct: false };
+    map.set(key, { attempts: current.attempts + 1, correct: current.correct || attempt.correct });
+    return map;
+  }, new Map());
+  const abandonedCount = Array.from(groupedByPlayerDay.values()).filter((entry) => !entry.correct).length;
+  const formatAttemptDate = (value) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+  };
+  const resultForAttempt = (attempt) => results.find((result) => String(result.playerId) === String(attempt.playerId) && result.challengeDay === attempt.challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(attempt.categoryId));
+
+  return (
+    <div style={styles.section}>
+      <Card title="Historique des essais — Défi pilote" icon="🧩">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Jour</span><select value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} style={styles.resultsSelect}><option value="">Tous les jours</option>{days.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Recherche</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pseudo, Discord ou pilote..." style={styles.input} /></label>
+        </div>
+        <div style={styles.statsGrid}>
+          <Stat label="Essais affichés" value={filteredAttempts.length} />
+          <Stat label="Joueurs" value={activePlayers} />
+          <Stat label="Bonnes réponses" value={successCount} />
+          <Stat label="Sessions sans réussite" value={abandonedCount} />
+        </div>
+      </Card>
+      <Card title="Détail des essais" icon="📋">
+        <div style={styles.tableWrap}>
+          <table style={{ ...styles.table, minWidth: 1040 }}>
+            <thead>
+              <tr style={styles.tableHead}>
+                <th style={styles.th}>Date</th>
+                <th style={styles.th}>Joueur</th>
+                <th style={styles.th}>Cat.</th>
+                <th style={styles.th}>Défi</th>
+                <th style={styles.th}>Essai</th>
+                <th style={styles.th}>Pilote tenté</th>
+                <th style={styles.th}>Pilote mystère</th>
+                <th style={styles.th}>Résultat</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAttempts.map((attempt) => {
+                const targetDriver = drivers.find((driver) => idsEqual(driver.id, attempt.targetDriverId));
+                const guessedDriver = drivers.find((driver) => idsEqual(driver.id, attempt.guessedDriverId));
+                const account = accounts.find((item) => idsEqual(item.id, attempt.playerId));
+                const savedResult = resultForAttempt(attempt);
+                return (
+                  <tr key={attempt.id} style={styles.tr}>
+                    <td style={styles.td}>{formatAttemptDate(attempt.createdAt)}</td>
+                    <td style={styles.td}><strong>{attempt.pseudo || account?.pseudo || "—"}</strong><p style={styles.mutedSmall}>{attempt.discordName || account?.discordName || "Discord —"}</p></td>
+                    <td style={styles.td}><span style={styles.titleBadge}>{attempt.categoryId}</span></td>
+                    <td style={styles.td}>{attempt.challengeDay}</td>
+                    <td style={styles.td}>#{attempt.attemptNumber || "—"}</td>
+                    <td style={styles.td}>{guessedDriver ? <DriverIdentity driver={guessedDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}><span style={attempt.correct ? styles.badgeGreen : styles.badgeDark}>{attempt.correct ? `Trouvé${savedResult?.score ? ` · ${savedResult.score} pts` : ""}` : "Raté"}</span></td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {filteredAttempts.length === 0 && <Empty text="Aucun essai enregistré pour ce filtre." />}
       </Card>
     </div>
   );
