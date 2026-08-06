@@ -1,4 +1,4 @@
-﻿import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabaseClient";
 import { useRef } from "react";
 
@@ -21,23 +21,23 @@ const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_MARK = String.fromCodePoint(0x1f465);
 const ADMIN_PAGE_OPTIONS = [
-  { id: "dashboard", icon: "ðŸ ", label: "Dashboard" },
-  { id: "supabase", icon: "ðŸ—„ï¸", label: "Supabase" },
-  { id: "search", icon: "ðŸ”Ž", label: "Recherche" },
-  { id: "titles", icon: "ðŸ‘‘", label: "Titres" },
-  { id: "drivers", icon: "ðŸ‘¥", label: "Pilotes" },
-  { id: "teams", icon: "ðŸŽï¸", label: "Ã‰curies" },
-  { id: "races", icon: "ðŸ", label: "Courses" },
-  { id: "planning", icon: "â±ï¸", label: "Planning" },
-  { id: "editions", icon: "ðŸ", label: "Hors Saison" },
-  { id: "development", icon: "ðŸ“ˆ", label: "DÃ©veloppement" },
-  { id: "games", icon: "ðŸŽ®", label: "Jeux" },
-  { id: "guess-attempts", icon: "ðŸ§©", label: "Essais dÃ©fi" },
-  { id: "player-accounts", icon: "ðŸ‘¤", label: "Comptes" },
-  { id: "results", icon: "ðŸ†", label: "RÃ©sultats" },
-  { id: "race-awards", icon: "âš¡", label: "Poles / MT" },
-  { id: "permissions", icon: "ðŸ”", label: "Permissions" },
-  { id: "settings", icon: "âš™ï¸", label: "RÃ©glages" },
+  { id: "dashboard", icon: "🏠", label: "Dashboard" },
+  { id: "supabase", icon: "🗄️", label: "Supabase" },
+  { id: "search", icon: "🔎", label: "Recherche" },
+  { id: "titles", icon: "👑", label: "Titres" },
+  { id: "drivers", icon: "👥", label: "Pilotes" },
+  { id: "teams", icon: "🏎️", label: "Écuries" },
+  { id: "races", icon: "🏁", label: "Courses" },
+  { id: "planning", icon: "⏱️", label: "Planning" },
+  { id: "editions", icon: "🏁", label: "Hors Saison" },
+  { id: "development", icon: "📈", label: "Développement" },
+  { id: "games", icon: "🎮", label: "Jeux" },
+  { id: "guess-attempts", icon: "🧩", label: "Essais défi" },
+  { id: "player-accounts", icon: "👤", label: "Comptes" },
+  { id: "results", icon: "🏆", label: "Résultats" },
+  { id: "race-awards", icon: "⚡", label: "Poles / MT" },
+  { id: "permissions", icon: "🔐", label: "Permissions" },
+  { id: "settings", icon: "⚙️", label: "Réglages" },
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
@@ -45,21 +45,21 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "home", label: "Accueil" },
   { id: "standings", label: "Classements" },
   { id: "drivers", label: "Stats pilotes" },
-  { id: "teams", label: "Stats Ã©curies" },
+  { id: "teams", label: "Stats écuries" },
   { id: "seasons", label: "Saison" },
   { id: "editions", label: "Hors Saison" },
-  { id: "development", label: "DÃ©veloppement" },
+  { id: "development", label: "Développement" },
   { id: "predictions", label: "Pronos" },
-  { id: "guess-driver", label: "DÃ©fi pilote" },
+  { id: "guess-driver", label: "Défi pilote" },
   { id: "easter-eggs", label: "Livre secret" },
   { id: "world", label: "Carte" },
 ];
 const EASTER_EGG_BOOK = [
-  { id: "kolti-s7", title: "CÃ©lÃ©bration annulÃ©e", hint: "Saison 7 Â· Classements Â· Kolti", unlockedText: "Kolti S7 : les confettis commencent, puis la cÃ©lÃ©bration remonte et disparaÃ®t." },
-  { id: "kolti-s14", title: "Si proche", hint: "Saison 14 Â· Classements Â· Kolti", unlockedText: "Kolti S14 : le trophÃ©e arrive, tremble, puis s'Ã©chappe dans la derniÃ¨re course." },
-  { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 Â· Classements Â· Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
-  { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE aprÃ¨s une sÃ©quence cachÃ©e." },
-  { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 Â· Stats pilotes Â· Etienne", unlockedText: "Etienne F2 : aprÃ¨s 12 saisons en Formule 2, le papy quitte son nid." },
+  { id: "kolti-s7", title: "Célébration annulée", hint: "Saison 7 · Classements · Kolti", unlockedText: "Kolti S7 : les confettis commencent, puis la célébration remonte et disparaît." },
+  { id: "kolti-s14", title: "Si proche", hint: "Saison 14 · Classements · Kolti", unlockedText: "Kolti S14 : le trophée arrive, tremble, puis s'échappe dans la dernière course." },
+  { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 · Classements · Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
+  { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE après une séquence cachée." },
+  { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 · Stats pilotes · Etienne", unlockedText: "Etienne F2 : après 12 saisons en Formule 2, le papy quitte son nid." },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
@@ -406,7 +406,7 @@ function getCategoryColor(categoryId) {
   return CATEGORY_OPTIONS.find((category) => category.id === normalizeCategoryId(categoryId))?.color || "#3f3f46";
 }
 function getSpecialEventName(eventType) {
-  return SPECIAL_EVENT_OPTIONS.find((event) => event.id === eventType)?.name || eventType || "Ã‰vÃ©nement";
+  return SPECIAL_EVENT_OPTIONS.find((event) => event.id === eventType)?.name || eventType || "Événement";
 }
 function seasonName(id) {
   return getSeasonOptions().find((season) => season.id === normalizeSeasonId(id))?.name || id;
@@ -432,12 +432,12 @@ function idsEqual(left, right) {
   return String(left ?? "") === String(right ?? "");
 }
 function driverName(drivers, driverId) {
-  return drivers.find((driver) => idsEqual(driver.id, driverId))?.name || "â€”";
+  return drivers.find((driver) => idsEqual(driver.id, driverId))?.name || "—";
 }
 function specialEditionPodium(edition, drivers) {
   const podiumIds = [edition.podiumFirstDriverId, edition.podiumSecondDriverId, edition.podiumThirdDriverId].filter(Boolean);
-  if (podiumIds.length) return podiumIds.map((driverId) => driverName(drivers, driverId)).join(" Â· ");
-  return edition.podium || "â€”";
+  if (podiumIds.length) return podiumIds.map((driverId) => driverName(drivers, driverId)).join(" · ");
+  return edition.podium || "—";
 }
 function getDriverSpecialEditionRows(driver, editions = []) {
   return editions
@@ -850,7 +850,7 @@ function getRaceResultForRace(raceResults = [], raceId) {
 }
 function scoreRacePrediction(prediction, raceResults = []) {
   const result = getRaceResultForRace(raceResults, prediction.raceId);
-  if (!result) return { scored: false, score: 0, details: "En attente du rÃ©sultat" };
+  if (!result) return { scored: false, score: 0, details: "En attente du résultat" };
   const sortedEntries = [...result.entries].sort((a, b) => Number(a.position) - Number(b.position));
   const winner = sortedEntries.find((entry) => Number(entry.position) === 1);
   const poleIds = sortedEntries.filter((entry) => entry.pole).map((entry) => String(entry.driverId));
@@ -873,7 +873,7 @@ function scoreRacePrediction(prediction, raceResults = []) {
   }
   const exactPositions = predictedOrder.reduce((count, driverId, index) => sortedEntries[index] && idsEqual(sortedEntries[index].driverId, driverId) ? count + 1 : count, 0);
   if (exactPositions) { score += exactPositions * 2; parts.push(`Positions exactes +${exactPositions * 2}`); }
-  return { scored: true, score, details: parts.length ? parts.join(" Â· ") : "0 point" };
+  return { scored: true, score, details: parts.length ? parts.join(" · ") : "0 point" };
 }
 function getPredictionLeaderboard(predictions = [], raceResults = []) {
   const map = new Map();
@@ -1009,7 +1009,7 @@ function toggleParticipation(form, seasonId, categoryId) {
   return { ...form, participations: { ...(form.participations || {}), [seasonId]: next } };
 }
 function getTeamNameById(teams, teamId) {
-  return teams.find((team) => idsEqual(team.id, teamId))?.name || "Sans Ã©curie";
+  return teams.find((team) => idsEqual(team.id, teamId))?.name || "Sans écurie";
 }
 function getDriverSeasonTeam(driver, seasonId, teams) {
   const teamId = driver?.teamHistory?.[seasonId] || driver?.teamId;
@@ -1153,16 +1153,16 @@ function runTests() {
   console.assert(getPointsForPosition(1, "F2", "S3") === 20, "P1 F2 S3 doit rapporter 20 points");
   console.assert(getPointsForPosition(4, "F2", "S4") === 16, "P4 F2 S4 doit rapporter 16 points");
   console.assert(getPointsForPosition(20, "F2", "S4") === 0, "P20 F2 S4 ne doit rapporter aucun point");
-  console.assert(getPointsForPosition(1, "F2", "S5") === 30, "F2 S5 doit garder le barÃ¨me standard");
-  console.assert(isSeasonIncluded("S1", "S4") === true, "S1 doit Ãªtre incluse dans S4");
-  console.assert(isSeasonIncluded("S5", "S4") === false, "S5 ne doit pas Ãªtre incluse dans S4");
+  console.assert(getPointsForPosition(1, "F2", "S5") === 30, "F2 S5 doit garder le barème standard");
+  console.assert(isSeasonIncluded("S1", "S4") === true, "S1 doit être incluse dans S4");
+  console.assert(isSeasonIncluded("S5", "S4") === false, "S5 ne doit pas être incluse dans S4");
   console.assert(CATEGORY_OPTIONS.length === 4, "Il doit y avoir F1, F2, F3 et FE");
   console.assert(demoRaceLibrary.length > 0, "La bibliotheque de demo doit contenir des GP");
   console.assert(createDemoSeasonMap().S16.length === 3, "La saison de demo S16 doit contenir 3 GP");
-  console.assert(toggleParticipation(emptyDriver, "S1", "F1").participations.S1.includes("F1"), "La participation F1 S1 doit pouvoir Ãªtre ajoutÃ©e");
-  console.assert(demoDrivers.some((driver) => driver.participations.S2?.includes("FE")), "Il doit y avoir au moins un pilote FE de dÃ©mo");
-  console.assert(demoDrivers.some((driver) => driver.participations.S1?.includes("F2")), "Il doit y avoir au moins un pilote F2 de dÃ©mo");
-  console.assert(getLatestDriverTeamId({ teamId: 101, teamHistory: { S1: 101, S4: 104, S3: 103 } }) === 104, "L'Ã©curie par dÃ©faut doit suivre la saison la plus rÃ©cente");
+  console.assert(toggleParticipation(emptyDriver, "S1", "F1").participations.S1.includes("F1"), "La participation F1 S1 doit pouvoir être ajoutée");
+  console.assert(demoDrivers.some((driver) => driver.participations.S2?.includes("FE")), "Il doit y avoir au moins un pilote FE de démo");
+  console.assert(demoDrivers.some((driver) => driver.participations.S1?.includes("F2")), "Il doit y avoir au moins un pilote F2 de démo");
+  console.assert(getLatestDriverTeamId({ teamId: 101, teamHistory: { S1: 101, S4: 104, S3: 103 } }) === 104, "L'écurie par défaut doit suivre la saison la plus récente");
   const tiedStandings = [
     { name: "Pilote P3", points: 100, resultCounts: { 3: 1 } },
     { name: "Pilote P1", points: 100, resultCounts: { 1: 1 } },
@@ -1171,9 +1171,9 @@ function runTests() {
   const f1Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F1" });
   const feStats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "FE" });
   const f2Stats = computeStats({ drivers: demoDrivers, teams: demoTeams, raceResults: demoRaceResults, selectedCategoryId: "F2" });
-  console.assert(f1Stats.driverStatsBySeason.S2.length !== feStats.driverStatsBySeason.S2.length, "Les catÃ©gories doivent afficher des stats diffÃ©rentes");
-  console.assert(f2Stats.driverStatsBySeason.S4.find((driver) => driver.id === 203)?.teamName === "Thunder Junior", "Le classement pilote doit utiliser l'Ã©curie de la saison");
-  console.assert(f2Stats.teamStatsBySeason.S4.some((team) => team.id === 104 && team.points > 0), "Le classement Ã©curie doit utiliser les pilotes de la saison");
+  console.assert(f1Stats.driverStatsBySeason.S2.length !== feStats.driverStatsBySeason.S2.length, "Les catégories doivent afficher des stats différentes");
+  console.assert(f2Stats.driverStatsBySeason.S4.find((driver) => driver.id === 203)?.teamName === "Thunder Junior", "Le classement pilote doit utiliser l'écurie de la saison");
+  console.assert(f2Stats.teamStatsBySeason.S4.some((team) => team.id === 104 && team.points > 0), "Le classement écurie doit utiliser les pilotes de la saison");
 }
 if (import.meta.env.DEV) runTests();
 
@@ -2073,7 +2073,7 @@ export default function URTTAdminPanel() {
 
   async function saveDriver() {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
 
@@ -2100,7 +2100,7 @@ export default function URTTAdminPanel() {
     if (error) {
       setIsSaving(false);
       console.error("Erreur sauvegarde pilote:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™enregistrer le pilote." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’enregistrer le pilote." });
       return;
     }
 
@@ -2115,7 +2115,7 @@ export default function URTTAdminPanel() {
     if (deleteParticipationError) {
       setIsSaving(false);
       console.error("Erreur reset participations:", deleteParticipationError);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de mettre Ã  jour les participations." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de mettre à jour les participations." });
       return;
     }
 
@@ -2127,7 +2127,7 @@ export default function URTTAdminPanel() {
       if (participationError) {
         setIsSaving(false);
         console.error("Erreur participations:", participationError);
-        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™enregistrer les catÃ©gories du pilote." });
+        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’enregistrer les catégories du pilote." });
         return;
       }
     }
@@ -2139,7 +2139,7 @@ export default function URTTAdminPanel() {
     setDrivers((current) => editingDriverId ? current.map((driver) => driver.id === editingDriverId ? cleanDriver : driver) : [...current, cleanDriver]);
     setDriverForm(emptyDriver);
     setEditingDriverId(null);
-    setPopup({ type: "success", title: editingDriverId ? "Pilote modifiÃ©" : "Pilote crÃ©Ã©", message: `${cleanDriver.name} a bien Ã©tÃ© enregistrÃ© dans Supabase.` });
+    setPopup({ type: "success", title: editingDriverId ? "Pilote modifié" : "Pilote créé", message: `${cleanDriver.name} a bien été enregistré dans Supabase.` });
   }
 
   async function deleteDriver(driverId) {
@@ -2160,12 +2160,12 @@ export default function URTTAdminPanel() {
 
   async function saveTeam() {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
 
     if (!teamForm.name.trim()) {
-      setPopup({ type: "error", title: "Ã‰curie incomplÃ¨te", message: "Ajoute au moins un nom dâ€™Ã©curie." });
+      setPopup({ type: "error", title: "Écurie incomplète", message: "Ajoute au moins un nom d’écurie." });
       return;
     }
 
@@ -2180,8 +2180,8 @@ export default function URTTAdminPanel() {
     setIsSaving(false);
 
     if (error) {
-      console.error("Erreur sauvegarde Ã©quipe:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™enregistrer lâ€™Ã©curie." });
+      console.error("Erreur sauvegarde équipe:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’enregistrer l’écurie." });
       return;
     }
 
@@ -2190,7 +2190,7 @@ export default function URTTAdminPanel() {
     setTeams((current) => editingTeamId ? current.map((team) => team.id === editingTeamId ? cleanTeam : team) : [...current, cleanTeam]);
     setTeamForm(emptyTeam);
     setEditingTeamId(null);
-    setPopup({ type: "success", title: editingTeamId ? "Ã‰curie modifiÃ©e" : "Ã‰curie crÃ©Ã©e", message: `${cleanTeam.name} a bien Ã©tÃ© enregistrÃ©e dans Supabase.` });
+    setPopup({ type: "success", title: editingTeamId ? "Écurie modifiée" : "Écurie créée", message: `${cleanTeam.name} a bien été enregistrée dans Supabase.` });
   }
 
   async function deleteTeam(teamId) {
@@ -2200,8 +2200,8 @@ export default function URTTAdminPanel() {
       .eq("id", teamId);
 
     if (error) {
-      console.error("Erreur suppression Ã©quipe:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de supprimer lâ€™Ã©curie." });
+      console.error("Erreur suppression équipe:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de supprimer l’écurie." });
       return;
     }
 
@@ -2211,7 +2211,7 @@ export default function URTTAdminPanel() {
 
   async function saveRace() {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
 
@@ -2231,20 +2231,20 @@ export default function URTTAdminPanel() {
     setIsSavingRace(false);
 
     if (error) {
-      console.error("Erreur crÃ©ation GP:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de crÃ©er le GP." });
+      console.error("Erreur création GP:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de créer le GP." });
       return;
     }
 
     const race = mapRaceLibraryFromDb(data);
     setRaceLibrary((current) => sortRacesByName([...current, race]));
     setRaceForm(emptyRace);
-    setPopup({ type: "success", title: "Circuit crÃ©Ã©", message: `${race.name} a Ã©tÃ© ajoutÃ© Ã  Supabase.` });
+    setPopup({ type: "success", title: "Circuit créé", message: `${race.name} a été ajouté à Supabase.` });
   }
 
   async function updateRaceCountry(raceId, country) {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return false;
     }
 
@@ -2257,7 +2257,7 @@ export default function URTTAdminPanel() {
 
     if (error) {
       console.error("Erreur pays GP:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier le pays. VÃ©rifie que la colonne country existe dans race_library." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier le pays. Vérifie que la colonne country existe dans race_library." });
       return false;
     }
 
@@ -2315,13 +2315,13 @@ export default function URTTAdminPanel() {
 
   async function addRaceToSeason() {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
     if (!ensureAdminCategoryAccess(adminSelectedCategoryId)) return;
 
     if (!calendarRaceForm.raceId) {
-      setPopup({ type: "error", title: "Aucun GP", message: "Choisis un GP Ã  ajouter au calendrier." });
+      setPopup({ type: "error", title: "Aucun GP", message: "Choisis un GP à ajouter au calendrier." });
       return;
     }
 
@@ -2349,7 +2349,7 @@ export default function URTTAdminPanel() {
 
     if (error) {
       console.error("Erreur calendrier:", error);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™ajouter le GP au calendrier." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’ajouter le GP au calendrier." });
       return;
     }
 
@@ -2357,12 +2357,12 @@ export default function URTTAdminPanel() {
     setAllCalendarRaces((current) => [...current, race]);
     setSelectedSeasonId(seasonId);
     setSelectedRaceId(String(race.id));
-    setPopup({ type: "success", title: "Calendrier mis Ã  jour", message: `${race.name} a Ã©tÃ© ajoutÃ© Ã  ${seasonName(seasonId)}.` });
+    setPopup({ type: "success", title: "Calendrier mis à jour", message: `${race.name} a été ajouté à ${seasonName(seasonId)}.` });
   }
 
   async function deleteRace(seasonId, raceId) {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
 
@@ -2481,7 +2481,7 @@ export default function URTTAdminPanel() {
 
   async function moveRace(raceId, direction) {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier le calendrier." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier le calendrier." });
       return;
     }
 
@@ -2519,7 +2519,7 @@ export default function URTTAdminPanel() {
 
   async function updateRaceStartAt(raceId, startAt) {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return false;
     }
 
@@ -3007,12 +3007,12 @@ export default function URTTAdminPanel() {
 
   async function validateRaceResults() {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de modifier les donnÃ©es." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de modifier les données." });
       return;
     }
 
     if (!selectedRaceId) {
-      setPopup({ type: "error", title: "Aucun GP sÃ©lectionnÃ©", message: "CrÃ©e ou sÃ©lectionne un Grand Prix avant de valider les rÃ©sultats." });
+      setPopup({ type: "error", title: "Aucun GP sélectionné", message: "Crée ou sélectionne un Grand Prix avant de valider les résultats." });
       return;
     }
 
@@ -3047,7 +3047,7 @@ export default function URTTAdminPanel() {
       if (updateError) {
         setIsSavingResult(false);
         console.error("Erreur update result:", updateError);
-        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier le rÃ©sultat." });
+        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de modifier le résultat." });
         return;
       }
 
@@ -3059,7 +3059,7 @@ export default function URTTAdminPanel() {
       if (deleteEntriesError) {
         setIsSavingResult(false);
         console.error("Erreur reset entries:", deleteEntriesError);
-        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de remplacer les entrÃ©es du rÃ©sultat." });
+        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible de remplacer les entrées du résultat." });
         return;
       }
     } else {
@@ -3072,7 +3072,7 @@ export default function URTTAdminPanel() {
       if (insertResultError) {
         setIsSavingResult(false);
         console.error("Erreur insert result:", insertResultError);
-        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™enregistrer le rÃ©sultat." });
+        setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’enregistrer le résultat." });
         return;
       }
 
@@ -3096,7 +3096,7 @@ export default function URTTAdminPanel() {
 
     if (insertEntriesError) {
       console.error("Erreur entries:", insertEntriesError);
-      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible dâ€™enregistrer les positions." });
+      setPopup({ type: "error", title: "Erreur Supabase", message: "Impossible d’enregistrer les positions." });
       return;
     }
 
@@ -3117,7 +3117,7 @@ export default function URTTAdminPanel() {
 
     setRaceResults((current) => current.some((result) => String(result.raceId) === String(selectedRaceId)) ? current.map((result) => String(result.raceId) === String(selectedRaceId) ? payload : result) : [...current, payload]);
     setLiveRaceDrafts((current) => ({ ...current, [selectedRaceId]: [] }));
-    setPopup({ type: "success", title: "Course validÃ©e", message: `${selectedRace?.name || "La course"} a bien Ã©tÃ© enregistrÃ©e dans Supabase.` });
+    setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
   }
 
   async function savePlayerProfile(profile) {
@@ -3126,7 +3126,7 @@ export default function URTTAdminPanel() {
     const accessCode = String(profile.accessCode || "").trim();
     if (!pseudo) return { ok: false, message: "Ajoute un pseudo public." };
     if (!discordName) return { ok: false, message: "Ajoute ton nom Discord." };
-    if (accessCode.length < 4) return { ok: false, message: "Choisis un code secret d'au moins 4 caractÃ¨res." };
+    if (accessCode.length < 4) return { ok: false, message: "Choisis un code secret d'au moins 4 caractères." };
 
     setIsSavingPlayerAccount(true);
     const { data, error } = await supabase
@@ -3141,7 +3141,7 @@ export default function URTTAdminPanel() {
       const message = error.code === "42P01"
         ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex."
         : error.code === "23505"
-          ? "Ce pseudo est dÃ©jÃ  utilisÃ©."
+          ? "Ce pseudo est déjà utilisé."
           : "Impossible d'enregistrer le profil joueur.";
       return { ok: false, message };
     }
@@ -3152,7 +3152,7 @@ export default function URTTAdminPanel() {
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
     writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     setPlayerProfile(savedProfile);
-    return { ok: true, message: "Compte joueur prÃªt." };
+    return { ok: true, message: "Compte joueur prêt." };
   }
 
   async function signUpPlayerAccount({ pseudo, discordName, accessCode }) {
@@ -3184,7 +3184,7 @@ export default function URTTAdminPanel() {
       });
     }
     setPlayerProfile(savedProfile);
-    return { ok: true, message: "Connexion rÃ©ussie." };
+    return { ok: true, message: "Connexion réussie." };
   }
 
   async function logoutPlayerAccount() {
@@ -3215,14 +3215,14 @@ export default function URTTAdminPanel() {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
     const alreadySubmitted = racePredictions.some((existingPrediction) => String(existingPrediction.playerId) === String(playerProfile.id) && String(existingPrediction.raceId) === String(prediction.raceId));
-    if (alreadySubmitted) return { ok: false, message: "Tu as dÃ©jÃ  envoyÃ© un prono pour cette course." };
+    if (alreadySubmitted) return { ok: false, message: "Tu as déjà envoyé un prono pour cette course." };
     const selectedRace = allCalendarRaces.find((race) => String(race.id) === String(prediction.raceId));
     const seasonDrivers = drivers.filter((driver) => (driver.participations?.[normalizeSeasonId(prediction.seasonId)] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(prediction.categoryId)));
     const requiredPositionCount = Math.min(20, seasonDrivers.length || 20);
     const predictedOrder = (prediction.predictedOrder || []).slice(0, requiredPositionCount).filter(Boolean);
     if (!prediction.poleDriverId || !prediction.fastestDriverId || predictedOrder.length < requiredPositionCount) return { ok: false, message: `Remplis la pole, le MT et les ${requiredPositionCount} positions du prono.` };
-    if (new Set(predictedOrder.map(String)).size < predictedOrder.length) return { ok: false, message: "Un pilote ne peut pas Ãªtre choisi deux fois dans le classement." };
-    if (isPredictionClosedForRace(raceResults, predictionControls, prediction.raceId)) return { ok: false, message: "Les pronos sont fermÃ©s pour cette course." };
+    if (new Set(predictedOrder.map(String)).size < predictedOrder.length) return { ok: false, message: "Un pilote ne peut pas être choisi deux fois dans le classement." };
+    if (isPredictionClosedForRace(raceResults, predictionControls, prediction.raceId)) return { ok: false, message: "Les pronos sont fermés pour cette course." };
 
     setIsSavingPrediction(true);
     const { data, error } = await supabase
@@ -3237,20 +3237,20 @@ export default function URTTAdminPanel() {
       const message = error.code === "42P01"
         ? "La table race_predictions n'existe pas encore. Lance la commande SQL fournie par Codex."
         : error.code === "23505"
-          ? "Tu as dÃ©jÃ  envoyÃ© un prono pour cette course."
+          ? "Tu as déjà envoyé un prono pour cette course."
         : error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
-          ? "Supabase bloque l'envoi du prono. VÃ©rifie les policies RLS de race_predictions."
+          ? "Supabase bloque l'envoi du prono. Vérifie les policies RLS de race_predictions."
           : "Impossible d'envoyer le prono pour le moment.";
       return { ok: false, message };
     }
 
     const savedPrediction = mapRacePredictionFromDb(data);
     setRacePredictions((current) => [savedPrediction, ...current]);
-    return { ok: true, message: "Prono envoyÃ© ! Il sera scorÃ© quand le rÃ©sultat sera validÃ©." };
+    return { ok: true, message: "Prono envoyé ! Il sera scoré quand le résultat sera validé." };
   }
 
   async function saveGuessDriverWin({ categoryId, challengeDay, driverId, attempts }) {
-    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta sÃ©rie." };
+    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
     const score = getGuessDriverScore(attempts);
     setIsSavingGuessResult(true);
     const { data, error } = await supabase
@@ -3271,10 +3271,10 @@ export default function URTTAdminPanel() {
     setIsSavingGuessResult(false);
 
     if (error) {
-      console.error("Erreur dÃ©fi pilote:", error);
+      console.error("Erreur défi pilote:", error);
       const message = error.code === "42P01"
         ? "La table guess_driver_results n'existe pas encore. Lance la commande SQL fournie par Codex."
-        : "Impossible d'enregistrer le dÃ©fi pilote.";
+        : "Impossible d'enregistrer le défi pilote.";
       return { ok: false, message };
     }
 
@@ -3283,7 +3283,7 @@ export default function URTTAdminPanel() {
       const withoutSameDay = current.filter((result) => !(String(result.playerId) === String(savedResult.playerId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
       return [savedResult, ...withoutSameDay];
     });
-    return { ok: true, message: `DÃ©fi enregistrÃ© : +${savedResult.score} pts.` };
+    return { ok: true, message: `Défi enregistré : +${savedResult.score} pts.` };
   }
 
   async function saveGuessDriverAttempt({ categoryId, challengeDay, targetDriverId, guessedDriverId, attemptNumber, correct }) {
@@ -3340,7 +3340,7 @@ export default function URTTAdminPanel() {
       setPopup({
         type: "error",
         title: "Erreur Supabase",
-        message: error.code === "42P01" ? "La table race_prediction_controls n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de modifier l'Ã©tat des pronos.",
+        message: error.code === "42P01" ? "La table race_prediction_controls n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de modifier l'état des pronos.",
       });
       return;
     }
@@ -3354,10 +3354,10 @@ export default function URTTAdminPanel() {
 
   async function deleteRacePrediction(predictionId) {
     if (!adminUser) {
-      setPopup({ type: "error", title: "AccÃ¨s refusÃ©", message: "Connecte-toi avec un compte admin avant de supprimer un prono." });
+      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de supprimer un prono." });
       return;
     }
-    if (!window.confirm("Supprimer ce prono ? Cette action est dÃ©finitive.")) return;
+    if (!window.confirm("Supprimer ce prono ? Cette action est définitive.")) return;
 
     setIsSavingPrediction(true);
     const { error } = await supabase
@@ -3372,14 +3372,14 @@ export default function URTTAdminPanel() {
         type: "error",
         title: "Erreur Supabase",
         message: error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
-          ? "Supabase bloque la suppression du prono. VÃ©rifie les policies RLS de race_predictions."
+          ? "Supabase bloque la suppression du prono. Vérifie les policies RLS de race_predictions."
           : "Impossible de supprimer ce prono.",
       });
       return;
     }
 
     setRacePredictions((current) => current.filter((prediction) => String(prediction.id) !== String(predictionId)));
-    setPopup({ type: "success", title: "Prono supprimÃ©", message: "Le prono a bien Ã©tÃ© retirÃ©." });
+    setPopup({ type: "success", title: "Prono supprimé", message: "Le prono a bien été retiré." });
   }
 
   async function addSeason() {
@@ -3547,7 +3547,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
     return {
       ...driver,
       teamId: seasonTeamId,
-      teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans Ã©curie",
+      teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
       ...(activeCategoryId === "F1" ? {
         baseDriverTitles: Number(driver.driverTitles) || 0,
         baseTeamTitles: Number(driver.teamTitles) || 0,
@@ -3836,8 +3836,8 @@ function buildCircuitsByCountry(races, raceLibrary) {
 }
 
 const AREKU_MEDIA_LINKS = [
-  { label: "ChaÃ®ne YouTube", detail: "VidÃ©os et rediffusions AREKU_F1", url: "https://www.youtube.com/@AREKU_F1", color: "#dc2626" },
-  { label: "ChaÃ®ne Twitch", detail: "Lives et Ã©vÃ©nements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
+  { label: "Chaîne YouTube", detail: "Vidéos et rediffusions AREKU_F1", url: "https://www.youtube.com/@AREKU_F1", color: "#dc2626" },
+  { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
 function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
@@ -3869,8 +3869,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
   
-  const leaderDriver = seasonOnlyDrivers[0]?.name || "â€”";
-  const leaderTeam = seasonOnlyTeams[0]?.name || "â€”";
+  const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
+  const leaderTeam = seasonOnlyTeams[0]?.name || "—";
   useEffect(() => {
     if (!guessDriverInProgress) return undefined;
     const warnBeforeLeave = (event) => {
@@ -3949,12 +3949,12 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     <div className={`urtt-public-page${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
       <header className="urtt-public-header" style={styles.publicHeader}>
         <div>
-          <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE Â· {selectedCategoryId}</p>
+          <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
           <h1 className="urtt-public-title" onClick={handleChampionTitleClick} style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
-          <p className="urtt-public-subtitle" style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les Ã©curies et les rÃ©sultats.</p>
+          <p className="urtt-public-subtitle" style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
         </div>
         <div style={styles.publicSessionBox}>
-          {adminUser?.email && <span style={styles.sessionBadge}>Vous Ãªtes connectÃ© sur : <strong>{adminUser.email}</strong></span>}
+          {adminUser?.email && <span style={styles.sessionBadge}>Vous êtes connecté sur : <strong>{adminUser.email}</strong></span>}
           <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
           <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
         </div>
@@ -3962,8 +3962,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       {championMode && (
         <div className="urtt-champion-banner">
           <div className="urtt-champion-banner-inner">
-            <strong>CHAMPION MODE ACTIVÃ‰</strong>
-            <button type="button" onClick={() => setChampionMode(false)}>DÃ©sactiver</button>
+            <strong>CHAMPION MODE ACTIVÉ</strong>
+            <button type="button" onClick={() => setChampionMode(false)}>Désactiver</button>
           </div>
         </div>
       )}
@@ -3978,9 +3978,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
-        {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulÃ©es S1 â†’ ${seasonName(selectedSeasonId)}`} icon="ðŸ‘¥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
-        {activePublicPage === "teams" && <><Card title={`Stats Ã©curies cumulÃ©es S1 â†’ ${seasonName(selectedSeasonId)}`} icon="ðŸŽï¸"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
-        {activePublicPage === "seasons" && <><Card title={`RÃ©sultats â€” ${seasonName(selectedSeasonId)}`} icon="ðŸ"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
+        {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
+        {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
@@ -3997,7 +3997,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
                 <h2 style={styles.gpDetailTitle}>Abandonner la tentative ?</h2>
               </div>
             </div>
-            <p style={styles.muted}>Si tu quittes cette page sans trouver le pilote, ta tentative sera considÃ©rÃ©e comme un abandon et tu ne marqueras aucun point.</p>
+            <p style={styles.muted}>Si tu quittes cette page sans trouver le pilote, ta tentative sera considérée comme un abandon et tu ne marqueras aucun point.</p>
             <div style={styles.actions}>
               <button type="button" onClick={cancelGuessDriverExit} style={styles.secondaryButton}>Rester sur le jeu</button>
               <button type="button" onClick={confirmGuessDriverExit} style={styles.dangerButton}>Quitter sans point</button>
@@ -4028,16 +4028,16 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
 
   return (
     <div style={styles.accountBox}>
-      {profile?.pseudo && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` Â· ${profile.discordName}` : ""}</span>}
+      {profile?.pseudo && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span>}
       <div style={styles.headerActions}>
         <button type="button" onClick={() => setOpen(true)} style={styles.secondaryButton}>{profile ? "Compte" : "Connexion"}</button>
-        {profile && <button type="button" onClick={onLogout} style={styles.linkButton}>DÃ©connexion</button>}
+        {profile && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
       {open && (
         <div style={styles.detailOverlay} onMouseDown={() => setOpen(false)}>
           <form onSubmit={submit} style={{ ...styles.feedbackModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
             <div style={styles.publicRaceHeader}>
-              <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "CrÃ©er un compte" : "Connexion"}</h2></div>
+              <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "Créer un compte" : "Connexion"}</h2></div>
               <button type="button" onClick={() => setOpen(false)} style={styles.secondaryButton}>Fermer</button>
             </div>
             <div style={styles.feedbackChoice}>
@@ -4051,7 +4051,7 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
                 <Input label="Nom Discord" value={form.discordName} onChange={(value) => update("discordName", value)} />
               </>
             )}
-            <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Patiente..." : mode === "signup" ? "CrÃ©er mon compte" : "Se connecter"}</button>
+            <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Patiente..." : mode === "signup" ? "Créer mon compte" : "Se connecter"}</button>
             {status && <p style={styles.mutedSmall}>{status}</p>}
           </form>
         </div>
@@ -4069,7 +4069,7 @@ function PoleToDnfAnimation({ onDone }) {
   return (
     <div className="urtt-pole-dnf-overlay" aria-live="polite">
       <div className="urtt-pole-dnf-card">
-        <p className="urtt-pole-dnf-kicker">Saison 12 Â· Monaco Â· Thibaut</p>
+        <p className="urtt-pole-dnf-kicker">Saison 12 · Monaco · Thibaut</p>
         <h2 className="urtt-pole-dnf-title">POLE TO DNF</h2>
       </div>
     </div>
@@ -4094,10 +4094,10 @@ function TitleHeartbreakAnimation({ type, onDone }) {
     return (
       <div className="urtt-heartbreak-overlay" aria-live="polite">
         <div className="urtt-trophy-card">
-          <p className="urtt-heartbreak-kicker">Saison 14 Â· Kolti</p>
-          <div className="urtt-trophy">ðŸ†</div>
+          <p className="urtt-heartbreak-kicker">Saison 14 · Kolti</p>
+          <div className="urtt-trophy">🏆</div>
           <h2 className="urtt-heartbreak-title">SI PROCHE.</h2>
-          <p className="urtt-heartbreak-subtitle">Perdu dans la derniÃ¨re course</p>
+          <p className="urtt-heartbreak-subtitle">Perdu dans la dernière course</p>
         </div>
       </div>
     );
@@ -4118,8 +4118,8 @@ function TitleHeartbreakAnimation({ type, onDone }) {
         />
       ))}
       <div className="urtt-heartbreak-card">
-        <p className="urtt-heartbreak-kicker">Saison 7 Â· Kolti</p>
-        <h2 className="urtt-heartbreak-title">CÃ‰LÃ‰BRATION ANNULÃ‰E</h2>
+        <p className="urtt-heartbreak-kicker">Saison 7 · Kolti</p>
+        <h2 className="urtt-heartbreak-title">CÉLÉBRATION ANNULÉE</h2>
         <p className="urtt-heartbreak-subtitle">Pas pour Kolti cette fois.</p>
       </div>
     </div>
@@ -4132,13 +4132,13 @@ function EasterEggBookPage({ unlockedIds = [] }) {
 
   return (
     <div style={styles.section}>
-      <Card title="Livre secret des easter eggs" icon="ðŸ“–">
+      <Card title="Livre secret des easter eggs" icon="📖">
         <div style={styles.statsGrid}>
-          <Stat label="DÃ©couverts" value={`${unlockedCount}/${EASTER_EGG_BOOK.length}`} />
-          <Stat label="CarrÃ©s cachÃ©s" value={EASTER_EGG_BOOK.length - unlockedCount} />
+          <Stat label="Découverts" value={`${unlockedCount}/${EASTER_EGG_BOOK.length}`} />
+          <Stat label="Carrés cachés" value={EASTER_EGG_BOOK.length - unlockedCount} />
           <Stat label="Mode" value="Collection" />
         </div>
-        <p style={styles.mutedSmall}>Chaque carrÃ© se dÃ©bloque quand tu dÃ©clenches l'easter egg correspondant sur le site.</p>
+        <p style={styles.mutedSmall}>Chaque carré se débloque quand tu déclenches l'easter egg correspondant sur le site.</p>
       </Card>
       <div style={styles.easterEggGrid}>
         {EASTER_EGG_BOOK.map((egg, index) => {
@@ -4147,13 +4147,13 @@ function EasterEggBookPage({ unlockedIds = [] }) {
             <div key={egg.id} style={{ ...styles.easterEggSquare, ...(unlocked ? styles.easterEggUnlocked : styles.easterEggLocked) }}>
               <div style={styles.easterEggSquareTop}>
                 <span style={styles.easterEggNumber}>#{index + 1}</span>
-                <span style={unlocked ? styles.badgeGreen : styles.badgeDark}>{unlocked ? "DÃ©bloquÃ©" : "CachÃ©"}</span>
+                <span style={unlocked ? styles.badgeGreen : styles.badgeDark}>{unlocked ? "Débloqué" : "Caché"}</span>
               </div>
               <div style={styles.easterEggCenter}>
                 <strong style={styles.easterEggTitle}>{unlocked ? egg.title : "???"}</strong>
-                <p style={styles.mutedSmall}>{unlocked ? egg.hint : "Easter egg non dÃ©couvert"}</p>
+                <p style={styles.mutedSmall}>{unlocked ? egg.hint : "Easter egg non découvert"}</p>
               </div>
-              <p style={styles.easterEggText}>{unlocked ? egg.unlockedText : "DÃ©clenche l'easter egg pour rÃ©vÃ©ler cette page du livre."}</p>
+              <p style={styles.easterEggText}>{unlocked ? egg.unlockedText : "Déclenche l'easter egg pour révéler cette page du livre."}</p>
             </div>
           );
         })}
@@ -4294,12 +4294,12 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
         </div>
         <div style={styles.worldCountrySummary}>
           <strong>{countryList.length} pays renseigne{countryList.length > 1 ? "s" : ""}</strong>
-          <span>{countryList.map(getCountryDisplayName).join(" Â· ") || "Ajoute un pays dans Admin > Courses."}</span>
+          <span>{countryList.map(getCountryDisplayName).join(" · ") || "Ajoute un pays dans Admin > Courses."}</span>
         </div>
         {mapError && <div style={styles.worldEmpty}>{mapError}</div>}
       </div>
       {countryList.length === 0 && (
-        <Card title="Pays a renseigner" icon="ðŸŒ">
+        <Card title="Pays a renseigner" icon="🌍">
           <div style={styles.stack}>
             <Empty text="Ajoute le pays des circuits dans Admin > Courses > Bibliotheque des GP pour les voir apparaitre sur la carte." />
           </div>
@@ -4323,10 +4323,10 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
 function SeasonSummary({ selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [] }) {
   return (
     <div style={styles.statsGrid}>
-      <Stat label="CatÃ©gorie" value={selectedCategoryId} />
+      <Stat label="Catégorie" value={selectedCategoryId} />
       <Stat label="Saison" value={seasonName(selectedSeasonId)} />
       <Stat label="Leader pilote" value={leaderDriver} />
-      <Stat label="Leader Ã©curie" value={leaderTeam} />
+      <Stat label="Leader écurie" value={leaderTeam} />
       <Stat label="GP" value={races.length} />
     </div>
   );
@@ -4337,8 +4337,8 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
     <div className="urtt-standings-page" style={styles.section}>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <div className="urtt-standings-grid" style={styles.standingsGrid}>
-        <Card title={`Classement pilotes â€” ${seasonName(selectedSeasonId)}`} icon="ðŸ†"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={onDriverClick} /></Card>
-        <Card title={`Classement Ã©curies â€” ${seasonName(selectedSeasonId)}`} icon="ðŸŽï¸"><TeamTable teams={seasonOnlyTeams} raceDetails compactRaceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
+        <Card title={`Classement pilotes — ${seasonName(selectedSeasonId)}`} icon="🏆"><DriverTable drivers={seasonOnlyDrivers} raceDetails compactRaceDetails races={races} raceResults={raceResults} teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={onDriverClick} /></Card>
+        <Card title={`Classement écuries — ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={seasonOnlyTeams} raceDetails compactRaceDetails races={races} raceResults={raceResults} drivers={allDrivers} selectedCategoryId={selectedCategoryId} /></Card>
       </div>
     </div>
   );
@@ -4396,12 +4396,12 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
 
   return (
     <div style={styles.section}>
-      <Card title={`Pronos GP â€” ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="ðŸŽ®">
+      <Card title={`Pronos GP — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="🎮">
         <form onSubmit={submit} style={styles.stack}>
           <div style={styles.resultsInfo}>
-            <label style={styles.label}><span style={styles.labelText}>Course</span><select value={activeRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}{isPredictionClosedForRace(raceResults, predictionControls, race.id) ? " Â· fermÃ©" : ""}</option>)}</select></label>
+            <label style={styles.label}><span style={styles.labelText}>Course</span><select value={activeRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}{isPredictionClosedForRace(raceResults, predictionControls, race.id) ? " · fermé" : ""}</option>)}</select></label>
             <div style={styles.raceStat}><span style={styles.mutedSmall}>Joueur</span><strong>{playerProfile?.pseudo || "Connexion requise"}</strong></div>
-            <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{raceClosed ? "Pronos fermÃ©s" : "Pronos ouverts"}</strong></div>
+            <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{raceClosed ? "Pronos fermés" : "Pronos ouverts"}</strong></div>
           </div>
           {races.length === 0 ? <Empty text="Aucune course disponible pour cette saison." /> : (
             <>
@@ -4410,17 +4410,17 @@ function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingD
                 <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
               </div>
               <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} teams={teams} seasonId={seasonId} order={predictionOrder} defaultOrder={defaultOrder} onMove={movePredictionDriver} onSetOrder={setPredictionOrder} />
-              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo || playerAlreadySubmitted} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermÃ©e" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : playerAlreadySubmitted ? "Prono dÃ©jÃ  envoyÃ©" : "Envoyer mon prono"}</button>
+              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo || playerAlreadySubmitted} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : playerAlreadySubmitted ? "Prono déjà envoyé" : "Envoyer mon prono"}</button>
               {status && <p style={styles.mutedSmall}>{status}</p>}
             </>
           )}
         </form>
       </Card>
       <div style={styles.twoColumns}>
-        <Card title="Classement pronos" icon="ðŸ†">
+        <Card title="Classement pronos" icon="🏆">
           <PredictionLeaderboard leaderboard={leaderboard} />
         </Card>
-        <Card title={selectedRace ? `Pronos envoyÃ©s â€” ${selectedRace.name}` : "Pronos envoyÃ©s"} icon="ðŸ“‹">
+        <Card title={selectedRace ? `Pronos envoyés — ${selectedRace.name}` : "Pronos envoyés"} icon="📋">
           <PredictionSummary predictions={racePredictions} drivers={drivers} teams={teams} raceResults={raceResults} />
         </Card>
       </div>
@@ -4461,12 +4461,12 @@ function PredictionOrderPicker({ drivers = [], teams = [], seasonId, order = [],
     <div style={styles.predictionOrderBox}>
       <div style={styles.predictionOrderHeader}>
         <div>
-          <strong>Classement prÃ©dit</strong>
-          <p style={styles.mutedSmall}>DÃ©place les pilotes pour construire ton top 20.</p>
+          <strong>Classement prédit</strong>
+          <p style={styles.mutedSmall}>Déplace les pilotes pour construire ton top 20.</p>
         </div>
         <div style={styles.actions}>
           <button type="button" onClick={reset} style={styles.editButton}>Classement actuel</button>
-          <button type="button" onClick={randomize} style={styles.secondaryButton}>MÃ©langer</button>
+          <button type="button" onClick={randomize} style={styles.secondaryButton}>Mélanger</button>
         </div>
       </div>
       <div style={styles.predictionOrderList}>
@@ -4486,9 +4486,9 @@ function PredictionOrderPicker({ drivers = [], teams = [], seasonId, order = [],
               <span style={styles.predictionPosition}>P{index + 1}</span>
               {driver ? <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /> : <strong>Pilote inconnu</strong>}
               <div style={styles.predictionMoveButtons}>
-                <button type="button" onClick={() => move(index, index - 1)} disabled={index === 0} style={styles.editButton}>â†‘</button>
-                <button type="button" onClick={() => move(index, index + 1)} disabled={index === fullOrder.length - 1} style={styles.editButton}>â†“</button>
-                <span style={styles.predictionDragHandle}>â‰¡</span>
+                <button type="button" onClick={() => move(index, index - 1)} disabled={index === 0} style={styles.editButton}>↑</button>
+                <button type="button" onClick={() => move(index, index + 1)} disabled={index === fullOrder.length - 1} style={styles.editButton}>↓</button>
+                <span style={styles.predictionDragHandle}>≡</span>
               </div>
             </div>
           );
@@ -4504,7 +4504,7 @@ function PredictionLeaderboard({ leaderboard }) {
 }
 
 function PredictionSummary({ predictions = [], drivers = [], teams = [], raceResults = [] }) {
-  if (!predictions.length) return <Empty text="Aucun prono envoyÃ© pour cette course." />;
+  if (!predictions.length) return <Empty text="Aucun prono envoyé pour cette course." />;
   return <div style={styles.stack}>{predictions.map((prediction) => {
     const score = scoreRacePrediction(prediction, raceResults);
     return (
@@ -4517,13 +4517,13 @@ function PredictionSummary({ predictions = [], drivers = [], teams = [], raceRes
           <RaceStat label="Vainqueur" value={driverName(drivers, prediction.winnerDriverId)} />
           <RaceStat label="Poleman" value={driverName(drivers, prediction.poleDriverId)} />
           <RaceStat label="Meilleur tour" value={driverName(drivers, prediction.fastestDriverId)} />
-          <RaceStat label="Podium" value={(prediction.predictedOrder?.length ? prediction.predictedOrder.slice(0, 3) : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).map((id) => driverName(drivers, id)).join(" Â· ")} />
+          <RaceStat label="Podium" value={(prediction.predictedOrder?.length ? prediction.predictedOrder.slice(0, 3) : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).map((id) => driverName(drivers, id)).join(" · ")} />
         </div>
         <p style={styles.mutedSmall}>{score.details}</p>
         <div style={styles.titleBadgeRow}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.winnerDriverId, prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).slice(0, 20).map((driverId, index) => {
           const driver = drivers.find((item) => idsEqual(item.id, driverId));
           const team = driver ? getDriverSeasonTeam(driver, prediction.seasonId, teams) : null;
-          return driver ? <span key={`${prediction.id}-${driverId}`} style={styles.titleBadge}>P{index + 1} Â· {team?.name ? `${team.name} Â· ` : ""}{driver.name}</span> : null;
+          return driver ? <span key={`${prediction.id}-${driverId}`} style={styles.titleBadge}>P{index + 1} · {team?.name ? `${team.name} · ` : ""}{driver.name}</span> : null;
         })}</div>
       </div>
     );
@@ -4555,7 +4555,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
     setAttempts(restoredAttempts);
     if (restoredAttempts.length) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, restoredAttempts);
     setGuessId("");
-    setMessage(restoredAttempts.length ? "Tes essais du jour ont Ã©tÃ© restaurÃ©s." : "");
+    setMessage(restoredAttempts.length ? "Tes essais du jour ont été restaurés." : "");
   }, [attemptStorageKey, profile?.id, selectedCategoryId, challengeDay, serverAttempts.join(",")]);
   useEffect(() => {
     if (savedToday) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, []);
@@ -4569,7 +4569,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
     event.preventDefault();
     setMessage("");
     if (!profile?.id || !profile?.pseudo) {
-      setMessage("Connecte-toi avec ton compte joueur pour enregistrer ta sÃ©rie.");
+      setMessage("Connecte-toi avec ton compte joueur pour enregistrer ta série.");
       return;
     }
     if (!guessId) {
@@ -4577,7 +4577,7 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
       return;
     }
     if (attempts.some((driverId) => idsEqual(driverId, guessId))) {
-      setMessage("Tu as dÃ©jÃ  tentÃ© ce pilote.");
+      setMessage("Tu as déjà tenté ce pilote.");
       return;
     }
     const nextAttempts = [...attempts, guessId];
@@ -4605,27 +4605,27 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
   }
 
   if (!targetDriver) {
-    return <Card title="DÃ©fi pilote" icon="â“"><Empty text="Aucun pilote disponible pour cette catÃ©gorie." /></Card>;
+    return <Card title="Défi pilote" icon="❓"><Empty text="Aucun pilote disponible pour cette catégorie." /></Card>;
   }
 
   return (
     <div style={styles.section}>
-      <Card title={`DÃ©fi pilote â€” ${selectedCategoryId}`} icon="â“">
+      <Card title={`Défi pilote — ${selectedCategoryId}`} icon="❓">
         <div style={styles.guessHero}>
           <div>
-            <p style={styles.kicker}>PILOTE MYSTÃˆRE DU JOUR</p>
+            <p style={styles.kicker}>PILOTE MYSTÈRE DU JOUR</p>
             <h2 style={styles.gpDetailTitle}>{won ? targetDriver.name : "Qui est-ce ?"}</h2>
-            <p style={styles.mutedSmall}>Le pilote mystÃ¨re est choisi parmi tous les pilotes {selectedCategoryId}, toutes saisons confondues. â†‘ veut dire que le pilote mystÃ¨re a une valeur plus haute, â†“ plus basse.</p>
+            <p style={styles.mutedSmall}>Le pilote mystère est choisi parmi tous les pilotes {selectedCategoryId}, toutes saisons confondues. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
           </div>
           <div style={styles.statsGrid}>
             <Stat label="Essais" value={attempts.length} />
             <Stat label="Pilotes possibles" value={playableDrivers.length} />
-            <Stat label="SÃ©rie" value={streak} />
-            <Stat label="Points si trouvÃ©" value={getGuessDriverScore(Math.max(1, attempts.length + 1))} />
+            <Stat label="Série" value={streak} />
+            <Stat label="Points si trouvé" value={getGuessDriverScore(Math.max(1, attempts.length + 1))} />
           </div>
         </div>
-        <p style={styles.mutedSmall}>BarÃ¨me : 10 pts au 1er essai, puis -1 pt par essai supplÃ©mentaire, minimum 1 pt.</p>
-        {!profile?.pseudo && <div style={styles.previewNotice}><strong>Compte requis</strong><span>Connecte-toi pour garder ta sÃ©rie et relier ton dÃ©fi Ã  ton pseudo Discord.</span></div>}
+        <p style={styles.mutedSmall}>Barème : 10 pts au 1er essai, puis -1 pt par essai supplémentaire, minimum 1 pt.</p>
+        {!profile?.pseudo && <div style={styles.previewNotice}><strong>Compte requis</strong><span>Connecte-toi pour garder ta série et relier ton défi à ton pseudo Discord.</span></div>}
         <form onSubmit={submitGuess} style={styles.resultsInfo}>
           <label style={styles.label}>
             <span style={styles.labelText}>Ton essai</span>
@@ -4634,15 +4634,15 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
               {remainingDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
             </select>
           </label>
-          <button type="submit" disabled={won || isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : won ? "TrouvÃ©" : "Valider l'essai"}</button>
+          <button type="submit" disabled={won || isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : won ? "Trouvé" : "Valider l'essai"}</button>
         </form>
         {message && <p style={styles.mutedSmall}>{message}</p>}
-        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvÃ© {targetDriver.name}{attempts.length ? ` en ${attempts.length} essai${attempts.length > 1 ? "s" : ""}` : ""}. SÃ©rie actuelle : {streak}.</span></div>}
+        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name}{attempts.length ? ` en ${attempts.length} essai${attempts.length > 1 ? "s" : ""}` : ""}. Série actuelle : {streak}.</span></div>}
       </Card>
-      <Card title="Indices" icon="ðŸ“Š">
+      <Card title="Indices" icon="📊">
         <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} />
       </Card>
-      <Card title={`Classement DÃ©fi pilote â€” ${selectedCategoryId}`} icon="ðŸ†">
+      <Card title={`Classement Défi pilote — ${selectedCategoryId}`} icon="🏆">
         <GuessDriverLeaderboard leaderboard={leaderboard} />
       </Card>
     </div>
@@ -4650,14 +4650,14 @@ function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile
 }
 
 function GuessDriverLeaderboard({ leaderboard = [] }) {
-  if (!leaderboard.length) return <Empty text="Aucun score enregistrÃ© pour le moment." />;
+  if (!leaderboard.length) return <Empty text="Aucun score enregistré pour le moment." />;
   return (
     <div style={styles.stack}>
       {leaderboard.map((row, index) => (
         <div key={`${row.pseudo}-${index}`} style={styles.itemBox}>
           <div>
             <strong>#{index + 1} {row.pseudo}</strong>
-            <p style={styles.mutedSmall}>{row.wins} dÃ©fi{row.wins > 1 ? "s" : ""} rÃ©ussi{row.wins > 1 ? "s" : ""}{row.bestAttempts ? ` Â· meilleur : ${row.bestAttempts} essai${row.bestAttempts > 1 ? "s" : ""}` : ""}</p>
+            <p style={styles.mutedSmall}>{row.wins} défi{row.wins > 1 ? "s" : ""} réussi{row.wins > 1 ? "s" : ""}{row.bestAttempts ? ` · meilleur : ${row.bestAttempts} essai${row.bestAttempts > 1 ? "s" : ""}` : ""}</p>
           </div>
           <span style={styles.points}>{row.score} pts</span>
         </div>
@@ -4683,14 +4683,14 @@ function GuessDriverTable({ guesses = [], target, teams = [] }) {
   return (
     <div style={styles.tableWrap}>
       <table style={{ ...styles.table, minWidth: 1120 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Ã‰curie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
         <tbody>{[...guesses].reverse().map((guess) => {
           const team = teams.find((item) => idsEqual(item.id, guess.teamId)) || null;
           const targetTeam = teams.find((item) => idsEqual(item.id, target.teamId)) || null;
           return (
             <tr key={guess.id} style={styles.tr}>
               <td style={styles.td}><GuessCell correct={idsEqual(guess.id, target.id)}><DriverIdentity driver={guess} teamColor={team?.color} teamLogo={team?.logo} /></GuessCell></td>
-              <td style={styles.td}><GuessCell correct={idsEqual(team?.id, targetTeam?.id)}>{team?.name || "â€”"}</GuessCell></td>
+              <td style={styles.td}><GuessCell correct={idsEqual(team?.id, targetTeam?.id)}>{team?.name || "—"}</GuessCell></td>
               {statColumns.map((column) => <td key={column.key} style={styles.td}><GuessStatCell value={guess[column.key]} state={compareGuessValue(guess[column.key], target[column.key])} /></td>)}
             </tr>
           );
@@ -4705,7 +4705,7 @@ function GuessCell({ correct, children }) {
 }
 
 function GuessStatCell({ value, state }) {
-  const marker = state === "correct" ? "âœ“" : state === "higher" ? "â†‘" : "â†“";
+  const marker = state === "correct" ? "✓" : state === "higher" ? "↑" : "↓";
   return <div style={{ ...styles.guessCell, ...(state === "correct" ? styles.guessCellCorrect : styles.guessCellWrong) }}><strong>{value || 0}</strong><span>{marker}</span></div>;
 }
 
@@ -4716,14 +4716,14 @@ function SpecialEditionsPage({ editions = [], drivers = [] }) {
       {SPECIAL_EVENT_OPTIONS.map((event) => {
         const eventEditions = sortedEditions.filter((edition) => edition.eventType === event.id);
         return (
-          <Card key={event.id} title={event.name} icon="ðŸ">
+          <Card key={event.id} title={event.name} icon="🏁">
             <div style={styles.stack}>
               {eventEditions.map((edition) => (
                 <div key={edition.id} style={{ ...styles.publicRaceCard, borderColor: event.color }}>
                   <div style={styles.publicRaceHeader}>
                     <div>
-                      <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non dÃ©finie"}</p>
-                      <h3 style={styles.raceTitle}>{edition.editionLabel}{edition.name ? ` Â· ${edition.name}` : ""}</h3>
+                      <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"}</p>
+                      <h3 style={styles.raceTitle}>{edition.editionLabel}{edition.name ? ` · ${edition.name}` : ""}</h3>
                     </div>
                     <span style={{ ...styles.categoryBadge, background: event.color, color: event.id === "INDY300" ? "#18181b" : "white" }}>{event.name}</span>
                   </div>
@@ -4735,7 +4735,7 @@ function SpecialEditionsPage({ editions = [], drivers = [] }) {
                   {edition.notes && <p style={styles.mutedSmall}>{edition.notes}</p>}
                 </div>
               ))}
-              {eventEditions.length === 0 && <Empty text={`Aucune Ã©dition ${event.name} enregistrÃ©e.`} />}
+              {eventEditions.length === 0 && <Empty text={`Aucune édition ${event.name} enregistrée.`} />}
             </div>
           </Card>
         );
@@ -4756,24 +4756,24 @@ function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, 
   })).sort((a, b) => getDevelopmentCoef(b.entry) - getDevelopmentCoef(a.entry) || a.team.name.localeCompare(b.team.name, "fr"));
   return (
     <div style={styles.section}>
-      {isAdminPreview && <div style={styles.previewNotice}><strong>AperÃ§u admin</strong><span>Cette page est masquÃ©e pour le public.</span></div>}
-      <Card title={`DÃ©veloppement â€” ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="ðŸ“ˆ">
+      {isAdminPreview && <div style={styles.previewNotice}><strong>Aperçu admin</strong><span>Cette page est masquée pour le public.</span></div>}
+      <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
         <DevelopmentChart teams={teams} entries={selectedEntries} />
       </Card>
-      <Card title="Classement dÃ©veloppement" icon="ðŸ">
+      <Card title="Classement développement" icon="🏁">
         <DevelopmentBarChart rows={latestByTeam} />
       </Card>
       <div className="urtt-development-cards" style={styles.developmentCards}>
         {latestByTeam.map(({ team, entry }) => <DevelopmentTeamCard key={team.id} team={team} entry={entry} previous={getPreviousDevelopmentEntry(selectedEntries, entry)} />)}
       </div>
-      {latestByTeam.length === 0 && <Empty text="Aucune Ã©curie inscrite pour cette saison/catÃ©gorie." />}
+      {latestByTeam.length === 0 && <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />}
     </div>
   );
 }
 
 function DevelopmentBarChart({ rows = [] }) {
   const maxValue = Math.max(1, ...rows.map(({ entry }) => getDevelopmentCoef(entry)));
-  if (!rows.length) return <Empty text="Aucune Ã©curie inscrite pour cette saison/catÃ©gorie." />;
+  if (!rows.length) return <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />;
 
   return (
     <div style={styles.developmentBarChart}>
@@ -4819,11 +4819,11 @@ function DevelopmentChart({ teams, entries = [] }) {
     entries: entries.filter((entry) => idsEqual(entry.teamId, team.id)).sort((a, b) => Number(a.round) - Number(b.round)),
   })).filter((item) => item.entries.length).sort((a, b) => getDevelopmentCoef(b.entries.at(-1)) - getDevelopmentCoef(a.entries.at(-1)) || a.team.name.localeCompare(b.team.name, "fr"));
 
-  if (entriesByTeam.length === 0) return <Empty text="Ajoute des donnÃ©es dans Admin > DÃ©veloppement." />;
+  if (entriesByTeam.length === 0) return <Empty text="Ajoute des données dans Admin > Développement." />;
 
   return (
     <div style={styles.developmentChartWrap}>
-      <svg viewBox={`0 0 ${width} ${height}`} style={styles.developmentChart} role="img" aria-label="Courbe de dÃ©veloppement des Ã©curies">
+      <svg viewBox={`0 0 ${width} ${height}`} style={styles.developmentChart} role="img" aria-label="Courbe de développement des écuries">
         {Array.from({ length: 6 }, (_, index) => {
           const value = Math.round(minValue + (valueRange / 5) * index);
           return <g key={value}><line x1={padLeft} y1={y(value)} x2={width - padRight} y2={y(value)} stroke="rgba(255,255,255,.12)" /><text x={14} y={y(value) + 4} fill="#d4d4d8" fontSize="12" fontWeight="800">{value}</text></g>;
@@ -4861,7 +4861,7 @@ function DevelopmentStat({ label, value, previous }) {
   return (
     <div style={styles.developmentStat}>
       <span style={styles.developmentStatLabel}>{label}</span>
-      <span style={styles.developmentDeltaSlot}>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "â–²" : "â–¼"} {Math.abs(delta)}</span>}</span>
+      <span style={styles.developmentDeltaSlot}>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</span>
       <strong style={styles.developmentStatValue}>{value}</strong>
     </div>
   );
@@ -4871,7 +4871,7 @@ function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames, thanksT
   const names = normalizeThanksNames(thanksNames);
   const text = normalizeThanksText(thanksText);
   return (
-    <Card title="AREKU_F1 en vidÃ©o" icon="â–¶ï¸">
+    <Card title="AREKU_F1 en vidéo" icon="▶️">
       <div style={styles.mediaGrid}>
         {AREKU_MEDIA_LINKS.map((link) => (
           <a key={link.url} href={link.url} target="_blank" rel="noreferrer" style={{ ...styles.mediaLinkCard, borderColor: link.color }}>
@@ -4900,7 +4900,7 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
       <aside className="urtt-admin-sidebar" style={styles.sidebar}>
         <div className="urtt-admin-logo" style={styles.logoRow}>
           <div style={styles.logo}>UR</div>
-          <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privÃ©</p></div>
+          <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div>
         </div>
         <nav className="urtt-admin-nav" style={styles.nav}>
           {adminPageOptions.map(({ id, icon, label }) => <button className="urtt-admin-nav-button" key={id} onClick={() => setActive(id)} style={{ ...styles.navButton, ...(active === id ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
@@ -4908,8 +4908,8 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
       </aside>
       <main className="urtt-admin-main" style={styles.main}>
         <header className="urtt-admin-header" style={styles.header}>
-          <div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>ConnectÃ© : {adminUser.email} Â· CatÃ©gories : {normalizeAllowedCategories(adminPermissions.allowedCategories).join(", ")}</p>}</div>
-          <div className="urtt-admin-actions" style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>DÃ©connexion</button></div>
+          <div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email} · Catégories : {normalizeAllowedCategories(adminPermissions.allowedCategories).join(", ")}</p>}</div>
+          <div className="urtt-admin-actions" style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div>
         </header>
         {children}
       </main>
@@ -4918,7 +4918,7 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
 }
 
 function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId }) {
-  return <div style={styles.section}><div style={styles.statsGrid}><Stat label="CatÃ©gorie" value={selectedCategoryId} /><Stat label="Saison" value={seasonName(selectedSeasonId)} /><Stat label="Pilotes" value={drivers.length} /><Stat label="Ã‰curies" value={teams.length} /><Stat label="GP" value={races.length} /></div><div style={styles.twoColumns}><Card title="Top pilotes global" icon="ðŸ†"><DriverTable drivers={drivers} teams={[]} /></Card><Card title="Top Ã©curies global" icon="ðŸŽï¸"><TeamTable teams={teams} /></Card></div></div>;
+  return <div style={styles.section}><div style={styles.statsGrid}><Stat label="Catégorie" value={selectedCategoryId} /><Stat label="Saison" value={seasonName(selectedSeasonId)} /><Stat label="Pilotes" value={drivers.length} /><Stat label="Écuries" value={teams.length} /><Stat label="GP" value={races.length} /></div><div style={styles.twoColumns}><Card title="Top pilotes global" icon="🏆"><DriverTable drivers={drivers} teams={[]} /></Card><Card title="Top écuries global" icon="🏎️"><TeamTable teams={teams} /></Card></div></div>;
 }
 
 function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, calendarFeedHits = [], raceResults, selectedCategoryId, selectedSeasonId }) {
@@ -4928,7 +4928,7 @@ function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibr
   const estimated7Days = getCalendarFeedEstimate(calendarFeedHits, 7);
   const estimated30Days = getCalendarFeedEstimate(calendarFeedHits, 30);
 
-  return <div style={styles.section}><Card title="Ã‰tat Supabase" icon="ðŸ—„ï¸"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="DerniÃ¨re synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "â€”"} /><Stat label="CatÃ©gorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Ã‰curies Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothÃ¨que" value={raceLibrary.length} /><Stat label="Calendrier affichÃ©" value={visibleCalendar.length} /><Stat label="RÃ©sultats affichÃ©s" value={visibleResults.length} /><Stat label="EntrÃ©es rÃ©sultats" value={visibleEntriesCount} /><Stat label="AbonnÃ©s estimÃ©s 7j" value={estimated7Days} /><Stat label="AbonnÃ©s estimÃ©s 30j" value={estimated30Days} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargÃ©s" icon="ðŸ‘¥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargÃ© depuis Supabase." />}</div></Card><Card title="Derniers GP chargÃ©s" icon="ðŸ"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargÃ© depuis Supabase." />}</div></Card></div></div>;
+  return <div style={styles.section}><Card title="État Supabase" icon="🗄️"><div style={styles.statsGrid}><Stat label="Connexion" value={isLoading ? "Chargement..." : errors.length ? "Erreur" : "OK"} /><Stat label="Dernière synchro" value={lastSyncAt ? lastSyncAt.toLocaleTimeString("fr-FR") : "—"} /><Stat label="Catégorie active" value={selectedCategoryId} /><Stat label="Saison active" value={seasonName(selectedSeasonId)} /></div>{errors.length > 0 && <div style={styles.errorBox}>{errors.map((error) => <p key={error} style={styles.errorText}>{error}</p>)}</div>}</Card><div style={styles.statsGrid}><Stat label="Écuries Supabase" value={teams.length} /><Stat label="Pilotes Supabase" value={drivers.length} /><Stat label="GP bibliothèque" value={raceLibrary.length} /><Stat label="Calendrier affiché" value={visibleCalendar.length} /><Stat label="Résultats affichés" value={visibleResults.length} /><Stat label="Entrées résultats" value={visibleEntriesCount} /><Stat label="Abonnés estimés 7j" value={estimated7Days} /><Stat label="Abonnés estimés 30j" value={estimated30Days} /></div><div style={styles.twoColumns}><Card title="Derniers pilotes chargés" icon="👥"><div style={styles.stack}>{drivers.slice(0, 8).map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><span style={styles.mutedSmall}>ID {driver.id}</span></div>)}{drivers.length === 0 && <Empty text="Aucun pilote chargé depuis Supabase." />}</div></Card><Card title="Derniers GP chargés" icon="🏁"><div style={styles.stack}>{raceLibrary.slice(0, 8).map((race) => <div key={race.id} style={styles.itemBox}><strong>{race.name}</strong><span style={styles.mutedSmall}>ID {race.id}</span></div>)}{raceLibrary.length === 0 && <Empty text="Aucun GP chargé depuis Supabase." />}</div></Card></div></div>;
 }
 
 function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTeam }) {
@@ -4939,11 +4939,11 @@ function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTe
   });
   const matchedTeams = teams.filter((team) => `${team.name}`.toLowerCase().includes(query));
 
-  return <div style={styles.section}><Card title="Recherche admin" icon="ðŸ”Ž"><div style={styles.searchBox}>ðŸ”Ž <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pilote, numÃ©ro ou une Ã©curie..." style={styles.searchInput} /></div><p style={styles.mutedSmall}>Tape un nom ou un numÃ©ro pour retrouver rapidement une fiche Ã  modifier.</p></Card><div style={styles.twoColumns}><Card title={`Pilotes trouvÃ©s (${matchedDrivers.length})`} icon="ðŸ‘¥"><div style={styles.stack}>{matchedDrivers.map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><button onClick={() => onEditDriver(driver)} style={styles.editButton}>Modifier</button></div>)}{matchedDrivers.length === 0 && <Empty text="Aucun pilote trouvÃ©." />}</div></Card><Card title={`Ã‰curies trouvÃ©es (${matchedTeams.length})`} icon="ðŸŽï¸"><div style={styles.stack}>{matchedTeams.map((team) => <div key={team.id} style={styles.itemBox}><TeamIdentity team={team} /><button onClick={() => onEditTeam(team)} style={styles.editButton}>Modifier</button></div>)}{matchedTeams.length === 0 && <Empty text="Aucune Ã©curie trouvÃ©e." />}</div></Card></div></div>;
+  return <div style={styles.section}><Card title="Recherche admin" icon="🔎"><div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pilote, numéro ou une écurie..." style={styles.searchInput} /></div><p style={styles.mutedSmall}>Tape un nom ou un numéro pour retrouver rapidement une fiche à modifier.</p></Card><div style={styles.twoColumns}><Card title={`Pilotes trouvés (${matchedDrivers.length})`} icon="👥"><div style={styles.stack}>{matchedDrivers.map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><button onClick={() => onEditDriver(driver)} style={styles.editButton}>Modifier</button></div>)}{matchedDrivers.length === 0 && <Empty text="Aucun pilote trouvé." />}</div></Card><Card title={`Écuries trouvées (${matchedTeams.length})`} icon="🏎️"><div style={styles.stack}>{matchedTeams.map((team) => <div key={team.id} style={styles.itemBox}><TeamIdentity team={team} /><button onClick={() => onEditTeam(team)} style={styles.editButton}>Modifier</button></div>)}{matchedTeams.length === 0 && <Empty text="Aucune écurie trouvée." />}</div></Card></div></div>;
 }
 
 function AdminDrivers({ drivers, teams, selectedSeasonId, categoryOptions = CATEGORY_OPTIONS, form, setForm, editingId, isSaving, onSave, onEdit, onDelete, onCancel, search, setSearch }) {
-  return <div style={styles.twoColumnsSmallLeft}><Card title={editingId ? "Modifier un pilote" : "CrÃ©er un pilote"} icon="âž•"><DriverForm form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} onSave={onSave} onCancel={onCancel} editingId={editingId} isSaving={isSaving} /></Card><Card title="Pilotes" icon="ðŸ‘¥"><div style={styles.searchBox}>ðŸ”Ž <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher..." style={styles.searchInput} /></div><div style={styles.cardGrid}>{drivers.map((driver) => <DriverAdminCard key={driver.id} driver={driver} team={teams.find((team) => team.id === driver.teamId)} onEdit={onEdit} onDelete={onDelete} />)}</div>{drivers.length === 0 && <Empty text="Aucun pilote pour le moment." />}</Card></div>;
+  return <div style={styles.twoColumnsSmallLeft}><Card title={editingId ? "Modifier un pilote" : "Créer un pilote"} icon="➕"><DriverForm form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} onSave={onSave} onCancel={onCancel} editingId={editingId} isSaving={isSaving} /></Card><Card title="Pilotes" icon="👥"><div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher..." style={styles.searchInput} /></div><div style={styles.cardGrid}>{drivers.map((driver) => <DriverAdminCard key={driver.id} driver={driver} team={teams.find((team) => team.id === driver.teamId)} onEdit={onEdit} onDelete={onDelete} />)}</div>{drivers.length === 0 && <Empty text="Aucun pilote pour le moment." />}</Card></div>;
 }
 
 function PlanningPanel({ races, calendarEvents = [], eventForm, setEventForm, selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId, onUpdateStartAt, onSaveEvent, onDeleteEvent, isSavingEvent }) {
@@ -4964,44 +4964,44 @@ function PlanningPanel({ races, calendarEvents = [], eventForm, setEventForm, se
 
   return (
     <div style={styles.section}>
-      <Card title="Planning des prochaines courses" icon="â±ï¸">
+      <Card title="Planning des prochaines courses" icon="⏱️">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
         </div>
-        <div style={styles.stack}>{filteredRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} Â· {seasonName(race.seasonId)} Â· {formatRaceDate(race.startAt)}</p></div><RaceDateInput race={race} onSave={onUpdateStartAt} /></div>)}{filteredRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}</div>
+        <div style={styles.stack}>{filteredRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p></div><RaceDateInput race={race} onSave={onUpdateStartAt} /></div>)}{filteredRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}</div>
       </Card>
 
       <div style={styles.twoColumns}>
-        <Card title="Ã‰vÃ©nement hors calendrier" icon="âž•">
+        <Card title="Événement hors calendrier" icon="➕">
           <div style={styles.stack}>
             <Input label="Titre" value={eventForm.title} onChange={(value) => setEventForm({ ...eventForm, title: value })} />
             <label style={styles.label}><span style={styles.labelText}>Description</span><textarea value={eventForm.description} onChange={(event) => setEventForm({ ...eventForm, description: event.target.value })} rows={4} style={styles.textarea} /></label>
-            <Input label="DÃ©but" type="datetime-local" value={eventForm.startAt} onChange={(value) => setEventForm({ ...eventForm, startAt: value })} />
+            <Input label="Début" type="datetime-local" value={eventForm.startAt} onChange={(value) => setEventForm({ ...eventForm, startAt: value })} />
             <Input label="Fin optionnelle" type="datetime-local" value={eventForm.endAt} onChange={(value) => setEventForm({ ...eventForm, endAt: value })} />
-            <button type="button" onClick={onSaveEvent} disabled={isSavingEvent} style={styles.fullButton}>{isSavingEvent ? "Sauvegarde..." : "Ajouter au calendrier abonnÃ©"}</button>
+            <button type="button" onClick={onSaveEvent} disabled={isSavingEvent} style={styles.fullButton}>{isSavingEvent ? "Sauvegarde..." : "Ajouter au calendrier abonné"}</button>
           </div>
         </Card>
 
-        <Card title="Ã‰vÃ©nements Ã  venir" icon="ðŸ“Œ">
+        <Card title="Événements à venir" icon="📌">
           <div style={styles.stack}>
             {upcomingEvents.map((event) => (
               <div key={event.id} style={styles.itemBox}>
                 <div>
                   <strong>{event.title}</strong>
-                  <p style={styles.mutedSmall}>{formatRaceDate(event.startAt)}{event.endAt ? ` Â· Fin ${formatRaceDate(event.endAt)}` : ""}</p>
+                  <p style={styles.mutedSmall}>{formatRaceDate(event.startAt)}{event.endAt ? ` · Fin ${formatRaceDate(event.endAt)}` : ""}</p>
                   {event.description && <p style={styles.mutedSmall}>{event.description}</p>}
                 </div>
                 <button type="button" onClick={() => onDeleteEvent(event.id)} disabled={isSavingEvent} style={styles.dangerButton}>Supprimer</button>
               </div>
             ))}
-            {upcomingEvents.length === 0 && <Empty text="Aucun Ã©vÃ©nement hors calendrier programmÃ©." />}
+            {upcomingEvents.length === 0 && <Empty text="Aucun événement hors calendrier programmé." />}
           </div>
         </Card>
       </div>
 
-      <Card title="AperÃ§u public" icon="ðŸ“…">
-        <div style={styles.stack}>{upcomingRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} Â· {seasonName(race.seasonId)} Â· Course #{race.round}</p></div><span style={styles.badgeGreen}>{formatRaceDate(race.startAt)}</span></div>)}{upcomingRaces.length === 0 && <Empty text="Aucune course future programmÃ©e." />}</div>
+      <Card title="Aperçu public" icon="📅">
+        <div style={styles.stack}>{upcomingRaces.map((race) => <div key={race.id} style={styles.itemBox}><div><strong>{race.name}</strong><p style={styles.mutedSmall}>{race.categoryId} · {seasonName(race.seasonId)} · Course #{race.round}</p></div><span style={styles.badgeGreen}>{formatRaceDate(race.startAt)}</span></div>)}{upcomingRaces.length === 0 && <Empty text="Aucune course future programmée." />}</div>
       </Card>
     </div>
   );
@@ -5056,9 +5056,9 @@ function DevelopmentAdminPanel({ teams, drivers = [], entries = [], form, setFor
 
   return (
     <div style={styles.section}>
-      <Card title="DÃ©veloppement Ã©curies" icon="ðŸ“ˆ">
+      <Card title="Développement écuries" icon="📈">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => updateCategory(event.target.value)} style={styles.resultsSelect}>{developmentCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => updateCategory(event.target.value)} style={styles.resultsSelect}>{developmentCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => updateSeason(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
           <Input label="Course / Round" type="number" value={form.round} onChange={(value) => update("round", value)} />
           <label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.turboEnabled)} onChange={(event) => update("turboEnabled", event.target.checked)} /> Activer Turbo</label>
@@ -5074,17 +5074,17 @@ function DevelopmentAdminPanel({ teams, drivers = [], entries = [], form, setFor
             </div>
           ))}
         </div>
-        {seasonTeams.length === 0 && <Empty text="Aucune Ã©curie inscrite pour cette saison/catÃ©gorie." />}
-        <button type="button" onClick={() => onSave(buildRows())} disabled={isSaving || seasonTeams.length === 0} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : `Enregistrer les ${seasonTeams.length} Ã©curies`}</button>
+        {seasonTeams.length === 0 && <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />}
+        <button type="button" onClick={() => onSave(buildRows())} disabled={isSaving || seasonTeams.length === 0} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : `Enregistrer les ${seasonTeams.length} écuries`}</button>
       </Card>
 
-      <Card title={`DonnÃ©es enregistrÃ©es â€” ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="ðŸ“‹">
+      <Card title={`Données enregistrées — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📋">
         <div style={styles.stack}>
           {selectedEntries.map((entry) => {
             const team = teams.find((item) => idsEqual(item.id, entry.teamId));
             return (
               <div key={entry.id || `${entry.teamId}-${entry.round}`} style={styles.itemBox}>
-                <div><strong>R{entry.round} Â· {team?.name || "Ã‰curie"}</strong><p style={styles.mutedSmall}>Speed {entry.speed} Â· Acc {entry.acceleration} Â· Grip {entry.grip}{entry.turboEnabled ? ` Â· Turbo ${entry.turbo}` : ""}</p></div>
+                <div><strong>R{entry.round} · {team?.name || "Écurie"}</strong><p style={styles.mutedSmall}>Speed {entry.speed} · Acc {entry.acceleration} · Grip {entry.grip}{entry.turboEnabled ? ` · Turbo ${entry.turbo}` : ""}</p></div>
                 <div style={styles.actions}>
                   <button type="button" onClick={() => editEntry(entry)} style={styles.editButton}>Modifier</button>
                   <button type="button" onClick={() => onDelete(entry)} disabled={isSaving} style={styles.dangerButton}>Supprimer</button>
@@ -5092,7 +5092,7 @@ function DevelopmentAdminPanel({ teams, drivers = [], entries = [], form, setFor
               </div>
             );
           })}
-          {selectedEntries.length === 0 && <Empty text="Aucune donnÃ©e enregistrÃ©e pour cette sÃ©lection." />}
+          {selectedEntries.length === 0 && <Empty text="Aucune donnée enregistrée pour cette sélection." />}
         </div>
       </Card>
     </div>
@@ -5103,11 +5103,11 @@ function DriverForm({ form, setForm, teams, selectedSeasonId, categoryOptions = 
   const update = (key, value) => setForm({ ...form, [key]: value });
   const updateCrown = (key, value) => setForm({ ...form, tripleCrown: { ...form.tripleCrown, [key]: value } });
 
-  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraitÃ©</label><div style={styles.formGrid}><Input label="Titres pilote F1" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres Ã©curie F1" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Titre F1</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 300</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> 2,4H du Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "CrÃ©er le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+  return <div style={styles.stack}><Input label="Nom du pilote" value={form.name} onChange={(value) => update("name", value)} /><label style={styles.checkboxPill}><input type="checkbox" checked={Boolean(form.retired)} onChange={(event) => update("retired", event.target.checked)} /> Pilote retraité</label><div style={styles.formGrid}><Input label="Titres pilote F1" type="number" value={form.driverTitles} onChange={(value) => update("driverTitles", value)} /><Input label="Titres écurie F1" type="number" value={form.teamTitles} onChange={(value) => update("teamTitles", value)} /></div><div style={styles.teamPreview}><span style={styles.labelText}>Triple Couronne</span><label><input type="checkbox" checked={form.tripleCrown.monaco} onChange={(event) => updateCrown("monaco", event.target.checked)} /> Titre F1</label><label><input type="checkbox" checked={form.tripleCrown.indy500} onChange={(event) => updateCrown("indy500", event.target.checked)} /> Indy 300</label><label><input type="checkbox" checked={form.tripleCrown.lemans} onChange={(event) => updateCrown("lemans", event.target.checked)} /> 2,4H du Mans</label></div><ParticipationEditor form={form} setForm={setForm} teams={teams} selectedSeasonId={selectedSeasonId} categoryOptions={categoryOptions} /><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer le pilote"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
 function AdminTeams({ teams, form, setForm, editingId, isSaving, onSave, onEdit, onDelete, onCancel }) {
-  return <div style={styles.twoColumnsSmallLeft}><Card title={editingId ? "Modifier une Ã©curie" : "CrÃ©er une Ã©curie"} icon="âž•"><TeamForm form={form} setForm={setForm} onSave={onSave} onCancel={onCancel} editingId={editingId} isSaving={isSaving} /></Card><Card title="Ã‰curies" icon="ðŸŽï¸"><div style={styles.cardGrid}>{teams.map((team) => <TeamAdminCard key={team.id} team={team} onEdit={onEdit} onDelete={onDelete} />)}</div>{teams.length === 0 && <Empty text="Aucune Ã©curie pour le moment." />}</Card></div>;
+  return <div style={styles.twoColumnsSmallLeft}><Card title={editingId ? "Modifier une écurie" : "Créer une écurie"} icon="➕"><TeamForm form={form} setForm={setForm} onSave={onSave} onCancel={onCancel} editingId={editingId} isSaving={isSaving} /></Card><Card title="Écuries" icon="🏎️"><div style={styles.cardGrid}>{teams.map((team) => <TeamAdminCard key={team.id} team={team} onEdit={onEdit} onDelete={onDelete} />)}</div>{teams.length === 0 && <Empty text="Aucune écurie pour le moment." />}</Card></div>;
 }
 
 function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
@@ -5128,7 +5128,7 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
 
     if (error) {
       console.error("Erreur upload logo:", error);
-      alert("Impossible dâ€™importer le logo. VÃ©rifie le bucket team-logos et les policies Storage.");
+      alert("Impossible d’importer le logo. Vérifie le bucket team-logos et les policies Storage.");
       return;
     }
 
@@ -5138,7 +5138,7 @@ function TeamForm({ form, setForm, onSave, onCancel, editingId, isSaving }) {
 
     update("logo", data.publicUrl);
   }
-  return <div style={styles.stack}><Input label="Nom de lâ€™Ã©curie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote F3" type="number" value={form.driverTitlesF3 ?? 0} onChange={(value) => update("driverTitlesF3", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titre constructeur F1" type="number" value={form.teamTitlesF1 ?? form.teamTitles ?? 0} onChange={updateTeamTitleF1} /><Input label="Titre constructeur F2" type="number" value={form.teamTitlesF2 ?? 0} onChange={(value) => update("teamTitlesF2", value)} /><Input label="Titre constructeur F3" type="number" value={form.teamTitlesF3 ?? 0} onChange={(value) => update("teamTitlesF3", value)} /><Input label="Titre constructeur FE" type="number" value={form.teamTitlesFE ?? 0} onChange={(value) => update("teamTitlesFE", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "CrÃ©er lâ€™Ã©curie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
+  return <div style={styles.stack}><Input label="Nom de l’écurie" value={form.name} onChange={(value) => update("name", value)} /><ColorInput label="Couleur" value={form.color} onChange={(value) => update("color", value)} /><Input label="Logo URL" value={form.logo} onChange={(value) => update("logo", value)} /><label style={styles.label}><span style={styles.labelText}>Importer un logo</span><input type="file" accept="image/*" onChange={(event) => uploadTeamLogo(event.target.files?.[0])} style={styles.fileInput} /></label>{form.logo && <div style={styles.logoPreviewBox}><TeamIdentity team={form} /></div>}<div style={styles.formGrid}><Input label="Titre pilote F1" type="number" value={form.driverTitlesF1 ?? form.driverTitles ?? 0} onChange={updateDriverTitleF1} /><Input label="Titre pilote F2" type="number" value={form.driverTitlesF2 ?? 0} onChange={(value) => update("driverTitlesF2", value)} /><Input label="Titre pilote F3" type="number" value={form.driverTitlesF3 ?? 0} onChange={(value) => update("driverTitlesF3", value)} /><Input label="Titre pilote FE" type="number" value={form.driverTitlesFE ?? 0} onChange={(value) => update("driverTitlesFE", value)} /><Input label="Titre constructeur F1" type="number" value={form.teamTitlesF1 ?? form.teamTitles ?? 0} onChange={updateTeamTitleF1} /><Input label="Titre constructeur F2" type="number" value={form.teamTitlesF2 ?? 0} onChange={(value) => update("teamTitlesF2", value)} /><Input label="Titre constructeur F3" type="number" value={form.teamTitlesF3 ?? 0} onChange={(value) => update("teamTitlesF3", value)} /><Input label="Titre constructeur FE" type="number" value={form.teamTitlesFE ?? 0} onChange={(value) => update("teamTitlesFE", value)} /><Input label="Triple couronnes" type="number" value={form.tripleCrowns} onChange={(value) => update("tripleCrowns", value)} /></div><button onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Enregistrer" : "Créer l’écurie"}</button>{editingId && <button onClick={onCancel} style={styles.secondaryButton}>Annuler</button>}</div>;
 }
 
 function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, editingId, setEditingId, onSave, onDelete, isSaving }) {
@@ -5155,10 +5155,10 @@ function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, edit
 
   return (
     <div style={styles.twoColumnsSmallLeft}>
-      <Card title={editingId ? "Modifier un hors saison" : "CrÃ©er un hors saison"} icon="ðŸ">
+      <Card title={editingId ? "Modifier un hors saison" : "Créer un hors saison"} icon="🏁">
         <div style={styles.stack}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={form.eventType} onChange={(event) => update("eventType", event.target.value)} style={styles.input}>{SPECIAL_EVENT_OPTIONS.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select></label>
-          <Input label="Ã‰dition" value={form.editionLabel} onChange={(value) => update("editionLabel", value)} />
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={form.eventType} onChange={(event) => update("eventType", event.target.value)} style={styles.input}>{SPECIAL_EVENT_OPTIONS.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select></label>
+          <Input label="Édition" value={form.editionLabel} onChange={(value) => update("editionLabel", value)} />
           <Input label="Nom optionnel" value={form.name} onChange={(value) => update("name", value)} />
           <Input label="Date" type="date" value={form.date || ""} onChange={(value) => update("date", value)} />
           <Input label="Ordre d'affichage" type="number" value={form.sortOrder} onChange={(value) => update("sortOrder", value)} />
@@ -5172,17 +5172,17 @@ function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, edit
             <DriverSelect label="Podium P3" value={form.podiumThirdDriverId} onChange={(value) => update("podiumThirdDriverId", value)} drivers={drivers} />
           </div>
           <label style={styles.label}><span style={styles.labelText}>Notes</span><textarea value={form.notes} onChange={(event) => update("notes", event.target.value)} rows={4} style={styles.textarea} /></label>
-          <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier l'Ã©dition" : "CrÃ©er l'Ã©dition"}</button>
+          <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier l'édition" : "Créer l'édition"}</button>
           {editingId && <button type="button" onClick={cancel} style={styles.secondaryButton}>Annuler</button>}
         </div>
       </Card>
-      <Card title="Hors Saison enregistrÃ©s" icon="ðŸ“‹">
+      <Card title="Hors Saison enregistrés" icon="📋">
         <div style={styles.stack}>
           {sortedEditions.map((edition) => (
             <div key={edition.id} style={styles.itemBox}>
               <div>
-                <strong>{getSpecialEventName(edition.eventType)} Â· {edition.editionLabel}</strong>
-                <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non dÃ©finie"} Â· Vainqueur {driverName(drivers, edition.winnerDriverId)}</p>
+                <strong>{getSpecialEventName(edition.eventType)} · {edition.editionLabel}</strong>
+                <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"} · Vainqueur {driverName(drivers, edition.winnerDriverId)}</p>
               </div>
               <div style={styles.actions}>
                 <button type="button" onClick={() => editEdition(edition)} style={styles.editButton}>Modifier</button>
@@ -5190,7 +5190,7 @@ function SpecialEditionsAdmin({ editions = [], drivers = [], form, setForm, edit
               </div>
             </div>
           ))}
-          {sortedEditions.length === 0 && <Empty text="Aucun hors saison enregistrÃ©." />}
+          {sortedEditions.length === 0 && <Empty text="Aucun hors saison enregistré." />}
         </div>
       </Card>
     </div>
@@ -5219,27 +5219,27 @@ function AdminRaces({ raceForm, setRaceForm, raceLibrary, allCalendarRaces = [],
 
   return (
     <div style={styles.twoColumnsSmallLeft}>
-      <Card title="BibliothÃ¨que des GP" icon="ðŸ">
+      <Card title="Bibliothèque des GP" icon="🏁">
         <div style={styles.stack}>
           <Input label="Nom du Grand Prix" value={raceForm.name} onChange={(value) => setRaceForm({ ...raceForm, name: value })} />
           <Input label="Pays" value={raceForm.country} onChange={(value) => setRaceForm({ ...raceForm, country: value })} />
-          <button onClick={onSave} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "CrÃ©er le GP"}</button>
-          <div style={styles.searchBox}>ðŸ”Ž <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Rechercher un circuit..." style={styles.searchInput} /></div>
+          <button onClick={onSave} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Créer le GP"}</button>
+          <div style={styles.searchBox}>🔎 <input value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Rechercher un circuit..." style={styles.searchInput} /></div>
           <div style={styles.stack}>
             {filteredLibrary.map((race) => (
               <RaceLibraryItem key={race.id} race={race} participations={participationCounts[String(race.id)] || 0} onSaveName={onUpdateLibraryRaceName} onSaveCountry={onUpdateLibraryRaceCountry} onDelete={onDeleteLibraryRace} isSavingRace={isSavingRace} />
             ))}
-            {filteredLibrary.length === 0 && <Empty text={libraryQuery ? "Aucun GP trouvÃ© dans la bibliothÃ¨que." : "Aucun GP dans la bibliothÃ¨que."} />}
+            {filteredLibrary.length === 0 && <Empty text={libraryQuery ? "Aucun GP trouvé dans la bibliothèque." : "Aucun GP dans la bibliothèque."} />}
           </div>
         </div>
       </Card>
 
-      <Card title="Calendrier par catÃ©gorie" icon="ðŸ“…">
-        <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.input}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+      <Card title="Calendrier par catégorie" icon="📅">
+        <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.input}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
         <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setCalendarRaceForm({ ...calendarRaceForm, seasonId: event.target.value }); }} style={styles.input}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
         <label style={styles.label}><span style={styles.labelText}>Ajouter un GP au calendrier</span><select value={calendarRaceForm.raceId} onChange={(event) => setCalendarRaceForm({ ...calendarRaceForm, raceId: event.target.value, seasonId: selectedSeasonId })} style={styles.input}><option value="">Choisir un GP</option>{sortedRaceLibrary.map((race) => <option key={race.id} value={race.id}>{race.name}</option>)}</select></label>
         <button onClick={onAddToSeason} disabled={isSavingRace} style={styles.fullButton}>{isSavingRace ? "Sauvegarde..." : "Ajouter au calendrier"}</button>
-        <div style={styles.searchBox}>ðŸ”Ž <input value={calendarSearch} onChange={(event) => setCalendarSearch(event.target.value)} placeholder="Rechercher dans le calendrier..." style={styles.searchInput} /></div>
+        <div style={styles.searchBox}>🔎 <input value={calendarSearch} onChange={(event) => setCalendarSearch(event.target.value)} placeholder="Rechercher dans le calendrier..." style={styles.searchInput} /></div>
         <RaceTable races={filteredRaces} onDelete={(raceId) => onDelete(selectedSeasonId, raceId)} onMoveRace={calendarQuery ? null : onMoveRace} onUpdateStartAt={onUpdateStartAt} isSavingRace={isSavingRace} />
       </Card>
     </div>
@@ -5260,7 +5260,7 @@ function RaceLibraryItem({ race, participations, onSaveName, onSaveCountry, onDe
   async function saveCountry() {
     setStatus("");
     const saved = await onSaveCountry(race.id, country);
-    if (saved) setStatus("Pays enregistrÃ©");
+    if (saved) setStatus("Pays enregistré");
   }
 
   return (
@@ -5288,8 +5288,8 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
   const [fastestDriverId, setFastestDriverId] = useState("");
   const [positionOrder, setPositionOrder] = useState([]);
   const pointsLabel = usesSpecialF2Points(selectedCategoryId, selectedSeasonId)
-    ? "BarÃ¨me F2 S3/S4 : 20 Â· 18 Â· 17 Â· 16, puis -1 jusquâ€™Ã  P19. P20 ne marque pas."
-    : "BarÃ¨me : 30 Â· 25 Â· 22 Â· 20 Â· 18 Â· 16 Â· 14 Â· 12 Â· puis -1 jusquâ€™Ã  P19. Aucun point bonus pour le meilleur tour.";
+    ? "Barème F2 S3/S4 : 20 · 18 · 17 · 16, puis -1 jusqu’à P19. P20 ne marque pas."
+    : "Barème : 30 · 25 · 22 · 20 · 18 · 16 · 14 · 12 · puis -1 jusqu’à P19. Aucun point bonus pour le meilleur tour.";
 
   function findDriverFromLine(line) {
     const normalizedLine = normalizeResultText(cleanQuickResultLine(line));
@@ -5356,10 +5356,10 @@ function ResultsManager({ drivers, teams, selectedCategoryId, setSelectedCategor
       updateResultEntry(driver.id, "pole", idsEqual(driver.id, poleDriverId));
       updateResultEntry(driver.id, "fastestLap", idsEqual(driver.id, fastestDriverId));
     });
-    setQuickStatus("Pole et MT appliquÃ©s.");
+    setQuickStatus("Pole et MT appliqués.");
   }
 
-  return <Card title="RÃ©sultats automatiques" icon="ðŸ†"><div style={styles.stack}><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Circuit</span><select value={selectedRaceId} onChange={(event) => { setSelectedRaceId(event.target.value); setPositionOrder([]); }} style={styles.resultsSelect}><option value="">Choisir un GP</option>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}</option>)}</select></label><button onClick={onValidate} disabled={isSavingResult} style={styles.primaryButton}>{isSavingResult ? "Sauvegarde..." : "Valider la course"}</button></div><p style={styles.mutedSmall}>{pointsLabel}</p>{drivers.length === 0 ? <Empty text={`Aucun pilote inscrit en ${selectedCategoryId} sur ${seasonName(selectedSeasonId)}.`} /> : <><div style={styles.quickResultBox}><PositionPicker drivers={drivers} positionOrder={positionOrder} onPick={updatePositionPick} /><label style={styles.label}><span style={styles.labelText}>Coller l'ordre d'arrivÃ©e</span><textarea value={quickResults} onChange={(event) => setQuickResults(event.target.value)} rows={8} placeholder={"Zach\nMarden\nLeroi\nNatalino"} style={styles.textarea} /></label><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Pole</span><select value={poleDriverId} onChange={(event) => setPoleDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Meilleur tour</span><select value={fastestDriverId} onChange={(event) => setFastestDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><button type="button" onClick={applyQuickResults} style={styles.secondaryButton}>Appliquer l'ordre collÃ©</button><button type="button" onClick={applyQuickFlags} style={styles.secondaryButton}>Appliquer Pole / MT</button></div>{quickStatus && <p style={styles.mutedSmall}>{quickStatus}</p>}</div><ResultTable drivers={drivers} teams={teams} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} /></>}</div></Card>;
+  return <Card title="Résultats automatiques" icon="🏆"><div style={styles.stack}><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => { setSelectedCategoryId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => { setSelectedSeasonId(event.target.value); setSelectedRaceId(""); setPositionOrder([]); }} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Circuit</span><select value={selectedRaceId} onChange={(event) => { setSelectedRaceId(event.target.value); setPositionOrder([]); }} style={styles.resultsSelect}><option value="">Choisir un GP</option>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}</option>)}</select></label><button onClick={onValidate} disabled={isSavingResult} style={styles.primaryButton}>{isSavingResult ? "Sauvegarde..." : "Valider la course"}</button></div><p style={styles.mutedSmall}>{pointsLabel}</p>{drivers.length === 0 ? <Empty text={`Aucun pilote inscrit en ${selectedCategoryId} sur ${seasonName(selectedSeasonId)}.`} /> : <><div style={styles.quickResultBox}><PositionPicker drivers={drivers} positionOrder={positionOrder} onPick={updatePositionPick} /><label style={styles.label}><span style={styles.labelText}>Coller l'ordre d'arrivée</span><textarea value={quickResults} onChange={(event) => setQuickResults(event.target.value)} rows={8} placeholder={"Zach\nMarden\nLeroi\nNatalino"} style={styles.textarea} /></label><div style={styles.resultsInfo}><label style={styles.label}><span style={styles.labelText}>Pole</span><select value={poleDriverId} onChange={(event) => setPoleDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><label style={styles.label}><span style={styles.labelText}>Meilleur tour</span><select value={fastestDriverId} onChange={(event) => setFastestDriverId(event.target.value)} style={styles.resultsSelect}><option value="">Aucun</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label><button type="button" onClick={applyQuickResults} style={styles.secondaryButton}>Appliquer l'ordre collé</button><button type="button" onClick={applyQuickFlags} style={styles.secondaryButton}>Appliquer Pole / MT</button></div>{quickStatus && <p style={styles.mutedSmall}>{quickStatus}</p>}</div><ResultTable drivers={drivers} teams={teams} selectedCategoryId={selectedCategoryId} selectedSeasonId={selectedSeasonId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} /></>}</div></Card>;
 }
 
 function RaceAwardsPanel({ drivers = [], teams = [], raceResults = [], racesBySeason = {}, selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId }) {
@@ -5378,16 +5378,16 @@ function RaceAwardsPanel({ drivers = [], teams = [], raceResults = [], racesBySe
 
   return (
     <div style={styles.section}>
-      <Card title="Poles & meilleurs tours" icon="âš¡">
+      <Card title="Poles & meilleurs tours" icon="⚡">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
         </div>
-        <p style={styles.mutedSmall}>Vue rapide des polemen et des meilleurs tours pour chaque course validÃ©e de la saison.</p>
+        <p style={styles.mutedSmall}>Vue rapide des polemen et des meilleurs tours pour chaque course validée de la saison.</p>
       </Card>
       <div style={styles.twoColumns}>
-        <RaceAwardTable title={`Poles â€” ${seasonName(selectedSeasonId)}`} icon="âš¡" rows={buildAwardRows("pole")} empty="Aucune pole enregistrÃ©e pour cette saison." />
-        <RaceAwardTable title={`Meilleurs tours â€” ${seasonName(selectedSeasonId)}`} icon="ðŸŸ¢" rows={buildAwardRows("fastestLap")} empty="Aucun meilleur tour enregistrÃ© pour cette saison." />
+        <RaceAwardTable title={`Poles — ${seasonName(selectedSeasonId)}`} icon="⚡" rows={buildAwardRows("pole")} empty="Aucune pole enregistrée pour cette saison." />
+        <RaceAwardTable title={`Meilleurs tours — ${seasonName(selectedSeasonId)}`} icon="🟢" rows={buildAwardRows("fastestLap")} empty="Aucun meilleur tour enregistré pour cette saison." />
       </div>
     </div>
   );
@@ -5399,12 +5399,12 @@ function RaceAwardTable({ title, icon, rows = [], empty }) {
     <Card title={title} icon={icon}>
       <div style={styles.tableWrap}>
         <table style={{ ...styles.table, minWidth: 620 }}>
-          <thead><tr style={styles.tableHead}><th style={styles.th}>Course</th><th style={styles.th}>Pilote</th><th style={styles.th}>Ã‰curie</th></tr></thead>
+          <thead><tr style={styles.tableHead}><th style={styles.th}>Course</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th></tr></thead>
           <tbody>{visibleRows.map((row) => (
             <tr key={row.race.id} style={styles.tr}>
               <td style={styles.td}><strong>R{row.race.round}</strong><p style={styles.mutedSmall}>{row.race.name}</p></td>
-              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.driver ? <AwardDriverIdentity key={`${row.race.id}-driver-${award.driver.id}`} driver={award.driver} team={award.team} /> : <span key={`${row.race.id}-missing-${index}`}>â€”</span>)}</div> : "â€”"}</td>
-              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.team ? <TeamIdentity key={`${row.race.id}-team-${award.team.id}`} team={award.team} /> : <span key={`${row.race.id}-team-missing-${index}`}>â€”</span>)}</div> : "â€”"}</td>
+              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.driver ? <AwardDriverIdentity key={`${row.race.id}-driver-${award.driver.id}`} driver={award.driver} team={award.team} /> : <span key={`${row.race.id}-missing-${index}`}>—</span>)}</div> : "—"}</td>
+              <td style={styles.td}>{row.awards.length ? <div style={styles.stack}>{row.awards.map((award, index) => award.team ? <TeamIdentity key={`${row.race.id}-team-${award.team.id}`} team={award.team} /> : <span key={`${row.race.id}-team-missing-${index}`}>—</span>)}</div> : "—"}</td>
             </tr>
           ))}</tbody>
         </table>
@@ -5420,13 +5420,13 @@ function AwardDriverIdentity({ driver, team }) {
 
 function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [] }) {
   if (!isPermissionsOwner(adminUser)) {
-    return <div style={styles.section}><Card title="Comptes utilisateurs" icon="ðŸ‘¤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
+    return <div style={styles.section}><Card title="Comptes utilisateurs" icon="👤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
   }
 
   const formatAccountDate = (value) => {
-    if (!value) return "â€”";
+    if (!value) return "—";
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "â€”";
+    if (Number.isNaN(date.getTime())) return "—";
     return date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
   };
 
@@ -5444,24 +5444,24 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
 
   return (
     <div style={styles.section}>
-      <Card title="Comptes utilisateurs" icon="ðŸ‘¤">
+      <Card title="Comptes utilisateurs" icon="👤">
         <div style={styles.statsGrid}>
           <Stat label="Comptes" value={rows.length} />
-          <Stat label="Pronos envoyÃ©s" value={predictions.length} />
+          <Stat label="Pronos envoyés" value={predictions.length} />
           <Stat label="Devine le pilote" value={guessResults.length} />
-          <Stat label="ConnectÃ© sur" value={adminUser?.email || "â€”"} />
+          <Stat label="Connecté sur" value={adminUser?.email || "—"} />
         </div>
-        <p style={styles.mutedSmall}>Cette page est rÃ©servÃ©e Ã  {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rÃ´les admin ne peuvent pas y accÃ©der.</p>
+        <p style={styles.mutedSmall}>Cette page est réservée à {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rôles admin ne peuvent pas y accéder.</p>
       </Card>
-      <Card title="Liste des comptes" icon="ðŸ‘¥">
+      <Card title="Liste des comptes" icon="👥">
         <div style={styles.tableWrap}>
           <table style={{ ...styles.table, minWidth: 860 }}>
             <thead>
               <tr style={styles.tableHead}>
                 <th style={styles.th}>Pseudo</th>
                 <th style={styles.th}>Discord</th>
-                <th style={styles.th}>CrÃ©Ã© le</th>
-                <th style={styles.th}>DerniÃ¨re activitÃ©</th>
+                <th style={styles.th}>Créé le</th>
+                <th style={styles.th}>Dernière activité</th>
                 <th style={styles.th}>Pronos</th>
                 <th style={styles.th}>Devine</th>
                 <th style={styles.th}>Points</th>
@@ -5470,19 +5470,19 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
             <tbody>
               {rows.map((account) => (
                 <tr key={account.id} style={styles.tr}>
-                  <td style={styles.td}><strong>{account.pseudo || "â€”"}</strong><p style={styles.mutedSmall}>ID {account.id}</p></td>
-                  <td style={styles.td}>{account.discordName || "â€”"}</td>
+                  <td style={styles.td}><strong>{account.pseudo || "—"}</strong><p style={styles.mutedSmall}>ID {account.id}</p></td>
+                  <td style={styles.td}>{account.discordName || "—"}</td>
                   <td style={styles.td}>{formatAccountDate(account.createdAt)}</td>
                   <td style={styles.td}>{formatAccountDate(account.lastSeenAt)}</td>
                   <td style={styles.td}>{account.predictionsCount}</td>
-                  <td style={styles.td}>{account.guessCount} essais Â· {account.guessWins} win</td>
+                  <td style={styles.td}>{account.guessCount} essais · {account.guessWins} win</td>
                   <td style={{ ...styles.td, ...styles.points }}>{account.guessScore}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistrÃ©." />}
+        {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistré." />}
       </Card>
     </div>
   );
@@ -5525,29 +5525,29 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
   }, new Map());
   const abandonedCount = Array.from(groupedByPlayerDay.values()).filter((entry) => !entry.correct).length;
   const formatAttemptDate = (value) => {
-    if (!value) return "â€”";
+    if (!value) return "—";
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "â€”";
+    if (Number.isNaN(date.getTime())) return "—";
     return date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
   };
   const resultForAttempt = (attempt) => results.find((result) => String(result.playerId) === String(attempt.playerId) && result.challengeDay === attempt.challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(attempt.categoryId));
 
   return (
     <div style={styles.section}>
-      <Card title="Historique des essais â€” DÃ©fi pilote" icon="ðŸ§©">
+      <Card title="Historique des essais — Défi pilote" icon="🧩">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Jour</span><select value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} style={styles.resultsSelect}><option value="">Tous les jours</option>{days.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Recherche</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pseudo, Discord ou pilote..." style={styles.input} /></label>
         </div>
         <div style={styles.statsGrid}>
-          <Stat label="Essais affichÃ©s" value={filteredAttempts.length} />
+          <Stat label="Essais affichés" value={filteredAttempts.length} />
           <Stat label="Joueurs" value={activePlayers} />
-          <Stat label="Bonnes rÃ©ponses" value={successCount} />
-          <Stat label="Sessions sans rÃ©ussite" value={abandonedCount} />
+          <Stat label="Bonnes réponses" value={successCount} />
+          <Stat label="Sessions sans réussite" value={abandonedCount} />
         </div>
       </Card>
-      <Card title="DÃ©tail des essais" icon="ðŸ“‹">
+      <Card title="Détail des essais" icon="📋">
         <div style={styles.tableWrap}>
           <table style={{ ...styles.table, minWidth: 1040 }}>
             <thead>
@@ -5555,11 +5555,11 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
                 <th style={styles.th}>Date</th>
                 <th style={styles.th}>Joueur</th>
                 <th style={styles.th}>Cat.</th>
-                <th style={styles.th}>DÃ©fi</th>
+                <th style={styles.th}>Défi</th>
                 <th style={styles.th}>Essai</th>
-                <th style={styles.th}>Pilote tentÃ©</th>
-                <th style={styles.th}>Pilote mystÃ¨re</th>
-                <th style={styles.th}>RÃ©sultat</th>
+                <th style={styles.th}>Pilote tenté</th>
+                <th style={styles.th}>Pilote mystère</th>
+                <th style={styles.th}>Résultat</th>
               </tr>
             </thead>
             <tbody>
@@ -5571,22 +5571,22 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
                 return (
                   <tr key={attempt.id} style={styles.tr}>
                     <td style={styles.td}>{formatAttemptDate(attempt.createdAt)}</td>
-                    <td style={styles.td}><strong>{attempt.pseudo || account?.pseudo || "â€”"}</strong><p style={styles.mutedSmall}>{attempt.discordName || account?.discordName || "Discord â€”"}</p></td>
+                    <td style={styles.td}><strong>{attempt.pseudo || account?.pseudo || "—"}</strong><p style={styles.mutedSmall}>{attempt.discordName || account?.discordName || "Discord —"}</p></td>
                     <td style={styles.td}><span style={styles.titleBadge}>{attempt.categoryId}</span></td>
                     <td style={styles.td}>{attempt.challengeDay}</td>
-                    <td style={styles.td}>#{attempt.attemptNumber || "â€”"}</td>
-                    <td style={styles.td}>{guessedDriver ? <DriverIdentity driver={guessedDriver} showRetired={false} /> : "â€”"}</td>
-                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "â€”"}</td>
-                    <td style={styles.td}><span style={attempt.correct ? styles.badgeGreen : styles.badgeDark}>{attempt.correct ? `TrouvÃ©${savedResult?.score ? ` Â· ${savedResult.score} pts` : ""}` : "RatÃ©"}</span></td>
+                    <td style={styles.td}>#{attempt.attemptNumber || "—"}</td>
+                    <td style={styles.td}>{guessedDriver ? <DriverIdentity driver={guessedDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}><span style={attempt.correct ? styles.badgeGreen : styles.badgeDark}>{attempt.correct ? `Trouvé${savedResult?.score ? ` · ${savedResult.score} pts` : ""}` : "Raté"}</span></td>
                   </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-        {filteredAttempts.length === 0 && <Empty text="Aucun essai enregistrÃ© pour ce filtre." />}
+        {filteredAttempts.length === 0 && <Empty text="Aucun essai enregistré pour ce filtre." />}
       </Card>
-      <Card title="Resultats historiques" icon="â±">
+      <Card title="Resultats historiques" icon="⏱">
         <p style={styles.mutedSmall}>Ces lignes viennent de guess_driver_results : elles montrent les defis reussis, le score et le nombre d'essais, mais pas les mauvais pilotes tentes avant la creation de l'historique detaille.</p>
         <div style={styles.tableWrap}>
           <table style={{ ...styles.table, minWidth: 880 }}>
@@ -5607,11 +5607,11 @@ function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], 
                 const hasDetailedAttempts = attempts.some((attempt) => String(attempt.playerId) === String(result.playerId) && attempt.challengeDay === result.challengeDay && normalizeCategoryId(attempt.categoryId) === normalizeCategoryId(result.categoryId));
                 return (
                   <tr key={result.id} style={styles.tr}>
-                    <td style={styles.td}>{result.challengeDay || "â€”"}</td>
-                    <td style={styles.td}><strong>{result.pseudo || "â€”"}</strong><p style={styles.mutedSmall}>{result.discordName || "Discord â€”"}</p></td>
+                    <td style={styles.td}>{result.challengeDay || "—"}</td>
+                    <td style={styles.td}><strong>{result.pseudo || "—"}</strong><p style={styles.mutedSmall}>{result.discordName || "Discord —"}</p></td>
                     <td style={styles.td}><span style={styles.titleBadge}>{result.categoryId}</span></td>
-                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "â€”"}</td>
-                    <td style={styles.td}>{result.attempts || "â€”"}</td>
+                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
+                    <td style={styles.td}>{result.attempts || "—"}</td>
                     <td style={{ ...styles.td, ...styles.points }}>{result.score || 0}</td>
                     <td style={styles.td}><span style={hasDetailedAttempts ? styles.badgeGreen : styles.badgeDark}>{hasDetailedAttempts ? "Avec details" : "Resume seul"}</span></td>
                   </tr>
@@ -5637,36 +5637,36 @@ function GamesAdminPanel({ predictions = [], predictionControls = [], races = []
 
   return (
     <div style={styles.section}>
-      <Card title="Jeux â€” Pronos GP" icon="ðŸŽ®">
+      <Card title="Jeux — Pronos GP" icon="🎮">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>CatÃ©gorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
         </div>
         <div style={styles.statsGrid}>
           <Stat label="Pronos" value={visiblePredictions.length} />
           <Stat label="Joueurs" value={new Set(visiblePredictions.map((prediction) => prediction.pseudo.trim().toLowerCase()).filter(Boolean)).size} />
           <Stat label="Courses" value={seasonRaces.length} />
-          <Stat label="Course la plus jouÃ©e" value={topRace?.count ? `${topRace.race.name} (${topRace.count})` : "â€”"} />
+          <Stat label="Course la plus jouée" value={topRace?.count ? `${topRace.race.name} (${topRace.count})` : "—"} />
         </div>
       </Card>
       <div style={styles.twoColumns}>
-        <Card title="Classement joueurs" icon="ðŸ†">
+        <Card title="Classement joueurs" icon="🏆">
           <PredictionLeaderboard leaderboard={leaderboard} />
         </Card>
-        <Card title="Pronos par course" icon="ðŸ“‹">
+        <Card title="Pronos par course" icon="📋">
           <div style={styles.stack}>
             {seasonRaces.map((race) => {
               const count = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(race.id)).length;
               const resultClosed = Boolean(getRaceResultForRace(raceResults, race.id));
               const manuallyClosed = predictionControls.some((control) => String(control.raceId) === String(race.id) && control.closed);
               const closed = resultClosed || manuallyClosed;
-              return <div key={race.id} style={styles.itemBox}><div><strong>R{race.round} Â· {race.name}</strong><p style={styles.mutedSmall}>{resultClosed ? "RÃ©sultat validÃ©" : manuallyClosed ? "FermÃ© manuellement" : "Ouvert"} Â· {formatRaceDate(race.startAt)}</p></div><div style={styles.actions}><span style={closed ? styles.badgeGreen : styles.badgeDark}>{count} prono{count > 1 ? "s" : ""}</span><button type="button" disabled={isSaving || resultClosed} onClick={() => onToggleClosed?.(race.id, !manuallyClosed)} style={manuallyClosed ? styles.editButton : styles.dangerButton}>{manuallyClosed ? "Rouvrir" : "Fermer"}</button></div></div>;
+              return <div key={race.id} style={styles.itemBox}><div><strong>R{race.round} · {race.name}</strong><p style={styles.mutedSmall}>{resultClosed ? "Résultat validé" : manuallyClosed ? "Fermé manuellement" : "Ouvert"} · {formatRaceDate(race.startAt)}</p></div><div style={styles.actions}><span style={closed ? styles.badgeGreen : styles.badgeDark}>{count} prono{count > 1 ? "s" : ""}</span><button type="button" disabled={isSaving || resultClosed} onClick={() => onToggleClosed?.(race.id, !manuallyClosed)} style={manuallyClosed ? styles.editButton : styles.dangerButton}>{manuallyClosed ? "Rouvrir" : "Fermer"}</button></div></div>;
             })}
             {seasonRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}
           </div>
         </Card>
       </div>
-      <Card title="Toutes les participations" icon="ðŸ§¾">
+      <Card title="Toutes les participations" icon="🧾">
         <PredictionAdminTable predictions={visiblePredictions} races={seasonRaces} drivers={drivers} raceResults={raceResults} onDelete={onDeletePrediction} isSaving={isSaving} />
       </Card>
     </div>
@@ -5674,23 +5674,23 @@ function GamesAdminPanel({ predictions = [], predictionControls = [], races = []
 }
 
 function PredictionAdminTable({ predictions = [], races = [], drivers = [], raceResults = [], onDelete, isSaving }) {
-  if (!predictions.length) return <Empty text="Aucun prono enregistrÃ© sur cette sÃ©lection." />;
+  if (!predictions.length) return <Empty text="Aucun prono enregistré sur cette sélection." />;
   return (
     <div style={styles.tableWrap}>
       <table style={{ ...styles.table, minWidth: 980 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Classement prÃ©dit</th><th style={styles.th}>Score</th><th style={styles.th}>Action</th></tr></thead>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Classement prédit</th><th style={styles.th}>Score</th><th style={styles.th}>Action</th></tr></thead>
         <tbody>{predictions.map((prediction) => {
           const race = races.find((item) => String(item.id) === String(prediction.raceId));
           const score = scoreRacePrediction(prediction, raceResults);
           return (
             <tr key={prediction.id} style={styles.tr}>
-              <td style={styles.td}><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "â€”"}</p></td>
-              <td style={styles.td}>{race ? `R${race.round} Â· ${race.name}` : prediction.raceId}</td>
+              <td style={styles.td}><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "—"}</p></td>
+              <td style={styles.td}>{race ? `R${race.round} · ${race.name}` : prediction.raceId}</td>
               <td style={styles.td}>{driverName(drivers, prediction.predictedOrder?.[0] || prediction.winnerDriverId)}</td>
               <td style={styles.td}>{driverName(drivers, prediction.poleDriverId)}</td>
               <td style={styles.td}>{driverName(drivers, prediction.fastestDriverId)}</td>
-              <td style={styles.td}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).map((id, index) => `P${index + 1} ${driverName(drivers, id)}`).join(" Â· ")}</td>
-              <td style={{ ...styles.td, ...styles.points }}>{score.scored ? score.score : "â€”"}</td>
+              <td style={styles.td}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).map((id, index) => `P${index + 1} ${driverName(drivers, id)}`).join(" · ")}</td>
+              <td style={{ ...styles.td, ...styles.points }}>{score.scored ? score.score : "—"}</td>
               <td style={styles.td}><button type="button" onClick={() => onDelete?.(prediction.id)} disabled={isSaving || !onDelete} style={styles.dangerButton}>Supprimer</button></td>
             </tr>
           );
@@ -5724,12 +5724,12 @@ function PositionPicker({ drivers, positionOrder, onPick }) {
 }
 
 function ResultTable({ drivers, teams, selectedCategoryId, selectedSeasonId, getResultEntry, updateResultEntry }) {
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Ã‰curie</th><th style={styles.th}>Position</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Points</th></tr></thead><tbody>{drivers.map((driver, index) => { const entry = getResultEntry(driver.id); const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /></td><td style={styles.td}>{team?.name || "â€”"}</td><td style={styles.td}><input type="number" min="1" max="30" value={entry.position || index + 1} onChange={(event) => updateResultEntry(driver.id, "position", Number(event.target.value))} style={styles.positionInput} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.pole)} onChange={(event) => updateResultEntry(driver.id, "pole", event.target.checked)} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.fastestLap)} onChange={(event) => updateResultEntry(driver.id, "fastestLap", event.target.checked)} /></td><td style={{ ...styles.td, ...styles.points }}>{getPointsForPosition(Number(entry.position || index + 1), selectedCategoryId, selectedSeasonId)}</td></tr>; })}</tbody></table></div>;
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th><th style={styles.th}>Position</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Points</th></tr></thead><tbody>{drivers.map((driver, index) => { const entry = getResultEntry(driver.id); const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); return <tr key={driver.id} style={styles.tr}><td style={styles.td}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /></td><td style={styles.td}>{team?.name || "—"}</td><td style={styles.td}><input type="number" min="1" max="30" value={entry.position || index + 1} onChange={(event) => updateResultEntry(driver.id, "position", Number(event.target.value))} style={styles.positionInput} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.pole)} onChange={(event) => updateResultEntry(driver.id, "pole", event.target.checked)} /></td><td style={styles.td}><input type="checkbox" checked={Boolean(entry.fastestLap)} onChange={(event) => updateResultEntry(driver.id, "fastestLap", event.target.checked)} /></td><td style={{ ...styles.td, ...styles.points }}>{getPointsForPosition(Number(entry.position || index + 1), selectedCategoryId, selectedSeasonId)}</td></tr>; })}</tbody></table></div>;
 }
 
 function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setEditingId, onSave, onDelete, isSaving }) {
   if (!isPermissionsOwner(adminUser)) {
-    return <div style={styles.section}><Card title="Permissions admin" icon="ðŸ”"><Empty text="Seul kolti@urtt.fr peut gÃ©rer les permissions du panel." /></Card></div>;
+    return <div style={styles.section}><Card title="Permissions admin" icon="🔐"><Empty text="Seul kolti@urtt.fr peut gérer les permissions du panel." /></Card></div>;
   }
 
   const selectedCategories = form.allowedCategories || [];
@@ -5766,12 +5766,12 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
 
   return (
     <div style={styles.section}>
-      <Card title="Permissions admin" icon="ðŸ”">
+      <Card title="Permissions admin" icon="🔐">
         <div style={styles.formGrid}>
           <label style={styles.label}><span style={styles.labelText}>Email utilisateur</span><input value={form.userEmail} onChange={(event) => updateForm("userEmail", event.target.value)} placeholder="exemple@urtt.fr" style={styles.input} /></label>
-          <label style={styles.label}><span style={styles.labelText}>RÃ´le</span><input value={form.role} onChange={(event) => updateForm("role", event.target.value)} placeholder="Admin F1, RÃ©sultats, Courses..." style={styles.input} /></label>
+          <label style={styles.label}><span style={styles.labelText}>Rôle</span><input value={form.role} onChange={(event) => updateForm("role", event.target.value)} placeholder="Admin F1, Résultats, Courses..." style={styles.input} /></label>
         </div>
-        <p style={styles.labelText}>CatÃ©gories accessibles</p>
+        <p style={styles.labelText}>Catégories accessibles</p>
         <div style={styles.permissionCategoryGrid}>
           {CATEGORY_OPTIONS.map((category) => (
             <label key={category.id} style={{ ...styles.permissionCategoryPill, borderColor: category.color, background: selectedCategories.includes(category.id) ? `${category.color}33` : "#18181b" }}>
@@ -5794,15 +5794,15 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
           <button type="button" onClick={onSave} disabled={isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : editingId ? "Modifier les permissions" : "Ajouter les permissions"}</button>
           {editingId && <button type="button" onClick={cancelEdit} style={styles.secondaryButton}>Annuler</button>}
         </div>
-        <p style={styles.mutedSmall}>Seul {ADMIN_PERMISSIONS_OWNER_EMAIL} voit cet onglet. Les comptes ajoutÃ©s ici seront limitÃ©s aux catÃ©gories cochÃ©es dans le panel admin.</p>
+        <p style={styles.mutedSmall}>Seul {ADMIN_PERMISSIONS_OWNER_EMAIL} voit cet onglet. Les comptes ajoutés ici seront limités aux catégories cochées dans le panel admin.</p>
       </Card>
-      <Card title="Comptes configurÃ©s" icon="ðŸ‘¥">
+      <Card title="Comptes configurés" icon="👥">
         <div style={styles.stack}>
           {rows.map((row) => (
             <div key={row.id || row.userEmail} style={styles.itemBox}>
               <div>
                 <strong>{row.userEmail}</strong>
-                <p style={styles.mutedSmall}>{row.role} Â· {row.allowedCategories.join(", ")} Â· {row.allowedPages.filter((pageId) => !["permissions", "player-accounts"].includes(pageId)).map((pageId) => ADMIN_PAGE_OPTIONS.find((page) => page.id === pageId)?.label || pageId).join(", ")}</p>
+                <p style={styles.mutedSmall}>{row.role} · {row.allowedCategories.join(", ")} · {row.allowedPages.filter((pageId) => !["permissions", "player-accounts"].includes(pageId)).map((pageId) => ADMIN_PAGE_OPTIONS.find((page) => page.id === pageId)?.label || pageId).join(", ")}</p>
               </div>
               <div style={styles.actions}>
                 <button type="button" onClick={() => editRow(row)} style={styles.editButton}>Modifier</button>
@@ -5810,7 +5810,7 @@ function PermissionsPanel({ adminUser, rows = [], form, setForm, editingId, setE
               </div>
             </div>
           ))}
-          {rows.length === 0 && <Empty text="Aucune permission enregistrÃ©e. Ajoute un compte pour limiter ses catÃ©gories." />}
+          {rows.length === 0 && <Empty text="Aucune permission enregistrée. Ajoute un compte pour limiter ses catégories." />}
         </div>
       </Card>
     </div>
@@ -5828,36 +5828,36 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
 
   return (
     <div style={styles.section}>
-      <Card title="RÃ©glages" icon="âš™ï¸">
+      <Card title="Réglages" icon="⚙️">
         <div style={styles.cardGrid}>
-          <Setting title="AccÃ¨s privÃ©" description="Le panel admin est protÃ©gÃ© par mot de passe." active />
-          <Setting title="Stats automatiques" description="Les stats sont recalculÃ©es depuis les rÃ©sultats." active />
-          <Setting title="DonnÃ©es modifiables" description="Tu peux crÃ©er pilotes, Ã©curies et GP." active />
+          <Setting title="Accès privé" description="Le panel admin est protégé par mot de passe." active />
+          <Setting title="Stats automatiques" description="Les stats sont recalculées depuis les résultats." active />
+          <Setting title="Données modifiables" description="Tu peux créer pilotes, écuries et GP." active />
         </div>
       </Card>
-      <Card title="Saisons" icon="ðŸ“…">
+      <Card title="Saisons" icon="📅">
         <div style={styles.itemBox}>
           <div>
-            <strong>DerniÃ¨re saison : {latestSeason?.name || "Aucune"}</strong>
-            <p style={styles.mutedSmall}>Prochaine crÃ©ation : {nextSeason.name}</p>
+            <strong>Dernière saison : {latestSeason?.name || "Aucune"}</strong>
+            <p style={styles.mutedSmall}>Prochaine création : {nextSeason.name}</p>
           </div>
-          <button type="button" onClick={onAddSeason} disabled={isSaving} style={styles.primaryButton}>{isSaving ? "CrÃ©ation..." : `Ajouter ${nextSeason.name}`}</button>
+          <button type="button" onClick={onAddSeason} disabled={isSaving} style={styles.primaryButton}>{isSaving ? "Création..." : `Ajouter ${nextSeason.name}`}</button>
         </div>
       </Card>
-      <Card title="VisibilitÃ© publique" icon="ðŸ‘ï¸">
+      <Card title="Visibilité publique" icon="👁️">
         <div style={styles.stack}>
           {PUBLIC_PAGE_OPTIONS.map((page) => (
             <div key={page.id} style={styles.itemBox}>
               <div>
                 <strong>Page {page.label}</strong>
-                <p style={styles.mutedSmall}>{page.id === "development" ? "Quand c'est dÃ©sactivÃ©, le public ne voit pas l'onglet. L'admin garde accÃ¨s en aperÃ§u." : "Quand c'est dÃ©sactivÃ©, l'onglet disparaÃ®t cÃ´tÃ© public."}</p>
+                <p style={styles.mutedSmall}>{page.id === "development" ? "Quand c'est désactivé, le public ne voit pas l'onglet. L'admin garde accès en aperçu." : "Quand c'est désactivé, l'onglet disparaît côté public."}</p>
               </div>
               <label style={styles.checkboxPill}><input type="checkbox" checked={publicPages[page.id] !== false} onChange={(event) => updatePublicPage(page.id, event.target.checked)} /> Visible public</label>
             </div>
           ))}
         </div>
       </Card>
-      <Card title="Remerciements accueil" icon="ðŸ™">
+      <Card title="Remerciements accueil" icon="🙏">
         <ThanksSettings key={`${normalizeThanksNames(siteSettings.thanksNames).join("|")}::${normalizeThanksText(siteSettings.thanksText)}`} siteSettings={siteSettings} onUpdateSetting={onUpdateSetting} isSaving={isSaving} />
       </Card>
     </div>
@@ -5875,16 +5875,16 @@ function ThanksSettings({ siteSettings = defaultSiteSettings, onUpdateSetting, i
   return (
     <div style={styles.stack}>
       <label style={styles.label}>
-        <span style={styles.labelText}>Texte affichÃ©</span>
-        <textarea value={thanksTextDraft} onChange={(event) => setThanksTextDraft(event.target.value)} placeholder="Texte libre affichÃ© au-dessus des noms..." style={{ ...styles.input, minHeight: 110, resize: "vertical" }} />
+        <span style={styles.labelText}>Texte affiché</span>
+        <textarea value={thanksTextDraft} onChange={(event) => setThanksTextDraft(event.target.value)} placeholder="Texte libre affiché au-dessus des noms..." style={{ ...styles.input, minHeight: 110, resize: "vertical" }} />
       </label>
       <label style={styles.label}>
-        <span style={styles.labelText}>Noms affichÃ©s</span>
+        <span style={styles.labelText}>Noms affichés</span>
         <textarea value={thanksDraft} onChange={(event) => setThanksDraft(event.target.value)} placeholder="Un nom par ligne" style={{ ...styles.input, minHeight: 130, resize: "vertical" }} />
       </label>
       <div style={styles.itemBox}>
         <div>
-          <strong>AperÃ§u</strong>
+          <strong>Aperçu</strong>
           {normalizeThanksText(thanksTextDraft) && <p style={styles.thanksText}>{normalizeThanksText(thanksTextDraft)}</p>}
           <div style={styles.thanksList}>{normalizeThanksNames(thanksDraft).map((name) => <span key={name} style={styles.thanksBadge}>{name}</span>)}</div>
         </div>
@@ -5910,7 +5910,7 @@ function SortableTh({ label, sortKey, sortConfig, onSort }) {
   return (
     <th style={styles.th}>
       <button type="button" onClick={() => onSort(sortKey)} style={{ ...styles.sortHeaderButton, ...(active ? styles.sortHeaderButtonActive : {}) }}>
-        {label}{active ? (sortConfig.direction === "desc" ? " â†“" : " â†‘") : ""}
+        {label}{active ? (sortConfig.direction === "desc" ? " ↓" : " ↑") : ""}
       </button>
     </th>
   );
@@ -5924,10 +5924,10 @@ function DriverTable({ drivers, detailed = false, raceDetails = false, compactRa
   return (
     <div style={styles.tableWrap}>
       <table className={`urtt-standings-table urtt-driver-standings${compactRaceDetails ? " urtt-compact-race-table" : ""}`} style={{ ...styles.table, minWidth: raceDetails ? Math.max(compactRaceDetails ? 720 : 950, (compactRaceDetails ? 430 : 650) + races.length * (compactRaceDetails ? 42 : 105)) : 920 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Ã‰curie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label="Saisons" sortKey="seasons" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre P." sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre C." sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="HT" sortKey="hatTricks" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label="Saisons" sortKey="seasons" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre P." sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Titre C." sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="HT" sortKey="hatTricks" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple Couronne</th>}</tr></thead>
         <tbody>{sortedDrivers.map((driver, index) => { const team = getDriverSeasonTeam(driver, selectedSeasonId, teams); const showRetired = Boolean(detailed); return <tr key={driver.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onDriverClick ? <button onClick={() => onDriverClick(driver)} style={styles.nameButton}><DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} /></button> : <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} showRetired={showRetired} />}</td><td style={styles.td}>{showRetired && driver.retired ? RETIRED_LABEL : driver.teamName || team?.name || "-"}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><DriverRaceCell driverId={driver.id} race={race} raceResults={raceResults} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={driver.seasons || 0} record={isRecordValue(records, "seasons", driver.seasons)} /></td><td style={styles.td}><RecordValue value={driver.driverTitles || 0} record={isRecordValue(records, "driverTitles", driver.driverTitles)} /></td><td style={styles.td}><RecordValue value={driver.teamTitles || 0} record={isRecordValue(records, "teamTitles", driver.teamTitles)} /></td><td style={styles.td}><RecordValue value={driver.wins} record={isRecordValue(records, "wins", driver.wins)} /></td><td style={styles.td}><RecordValue value={driver.podiums} record={isRecordValue(records, "podiums", driver.podiums)} /></td><td style={styles.td}><RecordValue value={driver.poles} record={isRecordValue(records, "poles", driver.poles)} /></td><td style={styles.td}><RecordValue value={driver.fastestLaps} record={isRecordValue(records, "fastestLaps", driver.fastestLaps)} /></td><td style={styles.td}><RecordValue value={driver.hatTricks || 0} record={isRecordValue(records, "hatTricks", driver.hatTricks)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={driver.points} record={isRecordValue(records, "points", driver.points)} /></td>{detailed && <td style={styles.td}><TripleCrown crown={driver.tripleCrown} /></td>}</tr>; })}</tbody>
       </table>
-      {drivers.length === 0 && <Empty text="Aucun pilote Ã  afficher." />}
+      {drivers.length === 0 && <Empty text="Aucun pilote à afficher." />}
     </div>
   );
 }
@@ -5941,10 +5941,10 @@ function TeamTable({ teams, detailed = false, raceDetails = false, compactRaceDe
   return (
     <div style={styles.tableWrap}>
       <table className={`urtt-standings-table urtt-team-standings${showExtendedStats ? " urtt-team-stats-table" : ""}${compactRaceDetails ? " urtt-compact-race-table" : ""}`} style={{ ...styles.table, minWidth: raceDetails ? Math.max(compactRaceDetails ? 650 : 950, (compactRaceDetails ? 330 : 650) + races.length * (compactRaceDetails ? 42 : 105)) : 850 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Ã‰curie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label={`Titre P. ${titleSuffix}`} sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label={`Titre C. ${titleSuffix}`} sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>#</th><th style={styles.th}>Écurie</th>{raceDetails && races.map((race) => <th key={race.id} style={styles.th}><span style={styles.raceColumnTitle}>R{race.round}</span><span className="urtt-race-column-sub" style={styles.raceColumnSub}>{shortRaceName(race.name)}</span></th>)}{showExtendedStats && <><SortableTh label={`Titre P. ${titleSuffix}`} sortKey="driverTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label={`Titre C. ${titleSuffix}`} sortKey="teamTitles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="V" sortKey="wins" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Pod." sortKey="podiums" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="Poles" sortKey="poles" sortConfig={sortConfig} onSort={updateSort} /><SortableTh label="MT" sortKey="fastestLaps" sortConfig={sortConfig} onSort={updateSort} /></>}<SortableTh label="Points" sortKey="points" sortConfig={sortConfig} onSort={updateSort} />{detailed && <th style={styles.th}>Triple couronnes</th>}</tr></thead>
         <tbody>{sortedTeams.map((team, index) => <tr key={team.id} style={styles.tr}><td style={styles.td}>#{index + 1}</td><td style={styles.td}>{onTeamClick ? <button className="urtt-name-button" onClick={() => onTeamClick(team)} style={styles.nameButton}><TeamIdentity team={team} /></button> : <TeamIdentity team={team} />}</td>{raceDetails && races.map((race) => <td key={race.id} style={styles.td}><TeamRaceCell teamId={team.id} race={race} raceResults={raceResults} drivers={drivers} compact={compactRaceDetails} /></td>)}{showExtendedStats && <><td style={styles.td}><RecordValue value={team.driverTitles || 0} record={isRecordValue(records, "driverTitles", team.driverTitles)} /></td><td style={styles.td}><RecordValue value={team.teamTitles || 0} record={isRecordValue(records, "teamTitles", team.teamTitles)} /></td><td style={styles.td}><RecordValue value={team.wins} record={isRecordValue(records, "wins", team.wins)} /></td><td style={styles.td}><RecordValue value={team.podiums} record={isRecordValue(records, "podiums", team.podiums)} /></td><td style={styles.td}><RecordValue value={team.poles} record={isRecordValue(records, "poles", team.poles)} /></td><td style={styles.td}><RecordValue value={team.fastestLaps} record={isRecordValue(records, "fastestLaps", team.fastestLaps)} /></td></>}<td style={{ ...styles.td, ...styles.points }}><RecordValue value={team.points} record={isRecordValue(records, "points", team.points)} /></td>{detailed && <td style={styles.td}>{team.tripleCrowns}</td>}</tr>)}</tbody>
       </table>
-      {teams.length === 0 && <Empty text="Aucune Ã©curie Ã  afficher." />}
+      {teams.length === 0 && <Empty text="Aucune écurie à afficher." />}
     </div>
   );
 }
@@ -5952,7 +5952,7 @@ function TeamTable({ teams, detailed = false, raceDetails = false, compactRaceDe
 function DriverRaceCell({ driverId, race, raceResults, compact = false }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
   const driverResult = result?.entries.find((entry) => idsEqual(entry.driverId, driverId));
-  if (!driverResult) return <span style={styles.mutedSmall}>â€”</span>;
+  if (!driverResult) return <span style={styles.mutedSmall}>—</span>;
   const position = Number(driverResult.position);
   const points = getPointsForPosition(position, race.categoryId, race.seasonId);
   const badges = [];
@@ -5960,15 +5960,15 @@ function DriverRaceCell({ driverId, race, raceResults, compact = false }) {
   if (driverResult.pole) badges.push("P");
   if (driverResult.fastestLap) badges.push("MT");
   if (compact) return <div style={styles.compactRaceResultCell}><strong>P{position}</strong>{badges.length > 0 && <span style={styles.compactRaceBadges}>{badges.join("/")}</span>}</div>;
-  return <div style={styles.raceResultCell}><strong>P{position}</strong><span style={styles.mutedSmall}>{points} pts</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" Â· ")}</span>}</div>;
+  return <div style={styles.raceResultCell}><strong>P{position}</strong><span style={styles.mutedSmall}>{points} pts</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
 function TeamRaceCell({ teamId, race, raceResults, drivers, compact = false }) {
   const result = raceResults.find((entry) => String(entry.raceId) === String(race.id));
-  if (!result) return <span style={styles.mutedSmall}>â€”</span>;
+  if (!result) return <span style={styles.mutedSmall}>—</span>;
   const teamDriverIds = drivers.filter((driver) => idsEqual(driver.teamHistory?.[race.seasonId] || driver.teamId, teamId)).map((driver) => String(driver.id));
   const entries = result.entries.filter((entry) => teamDriverIds.includes(String(entry.driverId)));
-  if (!entries.length) return <span style={styles.mutedSmall}>â€”</span>;
+  if (!entries.length) return <span style={styles.mutedSmall}>—</span>;
   const points = entries.reduce((sum, entry) => sum + getPointsForPosition(Number(entry.position), race.categoryId, race.seasonId), 0);
   const bestPosition = Math.min(...entries.map((entry) => Number(entry.position)));
   const badges = [];
@@ -5976,22 +5976,22 @@ function TeamRaceCell({ teamId, race, raceResults, drivers, compact = false }) {
   if (entries.some((entry) => entry.pole)) badges.push("P");
   if (entries.some((entry) => entry.fastestLap)) badges.push("MT");
   if (compact) return <div style={styles.compactRaceResultCell}><strong>{points}</strong>{badges.length > 0 && <span style={styles.compactRaceBadges}>{badges.join("/")}</span>}</div>;
-  return <div style={styles.raceResultCell}><strong>{points} pts</strong><span style={styles.mutedSmall}>Meilleur P{bestPosition}</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" Â· ")}</span>}</div>;
+  return <div style={styles.raceResultCell}><strong>{points} pts</strong><span style={styles.mutedSmall}>Meilleur P{bestPosition}</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
 function PublicSeasonResults({ races, raceResults, drivers, selectedSeasonId, selectedCategoryId, onOpenGp }) {
   const categoryId = normalizeCategoryId(selectedCategoryId || races[0]?.categoryId || "F1");
   const seasonId = normalizeSeasonId(selectedSeasonId);
   const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === seasonId && normalizeCategoryId(result.categoryId) === categoryId);
-  return <div style={styles.stack}>{races.map((race) => { const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; const winner = sortedEntries.find((entry) => Number(entry.position) === 1); const poleman = sortedEntries.find((entry) => entry.pole); const fastest = sortedEntries.find((entry) => entry.fastestLap); const podium = sortedEntries.slice(0, 3); return <div key={race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>Course #{race.round}</p><button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button></div><span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "RÃ©sultat validÃ©" : "Ã€ venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} /><RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" Â· ") : "â€”"} /></div></div>; })}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
+  return <div style={styles.stack}>{races.map((race) => { const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; const winner = sortedEntries.find((entry) => Number(entry.position) === 1); const poleman = sortedEntries.find((entry) => entry.pole); const fastest = sortedEntries.find((entry) => entry.fastestLap); const podium = sortedEntries.slice(0, 3); return <div key={race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>Course #{race.round}</p><button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button></div><span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} /><RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>; })}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
 
 function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
   const gpRaces = allRaces.filter((race) => race.libraryRaceId === gp.libraryRaceId || race.name === gp.name);
   const gpResults = gpRaces.map((race) => { const result = raceResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; return { race, result, winner: sortedEntries.find((entry) => Number(entry.position) === 1), poleman: sortedEntries.find((entry) => entry.pole), fastest: sortedEntries.find((entry) => entry.fastestLap), podium: sortedEntries.slice(0, 3) }; }).sort((a, b) => getSeasonNumber(a.race.seasonId) - getSeasonNumber(b.race.seasonId));
-  const winnerCounts = countByName(gpResults.map((item) => driverName(drivers, item.winner?.driverId)).filter((name) => name !== "â€”"));
-  const poleCounts = countByName(gpResults.map((item) => driverName(drivers, item.poleman?.driverId)).filter((name) => name !== "â€”"));
-  return <div style={styles.detailOverlay} onClick={onClose}><div style={styles.detailModal} onClick={(event) => event.stopPropagation()}><div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE GRAND PRIX</p><h2 style={styles.gpDetailTitle}>{gp.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><div style={styles.statsGrid}><Stat label="PrÃ©sences au calendrier" value={gpRaces.length} /><Stat label="RÃ©sultats validÃ©s" value={gpResults.filter((item) => item.result).length} /><Stat label="Dernier vainqueur" value={driverName(drivers, [...gpResults].reverse().find((item) => item.winner)?.winner?.driverId)} /><Stat label="Dernier poleman" value={driverName(drivers, [...gpResults].reverse().find((item) => item.poleman)?.poleman?.driverId)} /></div><div style={styles.twoColumns}><Card title="Vainqueurs" icon="ðŸ†"><MiniCountList counts={winnerCounts} empty="Aucun vainqueur enregistrÃ©." /></Card><Card title="Polemen" icon="âš¡"><MiniCountList counts={poleCounts} empty="Aucun poleman enregistrÃ©." /></Card></div><Card title="Historique du GP" icon="ðŸ“œ"><div style={styles.stack}>{gpResults.map((item) => <div key={item.race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>{seasonName(item.race.seasonId)} Â· Course #{item.race.round}</p><h3 style={styles.raceTitle}>{item.race.name}</h3></div><span style={item.result ? styles.badgeGreen : styles.badgeDark}>{item.result ? "RÃ©sultat validÃ©" : "Ã€ venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, item.winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, item.poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, item.fastest?.driverId)} /><RaceStat label="Podium" value={item.podium.length ? item.podium.map((entry) => driverName(drivers, entry.driverId)).join(" Â· ") : "â€”"} /></div></div>)}{gpResults.length === 0 && <Empty text="Aucun historique pour ce GP." />}</div></Card></div></div></div>;
+  const winnerCounts = countByName(gpResults.map((item) => driverName(drivers, item.winner?.driverId)).filter((name) => name !== "—"));
+  const poleCounts = countByName(gpResults.map((item) => driverName(drivers, item.poleman?.driverId)).filter((name) => name !== "—"));
+  return <div style={styles.detailOverlay} onClick={onClose}><div style={styles.detailModal} onClick={(event) => event.stopPropagation()}><div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE GRAND PRIX</p><h2 style={styles.gpDetailTitle}>{gp.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><div style={styles.statsGrid}><Stat label="Présences au calendrier" value={gpRaces.length} /><Stat label="Résultats validés" value={gpResults.filter((item) => item.result).length} /><Stat label="Dernier vainqueur" value={driverName(drivers, [...gpResults].reverse().find((item) => item.winner)?.winner?.driverId)} /><Stat label="Dernier poleman" value={driverName(drivers, [...gpResults].reverse().find((item) => item.poleman)?.poleman?.driverId)} /></div><div style={styles.twoColumns}><Card title="Vainqueurs" icon="🏆"><MiniCountList counts={winnerCounts} empty="Aucun vainqueur enregistré." /></Card><Card title="Polemen" icon="⚡"><MiniCountList counts={poleCounts} empty="Aucun poleman enregistré." /></Card></div><Card title="Historique du GP" icon="📜"><div style={styles.stack}>{gpResults.map((item) => <div key={item.race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>{seasonName(item.race.seasonId)} · Course #{item.race.round}</p><h3 style={styles.raceTitle}>{item.race.name}</h3></div><span style={item.result ? styles.badgeGreen : styles.badgeDark}>{item.result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, item.winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, item.poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, item.fastest?.driverId)} /><RaceStat label="Podium" value={item.podium.length ? item.podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>)}{gpResults.length === 0 && <Empty text="Aucun historique pour ce GP." />}</div></Card></div></div></div>;
 }
 
 function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, specialEditions = [], allDrivers, allRaces = [], onClose }) {
@@ -6003,8 +6003,8 @@ function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonT
       <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
         <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2>{isEtienneF2 && <p className="urtt-etienne-papy-label">Papy de la F2</p>}</div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
         {isEtienneF2 && <EtiennePapyAnimation />}
-        <Card title="Stats par saison et catÃ©gorie" icon="ðŸ‘¤"><SeasonBreakdownTable rows={rows} expandable /></Card>
-        <Card title="2,4H du Mans & Indy 300" icon="ðŸ"><SpecialEditionDriverTable rows={specialRows} /></Card>
+        <Card title="Stats par saison et catégorie" icon="👤"><SeasonBreakdownTable rows={rows} expandable /></Card>
+        <Card title="2,4H du Mans & Indy 300" icon="🏁"><SpecialEditionDriverTable rows={specialRows} /></Card>
       </div>
     </div>
   );
@@ -6013,19 +6013,19 @@ function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonT
 function EtiennePapyAnimation() {
   return (
     <div className="urtt-etienne-papy-scene" aria-hidden="true">
-      <div className="urtt-etienne-papy">ðŸ‘´</div>
-      <p className="urtt-etienne-papy-text">AprÃ¨s 12 saisons en Formule 2, le papy quitte son nid</p>
+      <div className="urtt-etienne-papy">👴</div>
+      <p className="urtt-etienne-papy-text">Après 12 saisons en Formule 2, le papy quitte son nid</p>
     </div>
   );
 }
 
 function SpecialEditionDriverTable({ rows }) {
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Ã‰vÃ©nement</th><th style={styles.th}>Ã‰dition</th><th style={styles.th}>Date</th><th style={styles.th}>RÃ©sultat</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.eventType}-${row.id}`} style={styles.tr}><td style={styles.td}><span style={{ ...styles.categoryBadge, background: SPECIAL_EVENT_OPTIONS.find((event) => event.id === row.eventType)?.color || "#7c3aed", color: row.eventType === "INDY300" ? "#18181b" : "white" }}>{getSpecialEventName(row.eventType)}</span></td><td style={styles.td}>{row.editionLabel}{row.name ? ` Â· ${row.name}` : ""}</td><td style={styles.td}>{row.date ? new Date(row.date).toLocaleDateString("fr-FR") : "â€”"}</td><td style={styles.td}><div style={styles.titleBadgeRow}>{row.roles.map((role) => <span key={role} style={styles.titleBadge}>ðŸ† {role}</span>)}</div></td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrÃ©e sur ces Ã©ditions." />}</div>;
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Événement</th><th style={styles.th}>Édition</th><th style={styles.th}>Date</th><th style={styles.th}>Résultat</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.eventType}-${row.id}`} style={styles.tr}><td style={styles.td}><span style={{ ...styles.categoryBadge, background: SPECIAL_EVENT_OPTIONS.find((event) => event.id === row.eventType)?.color || "#7c3aed", color: row.eventType === "INDY300" ? "#18181b" : "white" }}>{getSpecialEventName(row.eventType)}</span></td><td style={styles.td}>{row.editionLabel}{row.name ? ` · ${row.name}` : ""}</td><td style={styles.td}>{row.date ? new Date(row.date).toLocaleDateString("fr-FR") : "—"}</td><td style={styles.td}><div style={styles.titleBadgeRow}>{row.roles.map((role) => <span key={role} style={styles.titleBadge}>🏆 {role}</span>)}</div></td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée sur ces éditions." />}</div>;
 }
 
 function TeamDetails({ team, drivers, raceResults, onClose }) {
   const rows = getTeamSeasonBreakdown(team, drivers, raceResults);
-  return <div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE Ã‰CURIE</p><h2 style={styles.gpDetailTitle}>{team.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><Card title="Stats par saison et catÃ©gorie" icon="ðŸŽï¸"><SeasonBreakdownTable rows={rows} /></Card></div>;
+  return <div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE ÉCURIE</p><h2 style={styles.gpDetailTitle}>{team.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><Card title="Stats par saison et catégorie" icon="🏎️"><SeasonBreakdownTable rows={rows} /></Card></div>;
 }
 
 function SeasonBreakdownTable({ rows, expandable = false }) {
@@ -6036,16 +6036,16 @@ function SeasonBreakdownTable({ rows, expandable = false }) {
   return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Saison</th>{showPosition && <th style={styles.th}>Position</th>}{showTitles && <th style={styles.th}>Titres</th>}<th style={styles.th}>Ecurie</th><th style={styles.th}>Categories</th><th style={styles.th}>Points</th><th style={styles.th}>V</th><th style={styles.th}>Podiums</th><th style={styles.th}>Poles</th><th style={styles.th}>MT</th><th style={styles.th}>HT</th></tr></thead><tbody>{rows.map((row) => {
     const expanded = expandable && expandedSeasonId === row.seasonId;
     const canExpand = expandable && row.raceDetails?.length;
-    return <Fragment key={row.seasonId}><tr style={styles.tr}><td style={styles.td}>{canExpand ? <button type="button" onClick={() => setExpandedSeasonId(expanded ? "" : row.seasonId)} style={styles.linkButton}>{expanded ? "v" : ">"} {seasonName(row.seasonId)}</button> : seasonName(row.seasonId)}</td>{showPosition && <td style={{ ...styles.td, ...styles.points }}>{row.position ? `#${row.position}` : "—"}</td>}{showTitles && <td style={styles.td}><div style={styles.titleBadgeRow}>{row.driverChampion && <span style={styles.titleBadge}>Trophee Pilote</span>}{row.constructorChampion && <span style={styles.titleBadge}>Trophee Constructeur</span>}{!row.driverChampion && !row.constructorChampion && "—"}</div></td>}<td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans ecurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "—"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td><td style={styles.td}>{row.hatTricks || 0}</td></tr>{expanded && <tr style={styles.tr}><td style={styles.td} colSpan={columnCount}><DriverSeasonRaceDetails races={row.raceDetails} /></td></tr>}</Fragment>;
+    return <Fragment key={row.seasonId}><tr style={styles.tr}><td style={styles.td}>{canExpand ? <button type="button" onClick={() => setExpandedSeasonId(expanded ? "" : row.seasonId)} style={styles.linkButton}>{expanded ? "v" : ">"} {seasonName(row.seasonId)}</button> : seasonName(row.seasonId)}</td>{showPosition && <td style={{ ...styles.td, ...styles.points }}>{row.position ? `#${row.position}` : "�"}</td>}{showTitles && <td style={styles.td}><div style={styles.titleBadgeRow}>{row.driverChampion && <span style={styles.titleBadge}>Trophee Pilote</span>}{row.constructorChampion && <span style={styles.titleBadge}>Trophee Constructeur</span>}{!row.driverChampion && !row.constructorChampion && "�"}</div></td>}<td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : row.teamName || "Sans ecurie"}</td><td style={styles.td}>{row.categories.length ? row.categories.map((category) => <span key={category} style={{ ...styles.categoryBadge, background: getCategoryColor(category) }}>{category}</span>) : "�"}</td><td style={{ ...styles.td, ...styles.points }}>{row.points}</td><td style={styles.td}>{row.wins}</td><td style={styles.td}>{row.podiums}</td><td style={styles.td}>{row.poles}</td><td style={styles.td}>{row.fastestLaps}</td><td style={styles.td}>{row.hatTricks || 0}</td></tr>{expanded && <tr style={styles.tr}><td style={styles.td} colSpan={columnCount}><DriverSeasonRaceDetails races={row.raceDetails} /></td></tr>}</Fragment>;
   })}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistree." />}</div>;
 }
 
 function DriverSeasonRaceDetails({ races = [] }) {
-  return <div style={styles.tableWrap}><table style={{ ...styles.table, minWidth: 640 }}><thead><tr style={styles.tableHead}><th style={styles.th}>Course</th><th style={styles.th}>Resultat</th><th style={styles.th}>Points</th><th style={styles.th}>Bonus</th></tr></thead><tbody>{races.map((race) => <tr key={race.id} style={styles.tr}><td style={styles.td}><strong>R{race.round}</strong><p style={styles.mutedSmall}>{race.name}</p></td><td style={styles.td}>{race.validated ? race.entered ? <span style={styles.points}>P{race.position}</span> : <span style={styles.badgeDark}>Absent</span> : <span style={styles.badgeDark}>Non valide</span>}</td><td style={{ ...styles.td, ...styles.points }}>{race.points}</td><td style={styles.td}><div style={styles.titleBadgeRow}>{race.pole && <span style={styles.titleBadge}>Pole</span>}{race.fastestLap && <span style={styles.titleBadge}>MT</span>}{race.hatTrick && <span style={styles.titleBadge}>HT</span>}{!race.pole && !race.fastestLap && !race.hatTrick && "—"}</div></td></tr>)}</tbody></table>{races.length === 0 && <Empty text="Aucune course dans cette saison." />}</div>;
+  return <div style={styles.tableWrap}><table style={{ ...styles.table, minWidth: 640 }}><thead><tr style={styles.tableHead}><th style={styles.th}>Course</th><th style={styles.th}>Resultat</th><th style={styles.th}>Points</th><th style={styles.th}>Bonus</th></tr></thead><tbody>{races.map((race) => <tr key={race.id} style={styles.tr}><td style={styles.td}><strong>R{race.round}</strong><p style={styles.mutedSmall}>{race.name}</p></td><td style={styles.td}>{race.validated ? race.entered ? <span style={styles.points}>P{race.position}</span> : <span style={styles.badgeDark}>Absent</span> : <span style={styles.badgeDark}>Non valide</span>}</td><td style={{ ...styles.td, ...styles.points }}>{race.points}</td><td style={styles.td}><div style={styles.titleBadgeRow}>{race.pole && <span style={styles.titleBadge}>Pole</span>}{race.fastestLap && <span style={styles.titleBadge}>MT</span>}{race.hatTrick && <span style={styles.titleBadge}>HT</span>}{!race.pole && !race.fastestLap && !race.hatTrick && "�"}</div></td></tr>)}</tbody></table>{races.length === 0 && <Empty text="Aucune course dans cette saison." />}</div>;
 }
 function ParticipationEditor({ form, setForm, teams = [], selectedSeasonId = "S1", categoryOptions = CATEGORY_OPTIONS }) {
   const [seasonId, setSeasonId] = useState(selectedSeasonId || "S1");
-  return <div style={styles.teamPreview}><span style={styles.labelText}>Participations par saison</span><select value={seasonId} onChange={(event) => setSeasonId(event.target.value)} style={styles.input}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select><label style={styles.label}><span style={styles.labelText}>Ã‰curie cette saison</span><select value={form.teamHistory?.[seasonId] || form.teamId || ""} onChange={(event) => setForm(updateDriverSeasonTeam(form, seasonId, event.target.value))} style={styles.input}><option value="">Sans Ã©curie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label><div style={styles.categoryCheckboxGrid}>{categoryOptions.map((category) => <label key={category.id} style={{ ...styles.checkboxPill, borderColor: getCategoryColor(category.id) }}><input type="checkbox" checked={(form.participations?.[seasonId] || []).includes(category.id)} onChange={() => setForm(toggleParticipation(form, seasonId, category.id))} /> {category.name}</label>)}</div><p style={styles.mutedSmall}>Exemple : un pilote peut faire F2 en S1, puis F1 en S2, ou mÃªme plusieurs catÃ©gories la mÃªme saison.</p></div>;
+  return <div style={styles.teamPreview}><span style={styles.labelText}>Participations par saison</span><select value={seasonId} onChange={(event) => setSeasonId(event.target.value)} style={styles.input}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select><label style={styles.label}><span style={styles.labelText}>Écurie cette saison</span><select value={form.teamHistory?.[seasonId] || form.teamId || ""} onChange={(event) => setForm(updateDriverSeasonTeam(form, seasonId, event.target.value))} style={styles.input}><option value="">Sans écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label><div style={styles.categoryCheckboxGrid}>{categoryOptions.map((category) => <label key={category.id} style={{ ...styles.checkboxPill, borderColor: getCategoryColor(category.id) }}><input type="checkbox" checked={(form.participations?.[seasonId] || []).includes(category.id)} onChange={() => setForm(toggleParticipation(form, seasonId, category.id))} /> {category.name}</label>)}</div><p style={styles.mutedSmall}>Exemple : un pilote peut faire F2 en S1, puis F1 en S2, ou même plusieurs catégories la même saison.</p></div>;
 }
 
 function MiniCountList({ counts, empty }) {
@@ -6053,7 +6053,7 @@ function MiniCountList({ counts, empty }) {
   if (entries.length === 0) return <Empty text={empty} />;
   return <div style={styles.stack}>{entries.map(([name, count]) => <div key={name} style={styles.itemBox}><strong>{name}</strong><span style={styles.badgeGreen}>{count}</span></div>)}</div>;
 }
-function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "â€”"}</strong></div>; }
+function RaceStat({ label, value }) { return <div style={styles.raceStat}><span style={styles.mutedSmall}>{label}</span><strong>{value || "—"}</strong></div>; }
 function FeedbackWidget({ playerProfile = null }) {
   const [isOpen, setIsOpen] = useState(false);
   const [type, setType] = useState("Suggestion");
@@ -6090,7 +6090,7 @@ function FeedbackWidget({ playerProfile = null }) {
       });
 
       if (!response.ok) throw new Error("Feedback failed");
-      setStatus("EnvoyÃ© sur Discord, merci !");
+      setStatus("Envoyé sur Discord, merci !");
       setTitle("");
       setContent("");
     } catch (error) {
@@ -6108,7 +6108,7 @@ function FeedbackWidget({ playerProfile = null }) {
         <div style={styles.detailOverlay} onClick={() => setIsOpen(false)}>
           <form onSubmit={sendFeedback} style={styles.feedbackModal} onClick={(event) => event.stopPropagation()}>
             <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>RETOUR SITE</p><h2 style={styles.gpDetailTitle}>Suggestion ou bug</h2></div><button type="button" onClick={() => setIsOpen(false)} style={styles.secondaryButton}>Fermer</button></div>
-            <p style={styles.mutedSmall}>Compte : {playerProfile?.pseudo ? <strong>{playerProfile.pseudo}{playerProfile.discordName ? ` Â· ${playerProfile.discordName}` : ""}</strong> : "non connectÃ©"}</p>
+            <p style={styles.mutedSmall}>Compte : {playerProfile?.pseudo ? <strong>{playerProfile.pseudo}{playerProfile.discordName ? ` · ${playerProfile.discordName}` : ""}</strong> : "non connecté"}</p>
             <div style={styles.feedbackChoice}>{["Suggestion", "Bug"].map((item) => <button key={item} type="button" onClick={() => setType(item)} style={{ ...styles.feedbackChoiceButton, ...(type === item ? styles.feedbackChoiceActive : {}) }}>{item}</button>)}</div>
             <Input label="Titre" value={title} onChange={setTitle} />
             <label style={styles.label}><span style={styles.labelText}>Contenu</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} style={styles.textarea} /></label>
@@ -6136,7 +6136,7 @@ function RaceCountdown({ races, events = [] }) {
   const nextItem = upcomingItems[0];
 
   if (!nextItem) {
-    return <Card title="Prochain rendez-vous" icon="â±ï¸"><div style={styles.countdownBox}><strong>Aucune course ou evenement programme</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses ou Planning.</span></div><CalendarFeedLinks /></Card>;
+    return <Card title="Prochain rendez-vous" icon="⏱️"><div style={styles.countdownBox}><strong>Aucune course ou evenement programme</strong><span style={styles.mutedSmall}>Ajoute une date dans Admin &gt; Courses ou Planning.</span></div><CalendarFeedLinks /></Card>;
   }
 
   const remaining = Math.max(0, new Date(nextItem.sortAt).getTime() - now);
@@ -6146,10 +6146,10 @@ function RaceCountdown({ races, events = [] }) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   const itemTitle = nextItem.kind === "event" ? nextItem.title : nextItem.name;
-  const itemMeta = nextItem.kind === "event" ? "Evenement" : `${seasonName(nextItem.seasonId)} Â· Course #${nextItem.round}`;
+  const itemMeta = nextItem.kind === "event" ? "Evenement" : `${seasonName(nextItem.seasonId)} · Course #${nextItem.round}`;
 
   return (
-    <Card title="Prochains rendez-vous" icon="â±ï¸">
+    <Card title="Prochains rendez-vous" icon="⏱️">
       <div style={styles.countdownBox}>
         <div>
           <p style={styles.mutedSmall}>{itemMeta}</p>
@@ -6165,7 +6165,7 @@ function RaceCountdown({ races, events = [] }) {
             <div key={`${item.kind}-${item.id}`} style={styles.upcomingItem}>
               <div>
                 <strong>{item.kind === "event" ? item.title : item.name}</strong>
-                <p style={styles.mutedSmall}>{item.kind === "event" ? "Evenement" : `${seasonName(item.seasonId)} Â· Course #${item.round}`}</p>
+                <p style={styles.mutedSmall}>{item.kind === "event" ? "Evenement" : `${seasonName(item.seasonId)} · Course #${item.round}`}</p>
                 <AddToCalendarLinks race={item} compact />
               </div>
               <div style={styles.upcomingMeta}><CountdownBadge item={item} /><span style={styles.mutedSmall}>{formatRaceDate(item.sortAt)}</span></div>
@@ -6178,7 +6178,7 @@ function RaceCountdown({ races, events = [] }) {
   );
 }
 function CountdownBadge({ item }) {
-  if (item.kind === "event") return <span style={{ ...styles.categoryBadge, background: "#2563eb" }}>Ã‰vÃ©nement</span>;
+  if (item.kind === "event") return <span style={{ ...styles.categoryBadge, background: "#2563eb" }}>Événement</span>;
   return <span style={{ ...styles.categoryBadge, background: getCategoryColor(item.categoryId) }}>{item.categoryId}</span>;
 }
 function AddToCalendarLinks({ race, compact = false }) {
@@ -6226,14 +6226,14 @@ function RaceDateInput({ race, onSave }) {
   return <label style={styles.dateField}><span style={styles.mutedSmall}>{isSaving ? "Sauvegarde..." : "Depart"}</span><input type="datetime-local" value={value} onChange={(event) => save(event.target.value)} style={styles.dateInput} /></label>;
 }
 function RaceTable({ races, onDelete, onMoveRace, onUpdateStartAt, isSavingRace = false }) {
-  return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)} Â· {formatRaceDate(race.startAt)}</p><RaceDateInput race={race} onSave={onUpdateStartAt} /></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>â†‘</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>â†“</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
+  return <div style={styles.stack}>{races.map((race, index) => <div key={race.id} style={styles.itemBox}><div><strong>{race.round}. {race.name}</strong><p style={styles.mutedSmall}>{seasonName(race.seasonId)} · {formatRaceDate(race.startAt)}</p><RaceDateInput race={race} onSave={onUpdateStartAt} /></div><div style={styles.actions}>{onMoveRace && <><button type="button" onClick={() => onMoveRace(race.id, -1)} disabled={isSavingRace || index === 0} style={styles.editButton}>↑</button><button type="button" onClick={() => onMoveRace(race.id, 1)} disabled={isSavingRace || index === races.length - 1} style={styles.editButton}>↓</button></>}{onDelete && <button onClick={() => onDelete(race.id)} disabled={isSavingRace} style={styles.dangerButton}>Supprimer</button>}</div></div>)}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
 }
-function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Ã‰curie : {team?.name || "â€”"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
-function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} Â· F2 {team.teamTitlesF2 || 0} Â· F3 {team.teamTitlesF3 || 0} Â· FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
+function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Écurie : {team?.name || "—"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
+function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} · F2 {team.teamTitlesF2 || 0} · F3 {team.teamTitlesF3 || 0} · FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function DriverIdentity({ driver, teamColor, teamLogo, showRetired = true }) { const isRetiredVisible = showRetired && driver.retired; const imageSrc = driver.avatar || (isRetiredVisible ? "" : teamLogo); const borderColor = teamColor || driver.color || "#dc2626"; return <div className="urtt-identity" style={styles.identity}>{imageSrc ? <img src={imageSrc} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${borderColor}` }} /> : <div style={{ ...styles.fallbackLogo, background: isRetiredVisible ? "#18181b" : borderColor, border: `2px solid ${borderColor}`, fontSize: isRetiredVisible ? 20 : 12 }}>{isRetiredVisible ? RETIRED_DRIVER_MARK : (driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>{DRIVER_NUMBER_LABEL} {driver.number || "-"}{isRetiredVisible ? ` - ${RETIRED_LABEL}` : ""}</p></div></div>; }
-function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={{ ...styles.logoSmall, border: `2px solid ${team.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<div className="urtt-identity-text" style={styles.identityText}><strong className="urtt-team-name">{team.name || "Ã‰curie"}</strong><p style={styles.mutedSmall}>Ã‰curie</p></div></div>; }
+function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={{ ...styles.logoSmall, border: `2px solid ${team.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<div className="urtt-identity-text" style={styles.identityText}><strong className="urtt-team-name">{team.name || "Écurie"}</strong><p style={styles.mutedSmall}>Écurie</p></div></div>; }
 function TripleCrown({ crown }) { const safe = crown || { monaco: false, indy500: false, lemans: false }; return <div style={styles.crownBox}><span style={safe.monaco ? { ...styles.badgeGreen, background: "#7c3aed", color: "white" } : styles.badgeDark}>Titre F1</span><span style={safe.indy500 ? { ...styles.badgeGreen, background: "#ffff00", color: "#18181b" } : styles.badgeDark}>Indy 300</span><span style={safe.lemans ? { ...styles.badgeGreen, background: "#006ee6" } : styles.badgeDark}>2,4H du Mans</span></div>; }
-function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÃˆS PRIVÃ‰</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes Ã  crÃ©er dans Supabase Auth.</p></form></div>; }
+function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes à créer dans Supabase Auth.</p></form></div>; }
 function TitlesPanel({
   drivers,
   teams,
@@ -6309,7 +6309,7 @@ function TitlesPanel({
 
           <div>
             <label className="urtt-label">
-              Ã‰curie championne
+              Écurie championne
             </label>
 
             <select
@@ -6317,7 +6317,7 @@ function TitlesPanel({
               value={titleTeamId}
               onChange={(e) => { setTitleTeamId(e.target.value); setConstructorTitleDriverIds?.([]); }}
             >
-              <option value="">Choisir une Ã©curie</option>
+              <option value="">Choisir une écurie</option>
 
               {teams.map((team) => (
                 <option key={team.id} value={team.id}>
@@ -6346,7 +6346,7 @@ function TitlesPanel({
 
         <div className="urtt-form-grid" style={{ marginTop: 24 }}>
           <div>
-            <label className="urtt-label">CatÃ©gorie</label>
+            <label className="urtt-label">Catégorie</label>
             <select className="urtt-input" value={selectedCategoryId} onChange={(e) => { setSelectedCategoryId(e.target.value); setConstructorTitleDriverIds?.([]); }}>
               {categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </select>
@@ -6399,7 +6399,7 @@ function TitlesPanel({
         </button>
 
         <div style={{ ...styles.itemBox, marginTop: 16 }}>
-          <span>{seasonName(selectedSeasonId)} Â· {selectedCategoryId}</span>
+          <span>{seasonName(selectedSeasonId)} · {selectedCategoryId}</span>
           <strong>Pilote : {currentDriver?.name || "Aucun"} / Constructeur : {currentTeam?.name || "Aucune ecurie"}</strong>
           <p style={styles.mutedSmall}>Pilotes constructeur : {currentConstructorDrivers.length ? currentConstructorDrivers.map((driver) => driver.name).join(", ") : "Non precise, attribution par ecurie"}</p>
         </div>
@@ -6407,7 +6407,7 @@ function TitlesPanel({
 
       <div className="urtt-card">
         <h2 className="urtt-card-title">
-          AperÃ§u des titres
+          Aperçu des titres
         </h2>
 
         <div
@@ -6432,7 +6432,7 @@ function TitlesPanel({
                   <span>{driver.name}</span>
 
                   <strong>
-                    ðŸ† {driver.driverTitles || 0}
+                    🏆 {driver.driverTitles || 0}
                   </strong>
                 </div>
               ))}
@@ -6441,7 +6441,7 @@ function TitlesPanel({
 
           <div>
             <h3 style={{ marginBottom: 12 }}>
-              Ã‰curies
+              Écuries
             </h3>
 
             <div style={{ display: "grid", gap: 10 }}>
@@ -6453,7 +6453,7 @@ function TitlesPanel({
                   <span>{team.name}</span>
 
                   <strong>
-                    ðŸ‘‘ {team.teamTitles || 0}
+                    👑 {team.teamTitles || 0}
                   </strong>
                 </div>
               ))}
@@ -6464,7 +6464,7 @@ function TitlesPanel({
     </div>
   );
 }
-function Popup({ popup, onClose }) { return <div style={styles.popupOverlay}><div style={styles.popupCard}><div style={styles.popupIcon}>{popup.type === "error" ? "âš ï¸" : "âœ…"}</div><h3 style={styles.popupTitle}>{popup.title}</h3><p style={styles.muted}>{popup.message}</p><button onClick={onClose} style={styles.fullButton}>OK</button></div></div>; }
+function Popup({ popup, onClose }) { return <div style={styles.popupOverlay}><div style={styles.popupCard}><div style={styles.popupIcon}>{popup.type === "error" ? "⚠️" : "✅"}</div><h3 style={styles.popupTitle}>{popup.title}</h3><p style={styles.muted}>{popup.message}</p><button onClick={onClose} style={styles.fullButton}>OK</button></div></div>; }
 function Card({ title, icon, children }) { return <div className="urtt-card" style={styles.card}><div style={styles.cardHeader}><div style={styles.cardIcon}>{icon}</div><h3 style={styles.cardTitle}>{title}</h3></div>{children}</div>; }
 function Stat({ label, value }) { return <div className="urtt-stat-card" style={styles.statCard}><p style={styles.muted}>{label}</p><p style={styles.statValue}>{value}</p></div>; }
 function Input({ label, value, onChange, type = "text" }) { return <label style={styles.label}><span style={styles.labelText}>{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} style={styles.input} /></label>; }
