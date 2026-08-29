@@ -887,32 +887,6 @@ function getPredictionLeaderboard(predictions = [], raceResults = []) {
   });
   return Array.from(map.values()).sort((a, b) => b.score - a.score || a.pseudo.localeCompare(b.pseudo, "fr"));
 }
-function getPredictionMaxScore(prediction, raceResults = []) {
-  const result = getRaceResultForRace(raceResults, prediction.raceId);
-  if (!result) return 0;
-  const positionsCount = Math.min(20, result.entries?.length || 0);
-  return 10 + 5 + 5 + 9 + 10 + positionsCount * 2;
-}
-function getPredictionTwitchPointStats(predictions = [], raceResults = []) {
-  const map = new Map();
-  predictions.forEach((prediction) => {
-    const key = prediction.pseudo.trim().toLowerCase();
-    if (!key) return;
-    const score = scoreRacePrediction(prediction, raceResults);
-    if (!score.scored) return;
-    const maxScore = getPredictionMaxScore(prediction, raceResults);
-    const current = map.get(key) || { pseudo: prediction.pseudo, gained: 0, lost: 0, maxScore: 0, predictions: 0 };
-    map.set(key, {
-      ...current,
-      pseudo: current.pseudo || prediction.pseudo,
-      gained: current.gained + score.score,
-      lost: current.lost + Math.max(0, maxScore - score.score),
-      maxScore: current.maxScore + maxScore,
-      predictions: current.predictions + 1,
-    });
-  });
-  return Array.from(map.values()).sort((a, b) => b.gained - a.gained || a.lost - b.lost || a.pseudo.localeCompare(b.pseudo, "fr"));
-}
 const GUESS_DRIVER_RECENT_DAYS = 7;
 function getStableChallengeHash(seed = "") {
   return Array.from(seed).reduce((hash, char) => {
@@ -3540,7 +3514,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
-          {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel predictions={racePredictions} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
+          {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
           {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -5728,67 +5702,83 @@ function PredictionAdminTable({ predictions = [], races = [], drivers = [], race
   );
 }
 
-function TwitchPointsAdminPanel({ predictions = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId }) {
-  const categoryId = normalizeCategoryId(selectedCategoryId);
-  const seasonId = normalizeSeasonId(selectedSeasonId);
-  const seasonRaces = races.filter((race) => normalizeCategoryId(race.categoryId) === categoryId && normalizeSeasonId(race.seasonId) === seasonId).sort((a, b) => Number(a.round) - Number(b.round));
-  const visiblePredictions = predictions.filter((prediction) => normalizeCategoryId(prediction.categoryId) === categoryId && normalizeSeasonId(prediction.seasonId) === seasonId);
-  const scoredPredictions = visiblePredictions
-    .map((prediction) => {
-      const race = seasonRaces.find((item) => String(item.id) === String(prediction.raceId));
-      const score = scoreRacePrediction(prediction, raceResults);
-      const maxScore = getPredictionMaxScore(prediction, raceResults);
-      return { prediction, race, score, maxScore, lost: Math.max(0, maxScore - score.score) };
-    })
-    .filter((row) => row.score.scored);
-  const playerStats = getPredictionTwitchPointStats(visiblePredictions, raceResults);
-  const totals = playerStats.reduce((sum, row) => ({
-    gained: sum.gained + row.gained,
-    lost: sum.lost + row.lost,
-    maxScore: sum.maxScore + row.maxScore,
-    predictions: sum.predictions + row.predictions,
-  }), { gained: 0, lost: 0, maxScore: 0, predictions: 0 });
+function TwitchPointsAdminPanel() {
+  const [period, setPeriod] = useState("30d");
+  const [data, setData] = useState(null);
+  const [error, setError] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    setIsLoading(true);
+    setError("");
+    fetch(`/api/twitch-channel-points?period=${period}`, { signal: controller.signal })
+      .then(async (response) => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(payload.error || "Impossible de charger les points Twitch.");
+        return payload;
+      })
+      .then(setData)
+      .catch((fetchError) => {
+        if (fetchError.name !== "AbortError") setError(fetchError.message);
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setIsLoading(false);
+      });
+    return () => controller.abort();
+  }, [period]);
+
+  const summary = data?.summary || {};
+  const predictions = data?.predictions || [];
+  const topPredictors = data?.topPredictors || [];
 
   return (
     <div style={styles.section}>
-      <Card title="Points Twitch — Prédictions" icon="💠">
+      <Card title="Points Twitch — API Twitch" icon="💠">
         <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Période</span><select value={period} onChange={(event) => setPeriod(event.target.value)} style={styles.resultsSelect}><option value="30d">30 derniers jours</option><option value="365d">12 derniers mois</option></select></label>
+          <div style={styles.raceStat}><span style={styles.mutedSmall}>Chaîne</span><strong>{data?.broadcasterLogin || "Twitch"}</strong></div>
+          <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{isLoading ? "Chargement..." : error ? "Erreur" : "Synchronisé"}</strong></div>
         </div>
+        {error && <div style={styles.errorBox}><p style={styles.errorText}>{error}</p></div>}
         <div style={styles.statsGrid}>
-          <Stat label="Pronos scorés" value={totals.predictions} />
-          <Stat label="Points Twitch gagnés" value={totals.gained} />
-          <Stat label="Points Twitch perdus" value={totals.lost} />
-          <Stat label="Maximum possible" value={totals.maxScore} />
+          <Stat label="Prédictions Twitch" value={summary.predictions ?? 0} />
+          <Stat label="Résolues" value={summary.resolvedPredictions ?? 0} />
+          <Stat label="Points misés" value={formatTwitchPoints(summary.channelPointsSpent)} />
+          <Stat label="Points perdus" value={formatTwitchPoints(summary.channelPointsLost)} />
+          <Stat label="Gains visibles" value={formatTwitchPoints(summary.visibleChannelPointsWon)} />
         </div>
-        <p style={styles.mutedSmall}>Estimation Twitch : les points gagnés correspondent au score du prono, les points perdus correspondent aux points manqués par rapport au score maximum possible.</p>
+        <p style={styles.mutedSmall}>Twitch expose les points misés par outcome et les gains des top predictors. Les pertes sont calculées avec les points misés sur les outcomes perdants.</p>
       </Card>
       <div style={styles.twoColumns}>
-        <Card title="Résumé par joueur" icon="🏆">
-          <TwitchPointsLeaderboard rows={playerStats} />
+        <Card title="Top predictors visibles" icon="🏆">
+          <TwitchTopPredictors rows={topPredictors} />
         </Card>
-        <Card title="Détail des pronos scorés" icon="📋">
-          <TwitchPointsPredictionTable rows={scoredPredictions} drivers={drivers} />
+        <Card title="Prédictions Twitch" icon="📋">
+          <TwitchPredictionsTable rows={predictions} />
         </Card>
       </div>
     </div>
   );
 }
 
-function TwitchPointsLeaderboard({ rows = [] }) {
-  if (!rows.length) return <Empty text="Aucun prono scoré sur cette sélection." />;
+function formatTwitchPoints(value) {
+  return Number(value || 0).toLocaleString("fr-FR");
+}
+
+function TwitchTopPredictors({ rows = [] }) {
+  if (!rows.length) return <Empty text="Aucun top predictor disponible sur cette période." />;
   return (
     <div style={styles.stack}>
       {rows.map((row, index) => (
-        <div key={row.pseudo} style={styles.itemBox}>
+        <div key={row.userLogin || row.userName} style={styles.itemBox}>
           <div>
-            <strong>#{index + 1} {row.pseudo}</strong>
-            <p style={styles.mutedSmall}>{row.predictions} prono{row.predictions > 1 ? "s" : ""} scoré{row.predictions > 1 ? "s" : ""}</p>
+            <strong>#{index + 1} {row.userName}</strong>
+            <p style={styles.mutedSmall}>{row.predictions} prédiction{row.predictions > 1 ? "s" : ""} · @{row.userLogin}</p>
           </div>
           <div style={styles.twitchPointPair}>
-            <span style={styles.twitchPointGain}>+{row.gained}</span>
-            <span style={styles.twitchPointLoss}>-{row.lost}</span>
+            <span style={styles.twitchPointGain}>+{formatTwitchPoints(row.won)}</span>
+            <span style={styles.twitchPointLoss}>-{formatTwitchPoints(row.used)}</span>
           </div>
         </div>
       ))}
@@ -5796,20 +5786,20 @@ function TwitchPointsLeaderboard({ rows = [] }) {
   );
 }
 
-function TwitchPointsPredictionTable({ rows = [], drivers = [] }) {
-  if (!rows.length) return <Empty text="Aucun détail à afficher tant qu'aucune course avec prono n'a de résultat validé." />;
+function TwitchPredictionsTable({ rows = [] }) {
+  if (!rows.length) return <Empty text="Aucune prédiction Twitch sur cette période." />;
   return (
     <div style={styles.tableWrap}>
-      <table style={{ ...styles.table, minWidth: 760 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1 prédit</th><th style={styles.th}>Gagné</th><th style={styles.th}>Perdu</th><th style={styles.th}>Détail</th></tr></thead>
-        <tbody>{rows.map(({ prediction, race, score, maxScore, lost }) => (
+      <table style={{ ...styles.table, minWidth: 880 }}>
+        <thead><tr style={styles.tableHead}><th style={styles.th}>Titre</th><th style={styles.th}>Statut</th><th style={styles.th}>Début</th><th style={styles.th}>Points misés</th><th style={styles.th}>Points perdus</th><th style={styles.th}>Gains visibles</th></tr></thead>
+        <tbody>{rows.map((prediction) => (
           <tr key={prediction.id} style={styles.tr}>
-            <td style={styles.td}><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "—"}</p></td>
-            <td style={styles.td}>{race ? `R${race.round} · ${race.name}` : prediction.raceId}</td>
-            <td style={styles.td}>{driverName(drivers, prediction.predictedOrder?.[0] || prediction.winnerDriverId)}</td>
-            <td style={{ ...styles.td, ...styles.twitchPointGain }}>+{score.score}</td>
-            <td style={{ ...styles.td, ...styles.twitchPointLoss }}>-{lost}</td>
-            <td style={styles.td}><span style={styles.mutedSmall}>{score.details} · max {maxScore}</span></td>
+            <td style={styles.td}><strong>{prediction.title}</strong><p style={styles.mutedSmall}>{prediction.winningOutcomeTitle || "Aucun outcome gagnant"}</p></td>
+            <td style={styles.td}>{prediction.status}</td>
+            <td style={styles.td}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "—"}</td>
+            <td style={{ ...styles.td, ...styles.points }}>{formatTwitchPoints(prediction.channelPointsSpent)}</td>
+            <td style={{ ...styles.td, ...styles.twitchPointLoss }}>-{formatTwitchPoints(prediction.channelPointsLost)}</td>
+            <td style={{ ...styles.td, ...styles.twitchPointGain }}>+{formatTwitchPoints(prediction.visibleChannelPointsWon)}</td>
           </tr>
         ))}</tbody>
       </table>
