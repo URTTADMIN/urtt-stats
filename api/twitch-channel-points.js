@@ -1,5 +1,6 @@
 const TWITCH_API_URL = "https://api.twitch.tv/helix/predictions";
 const TWITCH_TOKEN_URL = "https://id.twitch.tv/oauth2/token";
+const TWITCH_COOKIE_MAX_AGE = 60 * 60 * 24 * 180;
 const PERIODS = {
   "30d": 30,
   "365d": 365,
@@ -9,11 +10,27 @@ function json(response, status, payload) {
   response.status(status).json(payload);
 }
 
-async function getAccessToken() {
-  if (process.env.TWITCH_REFRESH_TOKEN && process.env.TWITCH_CLIENT_SECRET) {
+function parseCookies(cookieHeader = "") {
+  return Object.fromEntries(cookieHeader.split(";").map((cookie) => {
+    const [name, ...parts] = cookie.trim().split("=");
+    return [name, decodeURIComponent(parts.join("=") || "")];
+  }).filter(([name]) => name));
+}
+
+function setTwitchCookies(response, tokenPayload) {
+  if (!tokenPayload.refresh_token) return;
+  response.setHeader("Set-Cookie", [
+    `urtt_twitch_refresh=${encodeURIComponent(tokenPayload.refresh_token)}; Path=/; Max-Age=${TWITCH_COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`,
+  ]);
+}
+
+async function getAccessToken(request, response) {
+  const cookies = parseCookies(request.headers.cookie || "");
+  const refreshToken = cookies.urtt_twitch_refresh || process.env.TWITCH_REFRESH_TOKEN;
+  if (refreshToken && process.env.TWITCH_CLIENT_SECRET) {
     const params = new URLSearchParams({
       grant_type: "refresh_token",
-      refresh_token: process.env.TWITCH_REFRESH_TOKEN,
+      refresh_token: refreshToken,
       client_id: process.env.TWITCH_CLIENT_ID,
       client_secret: process.env.TWITCH_CLIENT_SECRET,
     });
@@ -26,6 +43,7 @@ async function getAccessToken() {
     if (!tokenResponse.ok || !tokenPayload.access_token) {
       throw new Error(tokenPayload.message || "Impossible de renouveler le token Twitch.");
     }
+    setTwitchCookies(response, tokenPayload);
     return tokenPayload.access_token;
   }
   return process.env.TWITCH_ACCESS_TOKEN || "";
@@ -96,17 +114,19 @@ export default async function handler(request, response) {
   }
 
   const clientId = process.env.TWITCH_CLIENT_ID;
-  const broadcasterId = process.env.TWITCH_BROADCASTER_ID;
+  const cookies = parseCookies(request.headers.cookie || "");
+  const broadcasterId = cookies.urtt_twitch_broadcaster_id || process.env.TWITCH_BROADCASTER_ID;
+  const broadcasterLogin = cookies.urtt_twitch_broadcaster_login || "";
   if (!clientId || !broadcasterId) {
-    return json(response, 500, { error: "Configure TWITCH_CLIENT_ID et TWITCH_BROADCASTER_ID dans Vercel." });
+    return json(response, 500, { error: "Connecte la chaîne Twitch ou configure TWITCH_CLIENT_ID et TWITCH_BROADCASTER_ID dans Vercel." });
   }
 
   try {
     const period = PERIODS[request.query?.period] ? request.query.period : "30d";
     const since = new Date(Date.now() - PERIODS[period] * 24 * 60 * 60 * 1000);
-    const accessToken = await getAccessToken();
+    const accessToken = await getAccessToken(request, response);
     if (!accessToken) {
-      return json(response, 500, { error: "Configure TWITCH_ACCESS_TOKEN ou TWITCH_REFRESH_TOKEN dans Vercel." });
+      return json(response, 500, { error: "Connecte la chaîne Twitch ou configure TWITCH_ACCESS_TOKEN/TWITCH_REFRESH_TOKEN dans Vercel." });
     }
 
     const predictions = [];
@@ -147,7 +167,7 @@ export default async function handler(request, response) {
     return json(response, 200, {
       period,
       broadcasterId,
-      broadcasterLogin: predictions[0]?.broadcaster_login || "",
+      broadcasterLogin: predictions[0]?.broadcaster_login || broadcasterLogin,
       summary,
       predictions: summarized,
       topPredictors: buildTopPredictors(predictions),

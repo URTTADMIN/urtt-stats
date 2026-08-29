@@ -5705,8 +5705,16 @@ function PredictionAdminTable({ predictions = [], races = [], drivers = [], race
 function TwitchPointsAdminPanel() {
   const [period, setPeriod] = useState("30d");
   const [data, setData] = useState(null);
+  const [authStatus, setAuthStatus] = useState(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/twitch-auth-status")
+      .then((response) => response.json())
+      .then(setAuthStatus)
+      .catch(() => setAuthStatus({ connected: false, canConnect: false }));
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -5737,8 +5745,9 @@ function TwitchPointsAdminPanel() {
       <Card title="Points Twitch — API Twitch" icon="💠">
         <div style={styles.resultsInfo}>
           <label style={styles.label}><span style={styles.labelText}>Période</span><select value={period} onChange={(event) => setPeriod(event.target.value)} style={styles.resultsSelect}><option value="30d">30 derniers jours</option><option value="365d">12 derniers mois</option></select></label>
-          <div style={styles.raceStat}><span style={styles.mutedSmall}>Chaîne</span><strong>{data?.broadcasterLogin || "Twitch"}</strong></div>
+          <div style={styles.raceStat}><span style={styles.mutedSmall}>Chaîne</span><strong>{data?.broadcasterLogin || authStatus?.broadcasterLogin || "Non connectée"}</strong></div>
           <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{isLoading ? "Chargement..." : error ? "Erreur" : "Synchronisé"}</strong></div>
+          <a href="/api/twitch-auth-start" style={{ ...styles.primaryButton, textAlign: "center", textDecoration: "none" }}>{authStatus?.connected ? "Reconnecter Twitch" : "Connecter Twitch"}</a>
         </div>
         {error && <div style={styles.errorBox}><p style={styles.errorText}>{error}</p></div>}
         <div style={styles.statsGrid}>
