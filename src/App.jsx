@@ -61,6 +61,7 @@ const EASTER_EGG_BOOK = [
   { id: "thibaut-s12", title: "Pole to DNF", hint: "Saison 12 · Classements · Thibaut", unlockedText: "Thibaut S12 Monaco : POLE TO DNF, flash rouge et explosion finale." },
   { id: "urtt-stats-title", title: "Champion Mode", hint: "Texte URTT-Stats", unlockedText: "Le titre du site active le CHAMPION MODE après une séquence cachée." },
   { id: "etienne-f2-papy", title: "Papy de la F2", hint: "F2 · Stats pilotes · Etienne", unlockedText: "Etienne F2 : après 12 saisons en Formule 2, le papy quitte son nid." },
+  { id: "noah-legend", title: "Légende de l'URTT", hint: "Stats pilotes · Noah", unlockedText: "Noah : Légende de l'URTT." },
 ];
 const DEFAULT_PUBLIC_PAGE_VISIBILITY = Object.fromEntries(PUBLIC_PAGE_OPTIONS.map((page) => [page.id, true]));
 const SPECIAL_EVENT_OPTIONS = [
@@ -1412,6 +1413,19 @@ export default function URTTAdminPanel() {
         letter-spacing: .12em;
         text-transform: uppercase;
         text-shadow: 0 0 14px rgba(249, 115, 22, .65);
+      }
+      .urtt-noah-legend-label {
+        width: fit-content;
+        margin: 8px 0 0;
+        padding: 7px 12px;
+        border: 1px solid rgba(168,85,247,.6);
+        border-radius: 999px;
+        color: #f5f3ff;
+        background: linear-gradient(135deg, rgba(124,58,237,.34), rgba(236,72,153,.18));
+        font-weight: 950;
+        letter-spacing: .08em;
+        text-transform: uppercase;
+        box-shadow: 0 0 22px rgba(168,85,247,.25);
       }
       .urtt-etienne-papy-scene {
         position: relative;
@@ -3917,6 +3931,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     if (normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(fullDriver.name) === "etienne") {
       unlockEasterEgg("etienne-f2-papy");
     }
+    if (normalizeResultText(fullDriver.name) === "noah") {
+      unlockEasterEgg("noah-legend");
+    }
     setSelectedDriver(fullDriver);
   };
   const handleStandingsDriverClick = (driver) => {
@@ -6114,10 +6131,11 @@ function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonT
   const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId, seasonTitles, allDrivers, allRaces);
   const specialRows = getDriverSpecialEditionRows(driver, specialEditions);
   const isEtienneF2 = normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(driver.name) === "etienne";
+  const isNoahLegend = normalizeResultText(driver.name) === "noah";
   return (
     <div style={styles.detailOverlay} onClick={onClose}>
       <div style={styles.detailModal} onClick={(event) => event.stopPropagation()}>
-        <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2>{isEtienneF2 && <p className="urtt-etienne-papy-label">Papy de la F2</p>}</div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
+        <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE PILOTE</p><h2 style={styles.gpDetailTitle}>{driver.name}</h2>{isEtienneF2 && <p className="urtt-etienne-papy-label">Papy de la F2</p>}{isNoahLegend && <p className="urtt-noah-legend-label">Légende de l'URTT</p>}</div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div>
         {isEtienneF2 && <EtiennePapyAnimation />}
         <Card title="Stats par saison et catégorie" icon="👤"><SeasonBreakdownTable rows={rows} expandable /></Card>
         <Card title="2,4H du Mans & Indy 300" icon="🏁"><SpecialEditionDriverTable rows={specialRows} /></Card>
