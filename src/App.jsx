@@ -35,6 +35,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "channel-points", icon: "💠", label: "Points Twitch" },
   { id: "guess-attempts", icon: "🧩", label: "Essais défi" },
   { id: "player-accounts", icon: "👤", label: "Comptes" },
+  { id: "easter-egg-admin", icon: "📖", label: "Easter eggs" },
   { id: "results", icon: "🏆", label: "Résultats" },
   { id: "race-awards", icon: "⚡", label: "Poles / MT" },
   { id: "permissions", icon: "🔐", label: "Permissions" },
@@ -3531,6 +3532,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
           {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
+          {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
           {visibleAdminPage === "permissions" && (
@@ -5435,6 +5437,77 @@ function RaceAwardTable({ title, icon, rows = [], empty }) {
 
 function AwardDriverIdentity({ driver, team }) {
   return <DriverIdentity driver={{ ...driver, avatar: "" }} teamColor={team?.color} teamLogo={team?.logo} showRetired={false} />;
+}
+
+function EasterEggAdminPanel({ accounts = [] }) {
+  const rows = accounts
+    .map((account) => {
+      const unlockedIds = normalizeEasterEggIds(account.unlockedEasterEggs);
+      const unlockedEggs = EASTER_EGG_BOOK.filter((egg) => unlockedIds.includes(egg.id));
+      const missingEggs = EASTER_EGG_BOOK.filter((egg) => !unlockedIds.includes(egg.id));
+      return { ...account, unlockedIds, unlockedEggs, missingEggs };
+    })
+    .sort((a, b) => b.unlockedEggs.length - a.unlockedEggs.length || (a.pseudo || "").localeCompare(b.pseudo || "", "fr"));
+  const totalUnlocks = rows.reduce((total, row) => total + row.unlockedEggs.length, 0);
+  const completedBooks = rows.filter((row) => row.unlockedEggs.length === EASTER_EGG_BOOK.length).length;
+  const uniqueHunters = rows.filter((row) => row.unlockedEggs.length > 0).length;
+
+  const renderEggBadge = (egg, variant = "found") => {
+    const bookNumber = EASTER_EGG_BOOK.findIndex((item) => item.id === egg.id) + 1;
+    return <span key={egg.id} style={variant === "found" ? styles.titleBadge : styles.badgeDark}>#{bookNumber} {egg.title}</span>;
+  };
+
+  return (
+    <div style={styles.section}>
+      <Card title="Easter eggs débloqués" icon="📖">
+        <div style={styles.statsGrid}>
+          <Stat label="Comptes" value={rows.length} />
+          <Stat label="Chasseurs" value={uniqueHunters} />
+          <Stat label="Déblocages" value={totalUnlocks} />
+          <Stat label="Livres complets" value={completedBooks} />
+        </div>
+        <p style={styles.mutedSmall}>Cette page affiche les easter eggs sauvegardés sur chaque compte utilisateur.</p>
+      </Card>
+      <Card title="Détail par compte" icon="👥">
+        <div style={styles.tableWrap}>
+          <table style={{ ...styles.table, minWidth: 980 }}>
+            <thead>
+              <tr style={styles.tableHead}>
+                <th style={styles.th}>Compte</th>
+                <th style={styles.th}>Discord</th>
+                <th style={styles.th}>Progression</th>
+                <th style={styles.th}>Trouvés</th>
+                <th style={styles.th}>Manquants</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((account) => (
+                <tr key={account.id} style={styles.tr}>
+                  <td style={styles.td}>
+                    <strong>{account.pseudo || "—"}</strong>
+                    <p style={styles.mutedSmall}>ID {account.id}</p>
+                  </td>
+                  <td style={styles.td}>{account.discordName || "—"}</td>
+                  <td style={{ ...styles.td, ...styles.points }}>{account.unlockedEggs.length}/{EASTER_EGG_BOOK.length}</td>
+                  <td style={styles.td}>
+                    <div style={styles.titleBadgeRow}>
+                      {account.unlockedEggs.length ? account.unlockedEggs.map((egg) => renderEggBadge(egg, "found")) : <span style={styles.badgeDark}>Aucun</span>}
+                    </div>
+                  </td>
+                  <td style={styles.td}>
+                    <div style={styles.titleBadgeRow}>
+                      {account.missingEggs.length ? account.missingEggs.map((egg) => renderEggBadge(egg, "missing")) : <span style={styles.badgeGreen}>Livre complet</span>}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistré." />}
+      </Card>
+    </div>
+  );
 }
 
 function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [] }) {
