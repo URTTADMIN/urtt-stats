@@ -75,7 +75,17 @@ function getEasterEggStorageKey(playerId = "") {
 }
 
 function normalizeEasterEggIds(value) {
-  return Array.isArray(value) ? [...new Set(value.map(String).filter(Boolean))] : [];
+  if (!value) return [];
+  if (typeof value === "string") {
+    try {
+      return normalizeEasterEggIds(JSON.parse(value));
+    } catch {
+      return value.split(",").map((item) => item.trim()).filter(Boolean);
+    }
+  }
+  if (Array.isArray(value)) return [...new Set(value.map(String).filter(Boolean))];
+  if (typeof value === "object") return normalizeEasterEggIds(Object.values(value));
+  return [];
 }
 
 function normalizeIdList(value) {
@@ -802,6 +812,13 @@ function mapPlayerProfileFromDb(profile) {
     createdAt: profile.created_at || "",
     lastSeenAt: profile.last_seen_at || "",
   };
+}
+function mergeStoredEasterEggsIntoProfile(profile) {
+  const unlockedEasterEggs = normalizeEasterEggIds([
+    ...normalizeEasterEggIds(profile.unlockedEasterEggs),
+    ...readStoredEasterEggIds(profile.id),
+  ]);
+  return { ...profile, unlockedEasterEggs };
 }
 function mapGuessDriverResultFromDb(result) {
   const attempts = Number(result.attempts || 0);
@@ -1881,8 +1898,8 @@ export default function URTTAdminPanel() {
       }
 
       const loadedProfile = mapPlayerProfileFromDb(data);
-      const unlockedEasterEggs = normalizeEasterEggIds([...loadedProfile.unlockedEasterEggs, ...readStoredEasterEggIds(loadedProfile.id)]);
-      const mergedProfile = { ...loadedProfile, unlockedEasterEggs };
+      const mergedProfile = mergeStoredEasterEggsIntoProfile(loadedProfile);
+      const unlockedEasterEggs = mergedProfile.unlockedEasterEggs;
       writeStoredEasterEggIds(mergedProfile.id, unlockedEasterEggs);
       setPlayerProfile(mergedProfile);
       if (unlockedEasterEggs.length > loadedProfile.unlockedEasterEggs.length) {
@@ -2011,7 +2028,8 @@ export default function URTTAdminPanel() {
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
       setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
-      setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb));
+      const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY) : "";
+      setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb).map((profile) => idsEqual(profile.id, storedPlayerId) ? mergeStoredEasterEggsIntoProfile(profile) : profile));
       setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
       setGuessDriverAttempts((guessDriverAttemptsData || []).map(mapGuessDriverAttemptFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
@@ -3163,8 +3181,8 @@ export default function URTTAdminPanel() {
     }
 
     const dbProfile = mapPlayerProfileFromDb(data);
-    const unlockedEasterEggs = normalizeEasterEggIds([...dbProfile.unlockedEasterEggs, ...readStoredEasterEggIds(dbProfile.id)]);
-    const savedProfile = { ...dbProfile, unlockedEasterEggs };
+    const savedProfile = mergeStoredEasterEggsIntoProfile(dbProfile);
+    const unlockedEasterEggs = savedProfile.unlockedEasterEggs;
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
     writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     setPlayerProfile(savedProfile);
@@ -3190,8 +3208,8 @@ export default function URTTAdminPanel() {
     if (error) return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de connecter le compte joueur." };
     if (!data) return { ok: false, message: "Pseudo ou code secret incorrect." };
     const dbProfile = mapPlayerProfileFromDb(data);
-    const unlockedEasterEggs = normalizeEasterEggIds([...dbProfile.unlockedEasterEggs, ...readStoredEasterEggIds(dbProfile.id)]);
-    const savedProfile = { ...dbProfile, unlockedEasterEggs };
+    const savedProfile = mergeStoredEasterEggsIntoProfile(dbProfile);
+    const unlockedEasterEggs = savedProfile.unlockedEasterEggs;
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
     writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     if (unlockedEasterEggs.length > dbProfile.unlockedEasterEggs.length) {
