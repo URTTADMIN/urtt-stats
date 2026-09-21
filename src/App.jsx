@@ -3881,6 +3881,7 @@ const AREKU_MEDIA_LINKS = [
 function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
+  const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
   const [selectedTeam, setSelectedTeam] = useState(null);
   const [driverStatsSearch, setDriverStatsSearch] = useState("");
   const [multiStatsDriverId, setMultiStatsDriverId] = useState("");
@@ -3950,14 +3951,15 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       return next;
     });
   };
-  const openDriverDetails = (driver) => {
+  const openDriverDetails = (driver, categoryId = selectedCategoryId) => {
     const fullDriver = allDrivers.find((item) => item.id === driver.id) || driver;
-    if (normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(fullDriver.name) === "etienne") {
+    if (normalizeCategoryId(categoryId || selectedCategoryId) === "F2" && normalizeResultText(fullDriver.name) === "etienne") {
       unlockEasterEgg("etienne-f2-papy");
     }
     if (normalizeResultText(fullDriver.name) === "noah") {
       unlockEasterEgg("noah-legend");
     }
+    setSelectedDriverDetailsCategoryId(categoryId);
     setSelectedDriver(fullDriver);
   };
   const handleStandingsDriverClick = (driver) => {
@@ -4021,7 +4023,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
-        {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
+        {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
@@ -4783,7 +4785,7 @@ function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, 
         <>
           <div style={styles.itemBox}>
             <DriverIdentity driver={selectedDriver} teamColor={selectedTeam?.color} teamLogo={selectedTeam?.logo} />
-            <button type="button" onClick={() => onOpenDriver?.(selectedDriver)} style={styles.editButton}>Fiche pilote</button>
+            <button type="button" onClick={() => onOpenDriver?.(selectedDriver, "")} style={styles.editButton}>Fiche complète</button>
           </div>
           <div style={styles.tableWrap}>
             <table style={{ ...styles.table, minWidth: 920 }}>
