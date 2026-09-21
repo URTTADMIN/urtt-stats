@@ -26,6 +26,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "search", icon: "🔎", label: "Recherche" },
   { id: "titles", icon: "👑", label: "Titres" },
   { id: "drivers", icon: "👥", label: "Pilotes" },
+  { id: "championship-stats", icon: "📊", label: "Stats championnats" },
   { id: "teams", icon: "🏎️", label: "Écuries" },
   { id: "races", icon: "🏁", label: "Courses" },
   { id: "planning", icon: "⏱️", label: "Planning" },
@@ -3541,6 +3542,7 @@ export default function URTTAdminPanel() {
   />
 )}
           {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
+          {visibleAdminPage === "championship-stats" && <ChampionshipStatsAdminPanel drivers={drivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allCalendarRaces={allCalendarRaces} categoryOptions={adminCategoryOptions} seasonOptions={seasonOptions} />}
           {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
@@ -4958,6 +4960,50 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
 
 function Dashboard({ drivers, teams, races, selectedCategoryId, selectedSeasonId }) {
   return <div style={styles.section}><div style={styles.statsGrid}><Stat label="Catégorie" value={selectedCategoryId} /><Stat label="Saison" value={seasonName(selectedSeasonId)} /><Stat label="Pilotes" value={drivers.length} /><Stat label="Écuries" value={teams.length} /><Stat label="GP" value={races.length} /></div><div style={styles.twoColumns}><Card title="Top pilotes global" icon="🏆"><DriverTable drivers={drivers} teams={[]} /></Card><Card title="Top écuries global" icon="🏎️"><TeamTable teams={teams} /></Card></div></div>;
+}
+
+function ChampionshipStatsAdminPanel({ drivers = [], teams = [], raceResults = [], seasonTitles = [], allCalendarRaces = [], categoryOptions = CATEGORY_OPTIONS, seasonOptions = getSeasonOptions() }) {
+  const championshipRows = useMemo(() => categoryOptions.map((category) => {
+    const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: category.id, seasonTitles });
+    const categorySeasons = getSeasonOptionsForCategory(allCalendarRaces, category.id, seasonOptions);
+    const latestSeasonId = getLatestSeasonId(categorySeasons.length ? categorySeasons : seasonOptions);
+    const driverStats = stats.cumulativeDriverStatsBySeason[latestSeasonId] || [];
+    const resultCount = raceResults.filter((result) => normalizeCategoryId(result.categoryId) === normalizeCategoryId(category.id)).length;
+    const totalPoints = driverStats.reduce((total, driver) => total + (Number(driver.points) || 0), 0);
+    return { category, latestSeasonId, driverStats, resultCount, totalPoints };
+  }), [drivers, teams, raceResults, seasonTitles, allCalendarRaces, categoryOptions, seasonOptions]);
+  const totalDrivers = new Set(championshipRows.flatMap((row) => row.driverStats.map((driver) => String(driver.id)))).size;
+  const totalResults = championshipRows.reduce((total, row) => total + row.resultCount, 0);
+  const totalPoints = championshipRows.reduce((total, row) => total + row.totalPoints, 0);
+
+  return (
+    <div style={styles.section}>
+      <Card title="Stats pilotes de tous les championnats" icon="📊">
+        <div style={styles.statsGrid}>
+          <Stat label="Championnats" value={championshipRows.length} />
+          <Stat label="Pilotes uniques" value={totalDrivers} />
+          <Stat label="Résultats validés" value={totalResults} />
+          <Stat label="Points cumulés" value={totalPoints} />
+        </div>
+        <p style={styles.mutedSmall}>Les tableaux reprennent les mêmes stats que la page publique, mais regroupées ici pour F1, F2, F3 et FE.</p>
+      </Card>
+      {championshipRows.map(({ category, latestSeasonId, driverStats, resultCount, totalPoints: categoryPoints }) => (
+        <Card key={category.id} title={`${category.name} — Stats pilotes jusqu'à ${seasonName(latestSeasonId)}`} icon="👥">
+          <div style={styles.statsGrid}>
+            <Stat label="Pilotes" value={driverStats.length} />
+            <Stat label="Résultats" value={resultCount} />
+            <Stat label="Points" value={categoryPoints} />
+            <Stat label="Leader" value={driverStats[0]?.name || "—"} />
+          </div>
+          <div style={{ marginBottom: 12 }}>
+            <span style={{ ...styles.categoryBadge, background: getCategoryColor(category.id) }}>{category.name}</span>
+          </div>
+          <DriverTable drivers={driverStats} showExtendedStats teams={teams} selectedSeasonId={latestSeasonId} />
+        </Card>
+      ))}
+      {championshipRows.length === 0 && <Card title="Stats championnats" icon="📊"><Empty text="Aucun championnat accessible avec tes permissions." /></Card>}
+    </div>
+  );
 }
 
 function SupabasePanel({ isLoading, lastSyncAt, errors, teams, drivers, raceLibrary, allCalendarRaces, calendarFeedHits = [], raceResults, selectedCategoryId, selectedSeasonId }) {
