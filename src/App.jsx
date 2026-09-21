@@ -3882,6 +3882,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedTeam, setSelectedTeam] = useState(null);
+  const [driverStatsSearch, setDriverStatsSearch] = useState("");
+  const [multiStatsDriverId, setMultiStatsDriverId] = useState("");
   const [championMode, setChampionMode] = useState(false);
   const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
   const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
@@ -4019,7 +4021,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
-        {activePublicPage === "drivers" && <><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
+        {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
@@ -4738,6 +4740,87 @@ function GuessDriverTable({ guesses = [], target, teams = [] }) {
         })}</tbody>
       </table>
     </div>
+  );
+}
+
+function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, setSelectedDriverId, drivers = [], teams = [], raceResults = [], seasonTitles = [], allRaces = [], seasonOptions = getSeasonOptions(), onOpenDriver }) {
+  const query = normalizeResultText(search);
+  const matches = query
+    ? drivers.filter((driver) => normalizeResultText(driver.name).includes(query)).slice(0, 8)
+    : [];
+  const selectedDriver = drivers.find((driver) => idsEqual(driver.id, selectedDriverId)) || (matches.length === 1 ? matches[0] : null);
+  const selectedTeam = selectedDriver ? teams.find((team) => idsEqual(team.id, selectedDriver.teamId)) : null;
+  const rows = selectedDriver ? CATEGORY_OPTIONS.map((category) => {
+    const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: category.id, seasonTitles });
+    const categorySeasons = getSeasonOptionsForCategory(allRaces, category.id, seasonOptions);
+    const latestSeasonId = getLatestSeasonId(categorySeasons.length ? categorySeasons : seasonOptions);
+    const driverRows = stats.cumulativeDriverStatsBySeason[latestSeasonId] || [];
+    const driverStats = driverRows.find((row) => idsEqual(row.id, selectedDriver.id));
+    return { category, latestSeasonId, rank: driverStats ? driverRows.findIndex((row) => idsEqual(row.id, selectedDriver.id)) + 1 : 0, stats: driverStats };
+  }).filter((row) => row.stats && ((Number(row.stats.points) || 0) > 0 || (Number(row.stats.seasons) || 0) > 0 || (Number(row.stats.driverTitles) || 0) > 0 || (Number(row.stats.teamTitles) || 0) > 0)) : [];
+  const selectDriver = (driver) => {
+    setSelectedDriverId(driver.id);
+    setSearch(driver.name);
+  };
+
+  return (
+    <Card title="Recherche pilote toutes catégories" icon="🔎">
+      <div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => { setSearch(event.target.value); setSelectedDriverId(""); }} placeholder="Écris le nom d'un pilote..." style={styles.searchInput} /></div>
+      {matches.length > 1 && (
+        <div style={{ ...styles.titleBadgeRow, marginBottom: 14 }}>
+          {matches.map((driver) => (
+            <button key={driver.id} type="button" onClick={() => selectDriver(driver)} style={idsEqual(selectedDriver?.id, driver.id) ? styles.primaryButton : styles.secondaryButton}>{driver.name}</button>
+          ))}
+        </div>
+      )}
+      {!query && <p style={styles.mutedSmall}>Tape un nom pour afficher ses stats cumulées en F1, F2, F3 et FE.</p>}
+      {query && !selectedDriver && <Empty text="Aucun pilote trouvé avec ce nom." />}
+      {selectedDriver && (
+        <>
+          <div style={styles.itemBox}>
+            <DriverIdentity driver={selectedDriver} teamColor={selectedTeam?.color} teamLogo={selectedTeam?.logo} />
+            <button type="button" onClick={() => onOpenDriver?.(selectedDriver)} style={styles.editButton}>Fiche pilote</button>
+          </div>
+          <div style={styles.tableWrap}>
+            <table style={{ ...styles.table, minWidth: 920 }}>
+              <thead>
+                <tr style={styles.tableHead}>
+                  <th style={styles.th}>Catégorie</th>
+                  <th style={styles.th}>Rang</th>
+                  <th style={styles.th}>Saisons</th>
+                  <th style={styles.th}>Titre P.</th>
+                  <th style={styles.th}>Titre C.</th>
+                  <th style={styles.th}>V</th>
+                  <th style={styles.th}>Pod.</th>
+                  <th style={styles.th}>Poles</th>
+                  <th style={styles.th}>MT</th>
+                  <th style={styles.th}>HT</th>
+                  <th style={styles.th}>Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ category, rank, latestSeasonId, stats }) => (
+                  <tr key={category.id} style={styles.tr}>
+                    <td style={styles.td}><span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span><p style={styles.mutedSmall}>Jusqu'à {seasonName(latestSeasonId)}</p></td>
+                    <td style={styles.td}>{rank ? `#${rank}` : "—"}</td>
+                    <td style={styles.td}>{stats.seasons || 0}</td>
+                    <td style={styles.td}>{stats.driverTitles || 0}</td>
+                    <td style={styles.td}>{stats.teamTitles || 0}</td>
+                    <td style={styles.td}>{stats.wins || 0}</td>
+                    <td style={styles.td}>{stats.podiums || 0}</td>
+                    <td style={styles.td}>{stats.poles || 0}</td>
+                    <td style={styles.td}>{stats.fastestLaps || 0}</td>
+                    <td style={styles.td}>{stats.hatTricks || 0}</td>
+                    <td style={{ ...styles.td, ...styles.points }}>{stats.points || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length === 0 && <Empty text="Ce pilote n'a pas encore de stats enregistrées dans les championnats." />}
+        </>
+      )}
+    </Card>
   );
 }
 
