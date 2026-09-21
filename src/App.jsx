@@ -4758,6 +4758,10 @@ function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, 
     const driverStats = driverRows.find((row) => idsEqual(row.id, selectedDriver.id));
     return { category, latestSeasonId, rank: driverStats ? driverRows.findIndex((row) => idsEqual(row.id, selectedDriver.id)) + 1 : 0, stats: driverStats };
   }).filter((row) => row.stats && ((Number(row.stats.points) || 0) > 0 || (Number(row.stats.seasons) || 0) > 0 || (Number(row.stats.driverTitles) || 0) > 0 || (Number(row.stats.teamTitles) || 0) > 0)) : [];
+  const categoryBreakdowns = selectedDriver ? CATEGORY_OPTIONS.map((category) => ({
+    category,
+    rows: getDriverSeasonBreakdown(selectedDriver, raceResults, teams, category.id, seasonTitles, drivers, allRaces),
+  })).filter((item) => item.rows.length > 0) : [];
   const selectDriver = (driver) => {
     setSelectedDriverId(driver.id);
     setSearch(driver.name);
@@ -4818,6 +4822,24 @@ function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, 
             </table>
           </div>
           {rows.length === 0 && <Empty text="Ce pilote n'a pas encore de stats enregistrées dans les championnats." />}
+          {categoryBreakdowns.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <h3 style={styles.panelTitle}>Détail saisons et courses</h3>
+              <div style={styles.stack}>
+                {categoryBreakdowns.map(({ category, rows: breakdownRows }) => (
+                  <div key={category.id} style={styles.itemBoxColumn}>
+                    <div style={styles.publicRaceHeader}>
+                      <div>
+                        <span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span>
+                        <p style={styles.mutedSmall}>{breakdownRows.length} saison{breakdownRows.length > 1 ? "s" : ""} avec stats enregistrées.</p>
+                      </div>
+                    </div>
+                    <SeasonBreakdownTable rows={breakdownRows} expandable />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </>
       )}
     </Card>
@@ -6912,6 +6934,8 @@ const styles = {
   previewNotice: { background: "rgba(124,58,237,.16)", border: "1px solid rgba(168,85,247,.55)", color: "#f5f3ff", borderRadius: 16, padding: "12px 14px", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" },
   teamCard: { background: "#27272a", borderRadius: 20, padding: 18 },
   itemBox: { background: "#27272a", borderRadius: 18, padding: 16, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
+  itemBoxColumn: { background: "#27272a", borderRadius: 18, padding: 16, display: "grid", gap: 14 },
+  panelTitle: { margin: "0 0 12px", color: "white", fontSize: 18, fontWeight: 950 },
   raceLibraryInfo: { minWidth: 180 },
   countryEditRow: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexWrap: "wrap" },
   compactInput: { minWidth: 160, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: "10px 12px", outline: "none" },
