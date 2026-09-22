@@ -3580,15 +3580,13 @@ export default function URTTAdminPanel() {
 function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonTitles = [] }) {
   const activeCategoryId = normalizeCategoryId(selectedCategoryId);
   const latestSeasonId = getSeasonOptions().at(-1)?.id || "S16";
-  const hasSeasonTitleRecords = seasonTitles.some((title) => normalizeCategoryId(title.categoryId) === activeCategoryId);
-  const useManualTitleFallback = activeCategoryId === "F1" && !hasSeasonTitleRecords;
   const blankDriverStats = (driver, seasonId) => {
     const seasonTeamId = driver.teamHistory?.[seasonId] || driver.teamId;
     return {
       ...driver,
       teamId: seasonTeamId,
       teamName: teams.find((team) => idsEqual(team.id, seasonTeamId))?.name || "Sans écurie",
-      ...(useManualTitleFallback ? {
+      ...(activeCategoryId === "F1" ? {
         baseDriverTitles: Number(driver.driverTitles) || 0,
         baseTeamTitles: Number(driver.teamTitles) || 0,
       } : {}),
