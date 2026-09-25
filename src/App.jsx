@@ -14,6 +14,7 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
+const SITE_MAINTENANCE_ENABLED = true;
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
@@ -2053,6 +2054,11 @@ export default function URTTAdminPanel() {
   const adminPageOptions = useMemo(() => getAdminPageOptions(adminUser, adminPermissions), [adminUser, adminPermissions]);
   const userCanOpenAdmin = (user) => Boolean(user && (isPermissionsOwner(user) || adminPermissionRows.some((row) => normalizeAdminEmail(row.userEmail) === normalizeAdminEmail(user.email))));
   const canOpenAdmin = userCanOpenAdmin(adminUser);
+  const openAdminAccess = () => {
+    setIsAdminPreview(false);
+    setLoginError("");
+    setView(canOpenAdmin ? "admin" : "login");
+  };
   const visibleAdminPage = adminPageOptions.some((page) => page.id === adminPage) ? adminPage : adminPageOptions[0]?.id || "dashboard";
   const adminSelectedCategoryId = hasAdminCategoryAccess(adminPermissions, selectedCategoryId) ? selectedCategoryId : adminCategoryOptions[0]?.id || selectedCategoryId;
   const effectiveDevelopmentCategoryId = isDevelopmentCategory(adminSelectedCategoryId) ? adminSelectedCategoryId : adminCategoryOptions.find((category) => isDevelopmentCategory(category.id))?.id || "F1";
@@ -3443,11 +3449,15 @@ export default function URTTAdminPanel() {
   }
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
+  const showMaintenancePage = SITE_MAINTENANCE_ENABLED && !(isAdminPreview && Boolean(adminUser));
 
   return (
     <>
       {view === "front" && (
-        <PublicSite
+        showMaintenancePage ? (
+          <MaintenancePage adminUser={adminUser} onOpenAdmin={openAdminAccess} />
+        ) : (
+          <PublicSite
           teams={teams}
           selectedCategoryId={selectedCategoryId}
           setSelectedCategoryId={setSelectedCategoryId}
@@ -3489,12 +3499,9 @@ export default function URTTAdminPanel() {
           isSavingPlayerAccount={isSavingPlayerAccount}
           isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
-          onOpenAdmin={() => {
-            setIsAdminPreview(false);
-            setLoginError("");
-            setView(canOpenAdmin ? "admin" : "login");
-          }}
-        />
+          onOpenAdmin={openAdminAccess}
+          />
+        )
       )}
       {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
@@ -6647,6 +6654,9 @@ function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...sty
 function DriverIdentity({ driver, teamColor, teamLogo, showRetired = true }) { const isRetiredVisible = showRetired && driver.retired; const imageSrc = driver.avatar || (isRetiredVisible ? "" : teamLogo); const borderColor = teamColor || driver.color || "#dc2626"; return <div className="urtt-identity" style={styles.identity}>{imageSrc ? <img src={imageSrc} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${borderColor}` }} /> : <div style={{ ...styles.fallbackLogo, background: isRetiredVisible ? "#18181b" : borderColor, border: `2px solid ${borderColor}`, fontSize: isRetiredVisible ? 20 : 12 }}>{isRetiredVisible ? RETIRED_DRIVER_MARK : (driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>{DRIVER_NUMBER_LABEL} {driver.number || "-"}{isRetiredVisible ? ` - ${RETIRED_LABEL}` : ""}</p></div></div>; }
 function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={{ ...styles.logoSmall, border: `2px solid ${team.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<div className="urtt-identity-text" style={styles.identityText}><strong className="urtt-team-name">{team.name || "Écurie"}</strong><p style={styles.mutedSmall}>Écurie</p></div></div>; }
 function TripleCrown({ crown }) { const safe = crown || { monaco: false, indy500: false, lemans: false }; return <div style={styles.crownBox}><span style={safe.monaco ? { ...styles.badgeGreen, background: "#7c3aed", color: "white" } : styles.badgeDark}>Titre F1</span><span style={safe.indy500 ? { ...styles.badgeGreen, background: "#ffff00", color: "#18181b" } : styles.badgeDark}>Indy 300</span><span style={safe.lemans ? { ...styles.badgeGreen, background: "#006ee6" } : styles.badgeDark}>2,4H du Mans</span></div>; }
+function MaintenancePage({ adminUser, onOpenAdmin }) {
+  return <div style={styles.maintenancePage}><section style={styles.maintenanceCard}><div style={{ ...styles.logo, justifySelf: "center" }}>UR</div><p style={styles.kicker}>URTT DATABASE</p><h1 style={styles.maintenanceTitle}>Site en maintenance</h1><p style={styles.maintenanceText}>Une nouvelle version du site est en préparation. L'accès public est temporairement fermé.</p><button type="button" onClick={onOpenAdmin} style={styles.primaryButton}>{adminUser?.email ? "Ouvrir le panel admin" : "Accès admin"}</button><p style={styles.maintenanceHint}>Les admins peuvent continuer à accéder à la partie en développement depuis le panel.</p></section></div>;
+}
 function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes à créer dans Supabase Auth.</p></form></div>; }
 function TitlesPanel({
   drivers,
@@ -6924,6 +6934,11 @@ const styles = {
   adminSubNavButtonActive: { background: "rgba(239,68,68,.16)", borderColor: "#ef4444", color: "white" },
   kicker: { color: "#f87171", letterSpacing: 4, fontSize: 12, fontWeight: 900, margin: 0 },
   title: { margin: "8px 0 0", fontSize: 38, lineHeight: 1.05 },
+  maintenancePage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 48%)", color: "#f4f4f5", display: "grid", placeItems: "center", fontFamily: "Inter, system-ui, Arial", padding: 24 },
+  maintenanceCard: { width: "100%", maxWidth: 560, background: "rgba(24,24,27,.95)", border: "1px solid #27272a", borderRadius: 28, padding: 32, display: "grid", gap: 16, textAlign: "center", boxShadow: "0 24px 80px rgba(0,0,0,.45)" },
+  maintenanceTitle: { margin: 0, fontSize: 44, lineHeight: 1, fontWeight: 950 },
+  maintenanceText: { margin: 0, color: "#d4d4d8", fontSize: 17, lineHeight: 1.5 },
+  maintenanceHint: { color: "#a1a1aa", margin: 0, fontSize: 13, lineHeight: 1.45 },
   loginPage: { minHeight: "100vh", background: "#09090b", color: "#f4f4f5", display: "grid", placeItems: "center", fontFamily: "Inter, system-ui, Arial", padding: 24 },
   loginCard: { width: "100%", maxWidth: 420, background: "#18181b", border: "1px solid #27272a", borderRadius: 28, padding: 28, display: "grid", gap: 14 },
   loginTitle: { margin: 0, fontSize: 32 },
