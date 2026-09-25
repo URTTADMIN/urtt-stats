@@ -80,6 +80,28 @@ const SPECIAL_EVENT_OPTIONS = [
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
 ];
 
+function getPublicPageIcon(pageId) {
+  return {
+    home: "⌂",
+    standings: "≡",
+    drivers: "👥",
+    teams: "🏎",
+    seasons: "🏁",
+    editions: "◆",
+    development: "↗",
+    predictions: "◇",
+    "guess-driver": "?",
+    "easter-eggs": "□",
+    world: "◎",
+  }[pageId] || "•";
+}
+
+function getInitials(name = "") {
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  const initials = parts.length > 1 ? parts.map((part) => part[0]).join("") : String(name).slice(0, 2);
+  return initials.toUpperCase() || "UR";
+}
+
 function getEasterEggStorageKey(playerId = "") {
   return playerId ? `${EASTER_EGG_STORAGE_KEY}:${playerId}` : EASTER_EGG_STORAGE_KEY;
 }
@@ -1578,6 +1600,28 @@ export default function URTTAdminPanel() {
         to { text-shadow: 0 0 10px rgba(168,85,247,.95), 0 0 18px rgba(220,38,38,.55); }
       }
       @media (max-width: 760px) {
+        .urtt-public-app {
+          display: block !important;
+        }
+        .urtt-public-sidebar {
+          display: none !important;
+        }
+        .urtt-public-content {
+          padding: 0 16px 45px !important;
+        }
+        .urtt-public-topbar {
+          min-height: auto !important;
+          padding: 14px 0 !important;
+          display: grid !important;
+          align-items: start !important;
+        }
+        .urtt-public-mobile-nav {
+          display: flex !important;
+        }
+        .urtt-public-page [style*="grid-template-columns: minmax(0px, 1.35fr)"],
+        .urtt-public-page [style*="grid-template-columns: minmax(0, 1.35fr)"] {
+          grid-template-columns: 1fr !important;
+        }
         .urtt-public-header {
           padding: 24px 14px 12px !important;
           flex-direction: column !important;
@@ -3915,6 +3959,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
+  const activePublicPageOption = PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
@@ -3998,36 +4043,54 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   };
   return (
     <div className={`urtt-public-page${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
-      <header className="urtt-public-header" style={styles.publicHeader}>
-        <div>
-          <p style={{ ...styles.kicker, color: categoryColor }}>URTT DATABASE · {selectedCategoryId}</p>
-          <h1 className="urtt-public-title" onClick={handleChampionTitleClick} style={styles.publicTitle}>Statistiques URTT AREKU_F1</h1>
-          <p className="urtt-public-subtitle" style={styles.publicSubtitle}>Site public pour consulter les stats par saison, les pilotes, les écuries et les résultats.</p>
-        </div>
-        <div style={styles.publicSessionBox}>
-          {adminUser?.email && <span style={styles.sessionBadge}>Vous êtes connecté sur : <strong>{adminUser.email}</strong></span>}
-          <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
-          <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={{ ...styles.primaryButton, background: categoryColor }}>Admin</button>
-        </div>
-      </header>
-      {championMode && (
-        <div className="urtt-champion-banner">
-          <div className="urtt-champion-banner-inner">
-            <strong>CHAMPION MODE ACTIVÉ</strong>
-            <button type="button" onClick={() => setChampionMode(false)}>Désactiver</button>
+      <div className="urtt-public-app" style={styles.publicAppShell}>
+        <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
+          <div style={styles.publicBrand}>
+            <div style={styles.publicBrandMark}>UR</div>
+            <div>
+              <button type="button" onClick={handleChampionTitleClick} style={styles.publicBrandTitle}>URTT-Stats</button>
+              <small style={styles.publicBrandSubtitle}>DATABASE</small>
+            </div>
           </div>
-        </div>
-      )}
-      <nav className="urtt-public-nav" style={styles.publicNav}>
-        <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={{ ...styles.categorySelect, background: categoryColor, borderColor: categoryColor }}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-        <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.seasonSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-        {publicPages.map((key) => {
-          const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-          return <button key={key} onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicNavButton, ...(activePublicPage === key ? { ...styles.publicNavActive, background: categoryColor, borderColor: categoryColor } : {}) }}>{label}</button>;
-        })}
-      </nav>
-      <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
+          <nav className="urtt-site-nav" style={styles.publicSideNav}>
+            <span style={styles.publicNavLabel}>Navigation</span>
+            {publicPages.map((key) => {
+              const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
+              return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
+            })}
+          </nav>
+          <div style={styles.publicSidebarBottom}>
+            <strong>{selectedCategoryId} · {seasonName(selectedSeasonId)}</strong>
+            <span>{leaderDriver} mène le championnat pilotes.</span>
+          </div>
+        </aside>
+        <div className="urtt-public-content" style={styles.publicContentShell}>
+          <header className="urtt-public-topbar" style={styles.publicTopbar}>
+            <div style={styles.publicCrumb}>URTT <span style={{ padding: "0 8px" }}>/</span> <strong>{activePublicPageOption.label}</strong></div>
+            <div style={styles.publicTopbarActions}>
+              <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+              <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
+              {adminUser?.email && <span style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
+              <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
+              <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={{ ...styles.accentButton, background: categoryColor }}>Admin</button>
+            </div>
+          </header>
+          <nav className="urtt-public-mobile-nav" style={styles.publicMobileNav}>
+            {publicPages.map((key) => {
+              const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
+              return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicMobileNavButton, ...(activePublicPage === key ? { ...styles.publicMobileNavButtonActive, background: categoryColor } : {}) }}>{label}</button>;
+            })}
+          </nav>
+          {championMode && (
+            <div className="urtt-champion-banner">
+              <div className="urtt-champion-banner-inner">
+                <strong>CHAMPION MODE ACTIVÉ</strong>
+                <button type="button" onClick={() => setChampionMode(false)}>Désactiver</button>
+              </div>
+            </div>
+          )}
+          <main className="urtt-public-main" style={styles.publicMain}>
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -4038,7 +4101,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} attemptsHistory={guessDriverAttempts} onSaveWin={onSaveGuessDriverWin} onSaveAttempt={onSaveGuessDriverAttempt} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
         {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
-      </main>
+          </main>
+        </div>
+      </div>
       {showGuessExitPrompt && (
         <div style={styles.detailOverlay} onMouseDown={cancelGuessDriverExit}>
           <div style={{ ...styles.feedbackModal, maxWidth: 520 }} onMouseDown={(event) => event.stopPropagation()}>
@@ -4361,11 +4426,53 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+  const previewDrivers = seasonOnlyDrivers.slice(0, 5);
+  const previewRaces = races.slice(0, 5);
   return (
     <div style={styles.section}>
+      <div style={styles.publicHeading}>
+        <div>
+          <span style={styles.publicEyebrow}>Championnat URTT</span>
+          <h1 style={styles.publicDashboardTitle}>Vue d'ensemble</h1>
+          <p style={styles.publicDashboardSubtitle}>Résultats, classements et prochaines courses au même endroit.</p>
+        </div>
+      </div>
+      <section style={styles.publicSpotlight}>
+        <div>
+          <span style={styles.publicSpotlightKicker}>À l'affiche · {seasonName(selectedSeasonId)}</span>
+          <h2 style={styles.publicSpotlightTitle}>La grille {selectedCategoryId} se dessine.</h2>
+          <p style={styles.publicSpotlightText}>Suivez la lutte pour le titre avec {leaderDriver} côté pilotes et {leaderTeam} côté écuries.</p>
+        </div>
+        <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.accentButton}>Voir le calendrier</button>
+      </section>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
-      <RaceCountdown races={countdownRaces} events={calendarEvents} />
+      <div style={styles.publicHomeColumns}>
+        <Card title="Classement pilotes" icon="🏆">
+          <div style={styles.publicPreviewRows}>
+            {previewDrivers.map((driver, index) => <div key={driver.id || driver.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><span style={styles.publicPreviewInitials}>{getInitials(driver.name)}</span><div style={styles.publicPreviewIdentity}><strong>{driver.name}</strong><small>{driver.teamName || "Sans écurie"}</small></div><span style={styles.publicPreviewPoints}>{driver.points || 0} <em>pts</em></span></div>)}
+            {!previewDrivers.length && <Empty text="Aucun classement pilote pour cette saison." />}
+          </div>
+          <button type="button" onClick={() => onNavigate?.("standings")} style={styles.textButton}>Classement complet</button>
+        </Card>
+        <Card title="Courses de la saison" icon="🏁">
+          <div style={styles.publicPreviewRows}>
+            {previewRaces.map((race) => <div key={race.id} style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{race.country || race.track || "Circuit à définir"}</small></div><div style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>)}
+            {!previewRaces.length && <Empty text="Aucune course dans cette saison." />}
+          </div>
+          <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.textButton}>Tout voir</button>
+        </Card>
+      </div>
+      <div style={styles.publicHomeColumns}>
+        <Card title="Écuries en vue" icon="🏎️">
+          <div style={styles.publicPreviewRows}>
+            {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><span style={{ ...styles.publicPreviewInitials, background: team.color || "#293046" }}>{getInitials(team.name)}</span><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
+            {!seasonOnlyTeams.length && <Empty text="Aucun classement écurie pour cette saison." />}
+          </div>
+          <button type="button" onClick={() => onNavigate?.("teams")} style={styles.textButton}>Voir les écuries</button>
+        </Card>
+        <RaceCountdown races={countdownRaces} events={calendarEvents} />
+      </div>
       <MediaLinksCard thanksNames={thanksNames} thanksText={thanksText} />
     </div>
   );
@@ -6898,6 +7005,46 @@ function Setting({ title, description, active }) { return <div style={styles.tea
 
 const styles = {
   publicPage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 45%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
+  publicAppShell: { maxWidth: 1600, margin: "0 auto", minHeight: "100vh", display: "grid", gridTemplateColumns: "238px minmax(0, 1fr)", background: "#080b13" },
+  publicSidebar: { borderRight: "1px solid #222837", background: "#0c101b", padding: "27px 15px", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh" },
+  publicBrand: { display: "flex", alignItems: "center", gap: 12, padding: "0 9px" },
+  publicBrandMark: { width: 36, height: 34, background: "#bd00e9", color: "white", display: "grid", placeItems: "center", clipPath: "polygon(0 0,100% 0,82% 100%,0 100%)", transform: "skew(-10deg)", fontWeight: 950, fontSize: 12 },
+  publicBrandTitle: { border: 0, background: "transparent", color: "#eef1f7", padding: 0, fontWeight: 950, letterSpacing: "-.06em", fontStyle: "italic", fontSize: 27, cursor: "pointer" },
+  publicBrandSubtitle: { display: "block", fontWeight: 700, fontStyle: "normal", letterSpacing: ".13em", color: "#929bad", fontSize: 9, margin: "4px 0 0 1px" },
+  publicSideNav: { display: "grid", gap: 4 },
+  publicNavLabel: { color: "#707b91", textTransform: "uppercase", letterSpacing: ".14em", fontSize: 11, fontWeight: 800, padding: "0 14px 11px" },
+  publicSideNavButton: { border: 0, background: "transparent", color: "#a7b0c1", display: "flex", alignItems: "center", gap: 13, textAlign: "left", width: "100%", borderRadius: 9, padding: "12px 13px", fontSize: 14, fontWeight: 700, cursor: "pointer" },
+  publicSideNavButtonActive: { color: "white", background: "#29203a" },
+  publicSideNavIcon: { width: 20, display: "inline-grid", placeItems: "center", color: "#d954f4" },
+  publicSidebarBottom: { marginTop: "auto", padding: "15px 12px", borderTop: "1px solid #242a38", color: "#8b96aa", fontSize: 12, lineHeight: 1.6, display: "grid", gap: 4 },
+  publicContentShell: { minWidth: 0, padding: "0 43px 70px" },
+  publicTopbar: { minHeight: 76, borderBottom: "1px solid #222837", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
+  publicCrumb: { color: "#8792a8", fontSize: 13 },
+  publicTopbarActions: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" },
+  publicDesignSelect: { background: "#141a28", border: "1px solid #30394b", borderRadius: 9, color: "#e5eaf3", padding: "10px 30px 10px 12px", fontSize: 13, fontWeight: 800, outline: "none" },
+  publicMobileNav: { display: "none", overflowX: "auto", gap: 7, padding: "9px 0", borderBottom: "1px solid #252d3c" },
+  publicMobileNavButton: { whiteSpace: "nowrap", background: "#1a2130", border: 0, color: "#c0cadb", borderRadius: 7, padding: "9px 12px", fontSize: 12, fontWeight: 800 },
+  publicMobileNavButtonActive: { color: "white" },
+  publicHeading: { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, margin: "36px 0 25px" },
+  publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "#d954f4", fontWeight: 900, textTransform: "uppercase" },
+  publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
+  publicDashboardSubtitle: { color: "#939eb2", margin: 0, fontSize: 14 },
+  publicSpotlight: { background: "linear-gradient(118deg,#202438 0%,#191c30 47%,#321b49 100%)", border: "1px solid #353347", borderRadius: 16, padding: "27px 30px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 15, position: "relative", overflow: "hidden" },
+  publicSpotlightKicker: { color: "#dca4f8", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 11, fontWeight: 900 },
+  publicSpotlightTitle: { fontSize: 29, letterSpacing: "-.045em", margin: "8px 0" },
+  publicSpotlightText: { color: "#bec5d3", fontSize: 14, margin: 0 },
+  publicHomeColumns: { display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 1fr)", gap: 18 },
+  publicPreviewRows: { display: "grid", gap: 0 },
+  publicPreviewDriver: { display: "grid", gridTemplateColumns: "32px 34px minmax(0, 1fr) auto", alignItems: "center", gap: 11, padding: "14px 4px", borderBottom: "1px solid #242b39" },
+  publicPreviewRace: { display: "grid", gridTemplateColumns: "42px minmax(0, 1fr) auto", alignItems: "center", gap: 13, padding: "15px 4px", borderBottom: "1px solid #242b39" },
+  publicPreviewRank: { color: "#8792a7", fontSize: 13, fontWeight: 900 },
+  publicPreviewInitials: { height: 30, width: 30, borderRadius: 7, background: "#293046", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#eef1f7" },
+  publicPreviewRound: { height: 38, width: 38, background: "#222a39", color: "#c5cedf", borderRadius: 9, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 900 },
+  publicPreviewIdentity: { minWidth: 0, display: "grid", gap: 3 },
+  publicPreviewPoints: { fontSize: 14, fontWeight: 950, color: "#eef1f7" },
+  publicPreviewMeta: { marginLeft: "auto", textAlign: "right", display: "grid", gap: 3, color: "#d99af5", fontSize: 11, fontWeight: 900 },
+  accentButton: { border: 0, background: "#b900e4", color: "white", borderRadius: 9, padding: "12px 17px", fontSize: 13, fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer" },
+  textButton: { border: 0, background: "transparent", color: "#cf6bea", fontWeight: 850, fontSize: 12, justifySelf: "start", cursor: "pointer", padding: "10px 4px 0" },
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicSessionBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 },
   accountBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 },
