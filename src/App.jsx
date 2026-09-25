@@ -1424,6 +1424,9 @@ export default function URTTAdminPanel() {
       .urtt-public-theme-light .urtt-public-topbar {
         border-color: rgba(148,163,184,.45) !important;
       }
+      .urtt-public-theme-light .urtt-public-topbar {
+        background: rgba(248,250,252,.9) !important;
+      }
       .urtt-public-theme-light .urtt-site-nav button,
       .urtt-public-theme-light .urtt-public-mobile-nav button {
         color: #334155 !important;
@@ -7787,7 +7790,7 @@ const styles = {
   publicSideNavIcon: { width: 20, display: "inline-grid", placeItems: "center", color: "var(--urtt-accent-text, #d954f4)" },
   publicSidebarBottom: { marginTop: "auto", padding: "15px 12px", borderTop: "1px solid #242a38", color: "#8b96aa", fontSize: 12, lineHeight: 1.6, display: "grid", gap: 4 },
   publicContentShell: { minWidth: 0, padding: "0 43px 70px" },
-  publicTopbar: { minHeight: 76, borderBottom: "1px solid #33405a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
+  publicTopbar: { minHeight: 76, borderBottom: "1px solid #33405a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, position: "sticky", top: 0, zIndex: 60, background: "rgba(18,25,45,.9)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
   publicCrumb: { color: "#8792a8", fontSize: 13 },
   publicTopbarActions: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" },
   publicDesignSelect: { background: "#141a28", border: "1px solid #30394b", borderRadius: 9, color: "#e5eaf3", padding: "10px 30px 10px 12px", fontSize: 13, fontWeight: 800, outline: "none" },
