@@ -4372,7 +4372,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   })).filter((group) => group.pages.length);
   const publicMobilePages = ["home", ...publicNavGroups.flatMap((group) => group.pages)].filter((pageId, index, list) => publicPages.includes(pageId) && list.indexOf(pageId) === index);
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
-  const displayedPublicTheme = activePublicPage === "indy300" ? { ...publicCategoryTheme, logo: "/urtt-ic.png" } : publicCategoryTheme;
+  const offSeasonLogos = { lemans24: "/urtt-wec.png", indy300: "/urtt-ic.png" };
+  const displayedPublicTheme = offSeasonLogos[activePublicPage] ? { ...publicCategoryTheme, logo: offSeasonLogos[activePublicPage] } : publicCategoryTheme;
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
