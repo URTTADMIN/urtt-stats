@@ -4065,11 +4065,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       <div className="urtt-public-app" style={styles.publicAppShell}>
         <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
           <div style={styles.publicBrand}>
-            <div style={styles.publicBrandMark}>UR</div>
-            <div>
-              <button type="button" onClick={handleChampionTitleClick} style={styles.publicBrandTitle}>URTT-Stats</button>
-              <small style={styles.publicBrandSubtitle}>DATABASE</small>
-            </div>
+            <button type="button" onClick={handleChampionTitleClick} style={styles.publicBrandLogoButton} aria-label="URTT-Stats">
+              <img src="/urtt-f1.png" alt="URTT" style={styles.publicBrandLogo} />
+            </button>
           </div>
           <nav className="urtt-site-nav" style={styles.publicSideNav}>
             <span style={styles.publicNavLabel}>Navigation</span>
@@ -7047,7 +7045,9 @@ const styles = {
   publicPage: { minHeight: "100vh", background: "radial-gradient(circle at 18% 0%, rgba(185,0,228,.24), transparent 32%), linear-gradient(135deg, #141b31 0%, #1b2440 46%, #241a3c 100%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
   publicAppShell: { maxWidth: 1600, margin: "0 auto", minHeight: "100vh", display: "grid", gridTemplateColumns: "238px minmax(0, 1fr)", background: "linear-gradient(135deg, rgba(18,25,45,.92), rgba(28,26,53,.9))" },
   publicSidebar: { borderRight: "1px solid #33405a", background: "rgba(17,24,43,.88)", padding: "27px 15px", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh", backdropFilter: "blur(16px)" },
-  publicBrand: { display: "flex", alignItems: "center", gap: 12, padding: "0 9px" },
+  publicBrand: { display: "flex", alignItems: "center", padding: "0 9px" },
+  publicBrandLogoButton: { border: 0, background: "transparent", padding: 0, cursor: "pointer", width: "100%", textAlign: "left" },
+  publicBrandLogo: { display: "block", width: 172, maxWidth: "100%", height: "auto", objectFit: "contain" },
   publicBrandMark: { width: 36, height: 34, background: "#bd00e9", color: "white", display: "grid", placeItems: "center", clipPath: "polygon(0 0,100% 0,82% 100%,0 100%)", transform: "skew(-10deg)", fontWeight: 950, fontSize: 12 },
   publicBrandTitle: { border: 0, background: "transparent", color: "#eef1f7", padding: 0, fontWeight: 950, letterSpacing: "-.06em", fontStyle: "italic", fontSize: 27, cursor: "pointer" },
   publicBrandSubtitle: { display: "block", fontWeight: 700, fontStyle: "normal", letterSpacing: ".13em", color: "#929bad", fontSize: 9, margin: "4px 0 0 1px" },
