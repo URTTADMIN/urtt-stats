@@ -470,6 +470,16 @@ function getPublicCategoryTheme(categoryId) {
       spotlight: "linear-gradient(118deg,#3a1218 0%,#4a171d 47%,#7f1d1d 100%)",
     };
   }
+  if (category === "FE") {
+    return {
+      logo: "/urtt-fe.png",
+      accent: "#16c900",
+      accentSoft: "#bbf7d0",
+      accentText: "#22c55e",
+      navActive: "#17351f",
+      spotlight: "linear-gradient(118deg,#12351d 0%,#174826 47%,#166534 100%)",
+    };
+  }
   return {
     logo: "/urtt-f1.png",
     accent: "#cc00ff",
