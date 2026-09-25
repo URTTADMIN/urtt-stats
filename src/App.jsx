@@ -18,6 +18,7 @@ const SITE_MAINTENANCE_ENABLED = true;
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
+const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_MARK = String.fromCodePoint(0x1f465);
@@ -1291,6 +1292,68 @@ export default function URTTAdminPanel() {
       .urtt-champion-mode .urtt-record-value {
         animation: urttChampionValue 1.25s ease-in-out infinite alternate;
         font-weight: 950;
+      }
+      .urtt-public-theme-light {
+        background:
+          radial-gradient(circle at 18% 0%, rgba(185, 0, 228, .16), transparent 34%),
+          linear-gradient(135deg, #eef2ff 0%, #f8fafc 44%, #f4e8ff 100%) !important;
+        color: #111827 !important;
+      }
+      .urtt-public-theme-light .urtt-public-app {
+        background: linear-gradient(135deg, rgba(255,255,255,.94), rgba(241,245,249,.9)) !important;
+      }
+      .urtt-public-theme-light .urtt-public-sidebar,
+      .urtt-public-theme-light .urtt-card,
+      .urtt-public-theme-light .urtt-stat-card {
+        background: rgba(255,255,255,.9) !important;
+        border-color: rgba(148,163,184,.55) !important;
+      }
+      .urtt-public-theme-light .urtt-public-sidebar,
+      .urtt-public-theme-light .urtt-public-topbar {
+        border-color: rgba(148,163,184,.45) !important;
+      }
+      .urtt-public-theme-light .urtt-site-nav button,
+      .urtt-public-theme-light .urtt-public-mobile-nav button {
+        color: #334155 !important;
+      }
+      .urtt-public-theme-light .urtt-site-nav button[style*="background: rgb(41, 32, 58)"],
+      .urtt-public-theme-light .urtt-site-nav button[style*="background:#29203a"] {
+        color: white !important;
+      }
+      .urtt-public-theme-light h1,
+      .urtt-public-theme-light h2,
+      .urtt-public-theme-light h3,
+      .urtt-public-theme-light strong,
+      .urtt-public-theme-light td {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light th,
+      .urtt-public-theme-light small,
+      .urtt-public-theme-light p,
+      .urtt-public-theme-light span {
+        color: inherit;
+      }
+      .urtt-public-theme-light .urtt-standings-table {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light .urtt-standings-table thead tr {
+        background: #e2e8f0 !important;
+      }
+      .urtt-public-theme-light .urtt-standings-table tr {
+        border-color: rgba(148,163,184,.35) !important;
+      }
+      .urtt-public-theme-light select,
+      .urtt-public-theme-light input {
+        background: rgba(255,255,255,.9) !important;
+        border-color: rgba(148,163,184,.65) !important;
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light button {
+        border-color: rgba(148,163,184,.55);
+      }
+      .urtt-public-theme-light .urtt-public-main .urtt-card,
+      .urtt-public-theme-light .urtt-public-main .urtt-stat-card {
+        box-shadow: 0 18px 50px rgba(15,23,42,.08) !important;
       }
       .urtt-champion-banner {
         max-width: 1280px;
@@ -3957,6 +4020,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [driverStatsSearch, setDriverStatsSearch] = useState("");
   const [multiStatsDriverId, setMultiStatsDriverId] = useState("");
   const [championMode, setChampionMode] = useState(false);
+  const [publicTheme, setPublicTheme] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    return window.localStorage.getItem(PUBLIC_THEME_STORAGE_KEY) === "light" ? "light" : "dark";
+  });
   const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
   const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
   const [poleDnfAnimationKey, setPoleDnfAnimationKey] = useState(0);
@@ -3986,6 +4053,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
   const activePublicPageOption = PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
+  const isLightTheme = publicTheme === "light";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
@@ -3999,6 +4067,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     window.addEventListener("beforeunload", warnBeforeLeave);
     return () => window.removeEventListener("beforeunload", warnBeforeLeave);
   }, [guessDriverInProgress]);
+  useEffect(() => {
+    if (typeof window !== "undefined") window.localStorage.setItem(PUBLIC_THEME_STORAGE_KEY, publicTheme);
+  }, [publicTheme]);
   const requestPublicNavigation = (callback) => {
     if (activePublicPage === "guess-driver" && guessDriverInProgress) {
       pendingPublicNavigationRef.current = callback;
@@ -4068,7 +4139,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     championClicksRef.current = recentClicks;
   };
   return (
-    <div className={`urtt-public-page${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
+    <div className={`urtt-public-page urtt-public-theme-${publicTheme}${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
       <div className="urtt-public-app" style={styles.publicAppShell}>
         <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
           <div style={styles.publicBrand}>
@@ -4101,9 +4172,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             <div style={styles.publicTopbarActions}>
               <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
               <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
+              <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton}>{isLightTheme ? "Sombre" : "Clair"}</button>
               {adminUser?.email && <span style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
               <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
-              <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={{ ...styles.accentButton, background: categoryColor }}>Admin</button>
+              <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={styles.publicAdminBubble} aria-label="Accès admin">UR</button>
             </div>
           </header>
           <nav className="urtt-public-mobile-nav" style={styles.publicMobileNav}>
@@ -7078,6 +7150,8 @@ const styles = {
   publicMobileNav: { display: "none", overflowX: "auto", gap: 7, padding: "9px 0", borderBottom: "1px solid #252d3c" },
   publicMobileNavButton: { whiteSpace: "nowrap", background: "#1a2130", border: 0, color: "#c0cadb", borderRadius: 7, padding: "9px 12px", fontSize: 12, fontWeight: 800 },
   publicMobileNavButtonActive: { color: "white" },
+  themeToggleButton: { border: "1px solid #30394b", background: "#141a28", color: "#e5eaf3", borderRadius: 999, padding: "10px 13px", fontSize: 12, fontWeight: 900, cursor: "pointer" },
+  publicAdminBubble: { width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
   publicHeading: { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, margin: "36px 0 25px" },
   publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "#d954f4", fontWeight: 900, textTransform: "uppercase" },
   publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
