@@ -38,6 +38,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "channel-points", icon: "💠", label: "Points Twitch" },
   { id: "guess-attempts", icon: "🧩", label: "Essais défi" },
   { id: "player-accounts", icon: "👤", label: "Comptes" },
+  { id: "feedback-requests", icon: "📝", label: "Demandes" },
   { id: "easter-egg-admin", icon: "📖", label: "Easter eggs" },
   { id: "results", icon: "🏆", label: "Résultats" },
   { id: "race-awards", icon: "⚡", label: "Poles / MT" },
@@ -50,7 +51,7 @@ const ADMIN_PAGE_GROUPS = [
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
   { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["games", "channel-points", "guess-attempts", "easter-egg-admin"] },
-  { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "permissions", "settings"] },
+  { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "feedback-requests", "permissions", "settings"] },
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
@@ -887,6 +888,22 @@ function mapGuessDriverAttemptFromDb(attempt) {
     attemptNumber: Number(attempt.attempt_number || 0),
     correct: Boolean(attempt.correct),
     createdAt: attempt.created_at || "",
+  };
+}
+function mapFeedbackRequestFromDb(request) {
+  return {
+    id: request.id,
+    type: request.type || "Suggestion",
+    title: request.title || "",
+    content: request.content || "",
+    status: request.status || "pending",
+    playerId: request.player_id || "",
+    pseudo: request.pseudo || "",
+    discordName: request.discord_name || "",
+    pageUrl: request.page_url || "",
+    createdAt: request.created_at || "",
+    resolvedAt: request.resolved_at || "",
+    resolvedBy: request.resolved_by || "",
   };
 }
 function mapPredictionControlFromDb(control) {
@@ -1914,6 +1931,7 @@ export default function URTTAdminPanel() {
   const [playerAccounts, setPlayerAccounts] = useState([]);
   const [guessDriverResults, setGuessDriverResults] = useState([]);
   const [guessDriverAttempts, setGuessDriverAttempts] = useState([]);
+  const [feedbackRequests, setFeedbackRequests] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
@@ -1937,6 +1955,7 @@ export default function URTTAdminPanel() {
   const [isSavingPrediction, setIsSavingPrediction] = useState(false);
   const [isSavingPlayerAccount, setIsSavingPlayerAccount] = useState(false);
   const [isSavingGuessResult, setIsSavingGuessResult] = useState(false);
+  const [isSavingFeedbackRequest, setIsSavingFeedbackRequest] = useState(false);
   const [supabaseErrors, setSupabaseErrors] = useState([]);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [titleDriverId, setTitleDriverId] = useState("");
@@ -2085,6 +2104,7 @@ export default function URTTAdminPanel() {
         { data: playerAccountsData, error: playerAccountsError },
         { data: guessDriverResultsData, error: guessDriverResultsError },
         { data: guessDriverAttemptsData, error: guessDriverAttemptsError },
+        { data: feedbackRequestsData, error: feedbackRequestsError },
         { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
@@ -2106,6 +2126,7 @@ export default function URTTAdminPanel() {
         supabase.from("player_accounts").select("*").order("created_at", { ascending: false }),
         supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
         supabase.from("guess_driver_attempts").select("*").order("created_at", { ascending: false }),
+        supabase.from("feedback_requests").select("*").order("created_at", { ascending: false }),
         supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
@@ -2129,6 +2150,7 @@ export default function URTTAdminPanel() {
         playerAccountsError && playerAccountsError.code !== "42P01" && `player_accounts: ${playerAccountsError.message}`,
         guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
         guessDriverAttemptsError && guessDriverAttemptsError.code !== "42P01" && `guess_driver_attempts: ${guessDriverAttemptsError.message}`,
+        feedbackRequestsError && feedbackRequestsError.code !== "42P01" && `feedback_requests: ${feedbackRequestsError.message}`,
         adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
@@ -2159,6 +2181,7 @@ export default function URTTAdminPanel() {
       setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb).map((profile) => idsEqual(profile.id, storedPlayerId) ? mergeStoredEasterEggsIntoProfile(profile) : profile));
       setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
       setGuessDriverAttempts((guessDriverAttemptsData || []).map(mapGuessDriverAttemptFromDb));
+      setFeedbackRequests((feedbackRequestsData || []).map(mapFeedbackRequestFromDb));
       setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
@@ -3033,6 +3056,39 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Permissions supprimees", message: `${row.userEmail} n'a plus de restriction personnalisee.` });
   }
 
+  async function validateFeedbackRequest(requestId) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de valider une demande." });
+      return;
+    }
+
+    setIsSavingFeedbackRequest(true);
+    const payload = {
+      status: "validated",
+      resolved_at: new Date().toISOString(),
+      resolved_by: adminUser.email || "",
+    };
+    const { data, error } = await supabase
+      .from("feedback_requests")
+      .update(payload)
+      .eq("id", requestId)
+      .select("*")
+      .maybeSingle();
+    setIsSavingFeedbackRequest(false);
+
+    if (error) {
+      console.error("Erreur validation demande:", error);
+      const details = formatSupabaseError(error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table feedback_requests n'existe pas encore. Lance le fichier SQL fourni par Codex." : `Impossible de valider la demande.${details ? ` Detail Supabase : ${details}` : ""}` });
+      return;
+    }
+
+    setFeedbackRequests((current) => current.map((request) => idsEqual(request.id, requestId)
+      ? (data ? mapFeedbackRequestFromDb(data) : { ...request, status: "validated", resolvedAt: payload.resolved_at, resolvedBy: payload.resolved_by })
+      : request));
+    setPopup({ type: "success", title: "Demande validee", message: "La demande est maintenant marquee comme traitee." });
+  }
+
   function getResultEntry(driverId) {
     const draft = liveRaceDrafts[selectedRaceId] || [];
     const draftEntry = draft.find((entry) => idsEqual(entry.driverId, driverId));
@@ -3686,6 +3742,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
           {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
+          {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
           {visibleAdminPage === "race-awards" && <RaceAwardsPanel drivers={drivers} teams={teams} raceResults={raceResults} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} />}
@@ -5947,6 +6004,71 @@ function EasterEggAdminPanel({ accounts = [] }) {
   );
 }
 
+function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
+  const formatRequestDate = (value) => {
+    if (!value) return "—";
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return "—";
+    return date.toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" });
+  };
+  const pendingRequests = requests.filter((request) => request.status !== "validated");
+  const validatedRequests = requests.filter((request) => request.status === "validated");
+  const bugCount = pendingRequests.filter((request) => request.type?.toLowerCase() === "bug").length;
+  const suggestionCount = pendingRequests.filter((request) => request.type?.toLowerCase() !== "bug").length;
+
+  const renderRequest = (request, isValidated = false) => (
+    <div key={request.id} style={styles.feedbackRequestCard}>
+      <div style={styles.feedbackRequestTop}>
+        <div>
+          <div style={styles.titleBadgeRow}>
+            <span style={request.type?.toLowerCase() === "bug" ? styles.badgeRed : styles.titleBadge}>{request.type || "Suggestion"}</span>
+            <span style={isValidated ? styles.badgeGreen : styles.badgeDark}>{isValidated ? "Validée" : "En cours"}</span>
+          </div>
+          <h3 style={styles.feedbackRequestTitle}>{request.title || "Sans titre"}</h3>
+          <p style={styles.mutedSmall}>
+            {request.pseudo || "Compte non connecté"}
+            {request.discordName ? ` · ${request.discordName}` : ""}
+            {" · "}
+            {formatRequestDate(request.createdAt)}
+          </p>
+        </div>
+        {!isValidated && <button type="button" onClick={() => onValidate(request.id)} disabled={isSaving} style={styles.primaryButton}>{isSaving ? "Validation..." : "Valider"}</button>}
+      </div>
+      <p style={styles.feedbackRequestContent}>{request.content}</p>
+      <div style={styles.feedbackRequestFooter}>
+        {request.pageUrl ? <a href={request.pageUrl} target="_blank" rel="noreferrer" style={styles.publicLink}>Page source</a> : <span style={styles.mutedSmall}>Page inconnue</span>}
+        {isValidated && <span style={styles.mutedSmall}>Validée par {request.resolvedBy || "admin"} · {formatRequestDate(request.resolvedAt)}</span>}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={styles.section}>
+      <Card title="Demandes site" icon="📝">
+        <div style={styles.statsGrid}>
+          <Stat label="En cours" value={pendingRequests.length} />
+          <Stat label="Suggestions" value={suggestionCount} />
+          <Stat label="Bugs" value={bugCount} />
+          <Stat label="Validées" value={validatedRequests.length} />
+        </div>
+        <p style={styles.mutedSmall}>Les demandes sont aussi envoyées sur Discord. Cette page sert au suivi et à la validation côté admin.</p>
+      </Card>
+      <Card title="Demandes en cours" icon="⏳">
+        <div style={styles.feedbackRequestGrid}>
+          {pendingRequests.map((request) => renderRequest(request))}
+        </div>
+        {pendingRequests.length === 0 && <Empty text="Aucune demande en cours." />}
+      </Card>
+      <Card title="Demandes validées" icon="✅">
+        <div style={styles.feedbackRequestGrid}>
+          {validatedRequests.slice(0, 20).map((request) => renderRequest(request, true))}
+        </div>
+        {validatedRequests.length === 0 && <Empty text="Aucune demande validée pour le moment." />}
+      </Card>
+    </div>
+  );
+}
+
 function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [] }) {
   if (!isPermissionsOwner(adminUser)) {
     return <div style={styles.section}><Card title="Comptes utilisateurs" icon="👤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
@@ -6731,13 +6853,35 @@ function FeedbackWidget({ playerProfile = null }) {
 
     setIsSending(true);
     try {
+      let savedInSupabase = false;
+      const numericPlayerId = Number(playerProfile?.id);
+      const feedbackPayload = {
+        type,
+        title: title.trim(),
+        content: content.trim(),
+        page_url: window.location.href,
+        player_id: Number.isFinite(numericPlayerId) ? numericPlayerId : null,
+        pseudo: playerProfile?.pseudo || "",
+        discord_name: playerProfile?.discordName || "",
+        status: "pending",
+      };
+      const { error: feedbackError } = await supabase
+        .from("feedback_requests")
+        .insert(feedbackPayload);
+
+      if (feedbackError) {
+        if (feedbackError.code !== "42P01") console.error("Erreur sauvegarde feedback:", feedbackError);
+      } else {
+        savedInSupabase = true;
+      }
+
       const response = await fetch("/api/feedback", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           type,
-          title,
-          content,
+          title: title.trim(),
+          content: content.trim(),
           pageUrl: window.location.href,
           player: playerProfile ? {
             id: playerProfile.id,
@@ -6748,7 +6892,7 @@ function FeedbackWidget({ playerProfile = null }) {
       });
 
       if (!response.ok) throw new Error("Feedback failed");
-      setStatus("Envoyé sur Discord, merci !");
+      setStatus(savedInSupabase ? "Envoyé et ajouté aux demandes admin, merci !" : "Envoyé sur Discord, merci !");
       setTitle("");
       setContent("");
     } catch (error) {
@@ -6765,13 +6909,13 @@ function FeedbackWidget({ playerProfile = null }) {
       {isOpen && (
         <div style={styles.detailOverlay} onClick={() => setIsOpen(false)}>
           <form onSubmit={sendFeedback} style={styles.feedbackModal} onClick={(event) => event.stopPropagation()}>
-            <div style={styles.gpDetailHeader}><div><p style={styles.kicker}>RETOUR SITE</p><h2 style={styles.gpDetailTitle}>Suggestion ou bug</h2></div><button type="button" onClick={() => setIsOpen(false)} style={styles.secondaryButton}>Fermer</button></div>
-            <p style={styles.mutedSmall}>Compte : {playerProfile?.pseudo ? <strong>{playerProfile.pseudo}{playerProfile.discordName ? ` · ${playerProfile.discordName}` : ""}</strong> : "non connecté"}</p>
+            <div style={styles.feedbackModalHeader}><div><p style={styles.publicEyebrow}>Retour site</p><h2 style={styles.feedbackModalTitle}>Suggestion ou bug</h2></div><button type="button" onClick={() => setIsOpen(false)} style={styles.feedbackCloseButton}>Fermer</button></div>
+            <p style={styles.feedbackAccountLine}>Compte : {playerProfile?.pseudo ? <strong>{playerProfile.pseudo}{playerProfile.discordName ? ` · ${playerProfile.discordName}` : ""}</strong> : "non connecté"}</p>
             <div style={styles.feedbackChoice}>{["Suggestion", "Bug"].map((item) => <button key={item} type="button" onClick={() => setType(item)} style={{ ...styles.feedbackChoiceButton, ...(type === item ? styles.feedbackChoiceActive : {}) }}>{item}</button>)}</div>
-            <Input label="Titre" value={title} onChange={setTitle} />
-            <label style={styles.label}><span style={styles.labelText}>Contenu</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} style={styles.textarea} /></label>
-            {status && <p style={styles.mutedSmall}>{status}</p>}
-            <button type="submit" disabled={isSending} style={styles.fullButton}>{isSending ? "Envoi..." : "Envoyer"}</button>
+            <label style={styles.label}><span style={styles.labelText}>Titre</span><input value={title} onChange={(event) => setTitle(event.target.value)} style={styles.feedbackInput} /></label>
+            <label style={styles.label}><span style={styles.labelText}>Contenu</span><textarea value={content} onChange={(event) => setContent(event.target.value)} rows={6} style={styles.feedbackTextarea} /></label>
+            {status && <p style={styles.feedbackStatus}>{status}</p>}
+            <button type="submit" disabled={isSending} style={styles.feedbackSubmitButton}>{isSending ? "Envoi..." : "Envoyer"}</button>
           </form>
         </div>
       )}
@@ -7334,6 +7478,7 @@ const styles = {
   fallbackLogo: { width: 44, height: 44, borderRadius: 12, display: "grid", placeItems: "center", color: "white", fontWeight: 900, fontSize: 12, boxSizing: "border-box", lineHeight: 1 },
   crownBox: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" },
   badgeGreen: { background: "rgba(34,197,94,.15)", color: "#86efac", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
+  badgeRed: { background: "rgba(239,68,68,.16)", color: "#fecaca", border: "1px solid rgba(248,113,113,.45)", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
   badgeDark: { background: "#3f3f46", color: "#d4d4d8", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
   titleBadgeRow: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" },
   titleBadge: { background: "rgba(168,85,247,.16)", color: "#c084fc", border: "1px solid rgba(168,85,247,.45)", padding: "6px 9px", borderRadius: 999, fontSize: 12, fontWeight: 950, whiteSpace: "nowrap" },
@@ -7367,11 +7512,26 @@ const styles = {
   easterEggCenter: { display: "grid", placeItems: "center", textAlign: "center", gap: 8 },
   easterEggTitle: { color: "white", fontSize: 24, lineHeight: 1.08 },
   easterEggText: { color: "#d4d4d8", margin: 0, lineHeight: 1.45, fontSize: 14 },
-  feedbackButton: { position: "fixed", right: 22, bottom: 22, width: 58, height: 58, borderRadius: "50%", border: "2px solid rgba(255,255,255,.28)", background: "#2563eb", color: "white", fontSize: 24, fontWeight: 950, cursor: "pointer", zIndex: 45, boxShadow: "0 18px 42px rgba(37,99,235,.35)" },
-  feedbackModal: { width: "min(620px, 100%)", maxHeight: "90vh", overflow: "auto", background: "#18181b", border: "1px solid #3f3f46", borderRadius: 26, padding: 20, display: "grid", gap: 14 },
+  feedbackButton: { position: "fixed", right: 22, bottom: 22, width: 58, height: 58, borderRadius: "50%", border: "1px solid rgba(220,164,248,.6)", background: "linear-gradient(135deg,#bd00e9,#2563eb)", color: "white", fontSize: 24, fontWeight: 950, cursor: "pointer", zIndex: 45, boxShadow: "0 18px 42px rgba(189,0,233,.28)" },
+  feedbackModal: { width: "min(620px, 100%)", maxHeight: "90vh", overflow: "auto", background: "linear-gradient(135deg, rgba(22,31,54,.98), rgba(36,26,60,.98))", border: "1px solid #4a5270", borderRadius: 24, padding: 20, display: "grid", gap: 14, boxShadow: "0 28px 85px rgba(0,0,0,.5)" },
+  feedbackModalHeader: { background: "rgba(20,26,40,.74)", border: "1px solid #30394b", borderRadius: 18, padding: 18, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14 },
+  feedbackModalTitle: { margin: "6px 0 0", fontSize: 30, letterSpacing: "-.045em", lineHeight: 1.05 },
+  feedbackCloseButton: { background: "#222a39", color: "white", border: "1px solid #33415f", padding: "12px 16px", borderRadius: 14, fontWeight: 900, cursor: "pointer" },
+  feedbackAccountLine: { color: "#bec5d3", margin: 0, fontSize: 13 },
   feedbackChoice: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 },
-  feedbackChoiceButton: { background: "#27272a", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 12, fontWeight: 900, cursor: "pointer" },
-  feedbackChoiceActive: { background: "#2563eb", borderColor: "#60a5fa" },
+  feedbackChoiceButton: { background: "#141a28", border: "1px solid #30394b", color: "#c0cadb", borderRadius: 12, padding: 12, fontWeight: 900, cursor: "pointer" },
+  feedbackChoiceActive: { background: "linear-gradient(135deg,#2563eb,#8b5cf6)", borderColor: "#a78bfa", color: "white" },
+  feedbackInput: { background: "#141a28", border: "1px solid #30394b", color: "#f4f7fb", borderRadius: 12, padding: 13, outline: "none", width: "100%", boxSizing: "border-box" },
+  feedbackTextarea: { background: "#141a28", border: "1px solid #30394b", color: "#f4f7fb", borderRadius: 12, padding: 13, outline: "none", width: "100%", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" },
+  feedbackStatus: { color: "#dca4f8", margin: 0, fontSize: 13, fontWeight: 800 },
+  feedbackSubmitButton: { background: "linear-gradient(135deg,#bd00e9,#2563eb)", color: "white", border: 0, borderRadius: 12, padding: 14, fontWeight: 950, cursor: "pointer", boxShadow: "0 16px 35px rgba(37,99,235,.22)" },
+  feedbackRequestGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 320px), 1fr))", gap: 14 },
+  feedbackRequestCard: { background: "linear-gradient(135deg, rgba(20,26,40,.96), rgba(31,37,58,.92))", border: "1px solid #34415c", borderRadius: 18, padding: 16, display: "grid", gap: 14 },
+  feedbackRequestTop: { display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 14, flexWrap: "wrap" },
+  feedbackRequestTitle: { margin: "8px 0 0", fontSize: 20, lineHeight: 1.15 },
+  feedbackRequestContent: { margin: 0, color: "#d7deea", lineHeight: 1.5, whiteSpace: "pre-line" },
+  feedbackRequestFooter: { borderTop: "1px solid #30394b", paddingTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" },
+  publicLink: { color: "#d954f4", fontWeight: 900, textDecoration: "none" },
   textarea: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 13, outline: "none", width: "100%", resize: "vertical", boxSizing: "border-box", fontFamily: "inherit" },
   dateField: { display: "grid", gap: 4, marginTop: 8, maxWidth: 260 },
   dateInput: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
