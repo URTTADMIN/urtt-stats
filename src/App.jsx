@@ -480,6 +480,16 @@ function getPublicCategoryTheme(categoryId) {
       spotlight: "linear-gradient(118deg,#12351d 0%,#174826 47%,#166534 100%)",
     };
   }
+  if (category === "F3") {
+    return {
+      logo: "/urtt-f3.png",
+      accent: "#ff7900",
+      accentSoft: "#fed7aa",
+      accentText: "#f97316",
+      navActive: "#3a2414",
+      spotlight: "linear-gradient(118deg,#3a2112 0%,#5a2b0f 47%,#9a3412 100%)",
+    };
+  }
   return {
     logo: "/urtt-f1.png",
     accent: "#cc00ff",
