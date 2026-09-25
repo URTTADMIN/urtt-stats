@@ -7037,7 +7037,7 @@ function TeamIdentity({ team }) { return <div className="urtt-identity" style={s
 function TripleCrown({ crown }) {
   const safe = crown || { monaco: false, indy500: false, lemans: false };
   const stars = [
-    { key: "monaco", label: "Titre F1", color: "#8b5cf6", active: safe.monaco },
+    { key: "monaco", label: "Titre F1", color: "#cc00ff", active: safe.monaco },
     { key: "indy500", label: "Indy 300", color: "#ffff00", active: safe.indy500 },
     { key: "lemans", label: "2,4H du Mans", color: "#006ee6", active: safe.lemans },
   ];
