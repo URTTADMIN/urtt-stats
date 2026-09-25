@@ -1714,7 +1714,7 @@ export default function URTTAdminPanel() {
           max-width: min(96vw, 1800px) !important;
         }
         .urtt-standings-grid {
-          grid-template-columns: minmax(0, 1.12fr) minmax(0, .88fr) !important;
+          grid-template-columns: 1fr !important;
           align-items: start;
         }
         .urtt-public-main .urtt-standings-table {
