@@ -66,9 +66,11 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "predictions", label: "Pronos" },
   { id: "guess-driver", label: "Défi pilote" },
   { id: "easter-eggs", label: "Livre secret" },
+  { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
   { id: "championship", label: "Championnat", pages: ["standings", "drivers", "teams", "editions", "development"] },
+  { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
 const EASTER_EGG_BOOK = [
@@ -97,6 +99,7 @@ function getPublicPageIcon(pageId) {
     predictions: "◇",
     "guess-driver": "?",
     "easter-eggs": "□",
+    "other-championships": "+",
   }[pageId] || "•";
 }
 
@@ -4268,6 +4271,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} attemptsHistory={guessDriverAttempts} onSaveWin={onSaveGuessDriverWin} onSaveAttempt={onSaveGuessDriverAttempt} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
+        {activePublicPage === "other-championships" && <OtherChampionshipsPage />}
           </main>
         </div>
       </div>
@@ -4291,6 +4295,19 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       {poleDnfAnimationKey > 0 && <PoleToDnfAnimation key={poleDnfAnimationKey} onDone={() => setPoleDnfAnimationKey(0)} />}
       {titleHeartbreakAnimation && <TitleHeartbreakAnimation key={titleHeartbreakAnimation.key} type={titleHeartbreakAnimation.type} onDone={() => setTitleHeartbreakAnimation(null)} />}
       <FeedbackWidget playerProfile={playerProfile} />
+    </div>
+  );
+}
+
+function OtherChampionshipsPage() {
+  return (
+    <div style={styles.section}>
+      <Card title="Autre championnat" icon="+">
+        <div style={styles.previewNotice}>
+          <strong>À venir</strong>
+          <span>Cette catégorie est prête. Les prochains championnats pourront être ajoutés ici.</span>
+        </div>
+      </Card>
     </div>
   );
 }
