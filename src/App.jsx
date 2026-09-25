@@ -4090,7 +4090,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -4426,7 +4426,11 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
   );
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+function PreviewLogo({ name, image, color = "#293046" }) {
+  return image ? <img src={image} alt={name} style={{ ...styles.publicPreviewLogo, borderColor: color }} /> : <span style={{ ...styles.publicPreviewInitials, background: color }}>{getInitials(name)}</span>;
+}
+
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   const previewDrivers = seasonOnlyDrivers.slice(0, 5);
   const previewRaces = races.slice(0, 5);
   return (
@@ -4450,7 +4454,10 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
       <div style={styles.publicHomeColumns}>
         <Card title="Classement pilotes" icon="🏆">
           <div style={styles.publicPreviewRows}>
-            {previewDrivers.map((driver, index) => <div key={driver.id || driver.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><span style={styles.publicPreviewInitials}>{getInitials(driver.name)}</span><div style={styles.publicPreviewIdentity}><strong>{driver.name}</strong><small>{driver.teamName || "Sans écurie"}</small></div><span style={styles.publicPreviewPoints}>{driver.points || 0} <em>pts</em></span></div>)}
+            {previewDrivers.map((driver, index) => {
+              const team = getDriverSeasonTeam(driver, selectedSeasonId, teams);
+              return <div key={driver.id || driver.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={driver.name} image={driver.avatar || team?.logo} color={team?.color || driver.color} /><div style={styles.publicPreviewIdentity}><strong>{driver.name}</strong><small>{team?.name || driver.teamName || "Sans écurie"}</small></div><span style={styles.publicPreviewPoints}>{driver.points || 0} <em>pts</em></span></div>;
+            })}
             {!previewDrivers.length && <Empty text="Aucun classement pilote pour cette saison." />}
           </div>
           <button type="button" onClick={() => onNavigate?.("standings")} style={styles.textButton}>Classement complet</button>
@@ -4466,7 +4473,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
       <div style={styles.publicHomeColumns}>
         <Card title="Écuries en vue" icon="🏎️">
           <div style={styles.publicPreviewRows}>
-            {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><span style={{ ...styles.publicPreviewInitials, background: team.color || "#293046" }}>{getInitials(team.name)}</span><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
+            {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={team.name} image={team.logo} color={team.color || "#293046"} /><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
             {!seasonOnlyTeams.length && <Empty text="Aucun classement écurie pour cette saison." />}
           </div>
           <button type="button" onClick={() => onNavigate?.("teams")} style={styles.textButton}>Voir les écuries</button>
@@ -7004,9 +7011,9 @@ function Empty({ text }) { return <div style={styles.emptyBox}>{text}</div>; }
 function Setting({ title, description, active }) { return <div style={styles.teamCard}><strong>{title}</strong><p style={styles.mutedSmall}>{description}</p><span style={active ? styles.badgeGreen : styles.badgeDark}>{active ? "ON" : "OFF"}</span></div>; }
 
 const styles = {
-  publicPage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 45%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
-  publicAppShell: { maxWidth: 1600, margin: "0 auto", minHeight: "100vh", display: "grid", gridTemplateColumns: "238px minmax(0, 1fr)", background: "#080b13" },
-  publicSidebar: { borderRight: "1px solid #222837", background: "#0c101b", padding: "27px 15px", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh" },
+  publicPage: { minHeight: "100vh", background: "radial-gradient(circle at 18% 0%, rgba(185,0,228,.24), transparent 32%), linear-gradient(135deg, #141b31 0%, #1b2440 46%, #241a3c 100%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
+  publicAppShell: { maxWidth: 1600, margin: "0 auto", minHeight: "100vh", display: "grid", gridTemplateColumns: "238px minmax(0, 1fr)", background: "linear-gradient(135deg, rgba(18,25,45,.92), rgba(28,26,53,.9))" },
+  publicSidebar: { borderRight: "1px solid #33405a", background: "rgba(17,24,43,.88)", padding: "27px 15px", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh", backdropFilter: "blur(16px)" },
   publicBrand: { display: "flex", alignItems: "center", gap: 12, padding: "0 9px" },
   publicBrandMark: { width: 36, height: 34, background: "#bd00e9", color: "white", display: "grid", placeItems: "center", clipPath: "polygon(0 0,100% 0,82% 100%,0 100%)", transform: "skew(-10deg)", fontWeight: 950, fontSize: 12 },
   publicBrandTitle: { border: 0, background: "transparent", color: "#eef1f7", padding: 0, fontWeight: 950, letterSpacing: "-.06em", fontStyle: "italic", fontSize: 27, cursor: "pointer" },
@@ -7018,7 +7025,7 @@ const styles = {
   publicSideNavIcon: { width: 20, display: "inline-grid", placeItems: "center", color: "#d954f4" },
   publicSidebarBottom: { marginTop: "auto", padding: "15px 12px", borderTop: "1px solid #242a38", color: "#8b96aa", fontSize: 12, lineHeight: 1.6, display: "grid", gap: 4 },
   publicContentShell: { minWidth: 0, padding: "0 43px 70px" },
-  publicTopbar: { minHeight: 76, borderBottom: "1px solid #222837", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
+  publicTopbar: { minHeight: 76, borderBottom: "1px solid #33405a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
   publicCrumb: { color: "#8792a8", fontSize: 13 },
   publicTopbarActions: { display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, flexWrap: "wrap" },
   publicDesignSelect: { background: "#141a28", border: "1px solid #30394b", borderRadius: 9, color: "#e5eaf3", padding: "10px 30px 10px 12px", fontSize: 13, fontWeight: 800, outline: "none" },
@@ -7029,7 +7036,7 @@ const styles = {
   publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "#d954f4", fontWeight: 900, textTransform: "uppercase" },
   publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
   publicDashboardSubtitle: { color: "#939eb2", margin: 0, fontSize: 14 },
-  publicSpotlight: { background: "linear-gradient(118deg,#202438 0%,#191c30 47%,#321b49 100%)", border: "1px solid #353347", borderRadius: 16, padding: "27px 30px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 15, position: "relative", overflow: "hidden" },
+  publicSpotlight: { background: "linear-gradient(118deg,#263153 0%,#202b4a 47%,#452266 100%)", border: "1px solid #4a5270", borderRadius: 16, padding: "27px 30px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 15, position: "relative", overflow: "hidden" },
   publicSpotlightKicker: { color: "#dca4f8", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 11, fontWeight: 900 },
   publicSpotlightTitle: { fontSize: 29, letterSpacing: "-.045em", margin: "8px 0" },
   publicSpotlightText: { color: "#bec5d3", fontSize: 14, margin: 0 },
@@ -7039,6 +7046,7 @@ const styles = {
   publicPreviewRace: { display: "grid", gridTemplateColumns: "42px minmax(0, 1fr) auto", alignItems: "center", gap: 13, padding: "15px 4px", borderBottom: "1px solid #242b39" },
   publicPreviewRank: { color: "#8792a7", fontSize: 13, fontWeight: 900 },
   publicPreviewInitials: { height: 30, width: 30, borderRadius: 7, background: "#293046", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#eef1f7" },
+  publicPreviewLogo: { height: 32, width: 32, borderRadius: 8, objectFit: "contain", background: "rgba(255,255,255,.08)", border: "2px solid #293046", padding: 2 },
   publicPreviewRound: { height: 38, width: 38, background: "#222a39", color: "#c5cedf", borderRadius: 9, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 900 },
   publicPreviewIdentity: { minWidth: 0, display: "grid", gap: 3 },
   publicPreviewPoints: { fontSize: 14, fontWeight: 950, color: "#eef1f7" },
@@ -7097,11 +7105,11 @@ const styles = {
   dangerButton: { background: "#7f1d1d", color: "white", border: 0, padding: "10px 12px", borderRadius: 12, fontWeight: 900, cursor: "pointer" },
   section: { display: "grid", gap: 22 },
   statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 190px), 1fr))", gap: 16 },
-  statCard: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 22 },
+  statCard: { background: "rgba(22,31,54,.9)", border: "1px solid #34415c", borderRadius: 24, padding: 22 },
   statValue: { fontSize: 30, fontWeight: 900, margin: "6px 0 0" },
   twoColumns: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 22 },
   twoColumnsSmallLeft: { display: "grid", gridTemplateColumns: "minmax(310px, .75fr) minmax(0, 1.25fr)", gap: 22 },
-  card: { background: "#18181b", border: "1px solid #27272a", borderRadius: 26, padding: 22, boxShadow: "0 18px 50px rgba(0,0,0,.25)" },
+  card: { background: "rgba(22,31,54,.92)", border: "1px solid #34415c", borderRadius: 26, padding: 22, boxShadow: "0 18px 50px rgba(7,10,20,.22)" },
   cardHeader: { display: "flex", gap: 12, alignItems: "center", marginBottom: 18 },
   cardIcon: { background: "#27272a", borderRadius: 14, padding: 10, fontSize: 20 },
   cardTitle: { margin: 0, fontSize: 22 },
