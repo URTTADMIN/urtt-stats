@@ -4372,6 +4372,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   })).filter((group) => group.pages.length);
   const publicMobilePages = ["home", ...publicNavGroups.flatMap((group) => group.pages)].filter((pageId, index, list) => publicPages.includes(pageId) && list.indexOf(pageId) === index);
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
+  const displayedPublicTheme = activePublicPage === "indy300" ? { ...publicCategoryTheme, logo: "/urtt-ic.png" } : publicCategoryTheme;
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
@@ -4467,7 +4468,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
           <div style={styles.publicBrand}>
             <button type="button" onClick={handleChampionTitleClick} style={styles.publicBrandLogoButton} aria-label="URTT-Stats">
-              <img src={publicCategoryTheme.logo} alt="URTT" style={styles.publicBrandLogo} />
+              <img src={displayedPublicTheme.logo} alt="URTT" style={styles.publicBrandLogo} />
             </button>
           </div>
           <nav className="urtt-site-nav" style={styles.publicSideNav}>
