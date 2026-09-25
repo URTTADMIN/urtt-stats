@@ -458,6 +458,27 @@ function isSeasonIncluded(targetSeasonId, selectedSeasonId) {
 function getCategoryColor(categoryId) {
   return CATEGORY_OPTIONS.find((category) => category.id === normalizeCategoryId(categoryId))?.color || "#3f3f46";
 }
+function getPublicCategoryTheme(categoryId) {
+  const category = normalizeCategoryId(categoryId);
+  if (category === "F2") {
+    return {
+      logo: "/urtt-f2.png",
+      accent: "#dc2626",
+      accentSoft: "#fecaca",
+      accentText: "#ef4444",
+      navActive: "#3a2024",
+      spotlight: "linear-gradient(118deg,#3a1218 0%,#4a171d 47%,#7f1d1d 100%)",
+    };
+  }
+  return {
+    logo: "/urtt-f1.png",
+    accent: "#cc00ff",
+    accentSoft: "#f0abfc",
+    accentText: "#d954f4",
+    navActive: "#29203a",
+    spotlight: "linear-gradient(118deg,#263153 0%,#202b4a 47%,#452266 100%)",
+  };
+}
 function getSpecialEventName(eventType) {
   return SPECIAL_EVENT_OPTIONS.find((event) => event.id === eventType)?.name || eventType || "Événement";
 }
@@ -1391,7 +1412,7 @@ export default function URTTAdminPanel() {
         color: #ffffff !important;
       }
       .urtt-public-theme-light .urtt-public-spotlight span {
-        color: #f0abfc !important;
+        color: var(--urtt-accent-soft, #f0abfc) !important;
       }
       .urtt-public-theme-light .urtt-public-spotlight button {
         color: #ffffff !important;
@@ -1410,7 +1431,7 @@ export default function URTTAdminPanel() {
       .urtt-public-theme-light .urtt-public-preview-meta,
       .urtt-public-theme-light .urtt-public-preview-meta span,
       .urtt-public-theme-light .urtt-public-preview-meta small {
-        color: #a21caf !important;
+        color: var(--urtt-accent, #a21caf) !important;
       }
       .urtt-public-theme-light .urtt-card [style*="border-bottom"] {
         border-color: rgba(15,23,42,.22) !important;
@@ -4200,7 +4221,8 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   });
   const championClicksRef = useRef([]);
   const pendingPublicNavigationRef = useRef(null);
-  const categoryColor = getCategoryColor(selectedCategoryId);
+  const publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId);
+  const categoryColor = publicCategoryTheme.accent;
   const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
   const publicPages = PUBLIC_PAGE_OPTIONS
     .filter((page) => page.id !== "development" || isDevelopmentCategory(selectedCategoryId))
@@ -4302,24 +4324,24 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     championClicksRef.current = recentClicks;
   };
   return (
-    <div className={`urtt-public-page urtt-public-theme-${publicTheme}${championMode ? " urtt-champion-mode" : ""}`} style={styles.publicPage}>
+    <div className={`urtt-public-page urtt-public-theme-${publicTheme}${championMode ? " urtt-champion-mode" : ""}`} style={{ ...styles.publicPage, "--urtt-accent": publicCategoryTheme.accent, "--urtt-accent-soft": publicCategoryTheme.accentSoft, "--urtt-accent-text": publicCategoryTheme.accentText, "--urtt-nav-active": publicCategoryTheme.navActive, "--urtt-spotlight": publicCategoryTheme.spotlight }}>
       <div className="urtt-public-app" style={styles.publicAppShell}>
         <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
           <div style={styles.publicBrand}>
             <button type="button" onClick={handleChampionTitleClick} style={styles.publicBrandLogoButton} aria-label="URTT-Stats">
-              <img src="/urtt-f1.png" alt="URTT" style={styles.publicBrandLogo} />
+              <img src={publicCategoryTheme.logo} alt="URTT" style={styles.publicBrandLogo} />
             </button>
           </div>
           <nav className="urtt-site-nav" style={styles.publicSideNav}>
             {publicPages.includes("home") && (
-              <button type="button" onClick={() => activePublicPage !== "home" && requestPublicNavigation(() => setPublicPage("home"))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === "home" ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon("home")}</span>Accueil</button>
+              <button type="button" onClick={() => activePublicPage !== "home" && requestPublicNavigation(() => setPublicPage("home"))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === "home" ? { ...styles.publicSideNavButtonActive, background: publicCategoryTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon("home")}</span>Accueil</button>
             )}
             {publicNavGroups.map((group) => (
               <div key={group.id} style={styles.publicNavGroup}>
                 <span style={styles.publicNavLabel}>{group.label}</span>
                 {group.pages.map((key) => {
                   const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-                  return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
+                  return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, background: publicCategoryTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
                 })}
               </div>
             ))}
@@ -4363,7 +4385,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -4716,24 +4738,24 @@ function PreviewLogo({ name, image, color = "#293046" }) {
   return image ? <img src={image} alt={name} style={{ ...styles.publicPreviewLogo, borderColor: color }} /> : <span style={{ ...styles.publicPreviewInitials, background: color }}>{getInitials(name)}</span>;
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId), leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   const previewDrivers = seasonOnlyDrivers.slice(0, 5);
   const previewRaces = races.slice(0, 5);
   return (
     <div style={styles.section}>
       <div style={styles.publicHeading}>
         <div>
-          <span style={styles.publicEyebrow}>Championnat URTT</span>
+          <span style={{ ...styles.publicEyebrow, color: publicCategoryTheme.accentText }}>Championnat URTT</span>
           <h1 style={styles.publicDashboardTitle}>Vue d'ensemble</h1>
           <p style={styles.publicDashboardSubtitle}>Résultats, classements et prochaines courses au même endroit.</p>
         </div>
       </div>
-      <section className="urtt-public-spotlight" style={styles.publicSpotlight}>
+      <section className="urtt-public-spotlight" style={{ ...styles.publicSpotlight, background: publicCategoryTheme.spotlight }}>
         <div>
-          <span style={styles.publicSpotlightKicker}>À l'affiche · {seasonName(selectedSeasonId)}</span>
+          <span style={{ ...styles.publicSpotlightKicker, color: publicCategoryTheme.accentSoft }}>À l'affiche · {seasonName(selectedSeasonId)}</span>
           <h2 style={styles.publicSpotlightTitle}>{seasonName(selectedSeasonId)}</h2>
         </div>
-        <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.accentButton}>Voir le calendrier</button>
+        <button type="button" onClick={() => onNavigate?.("seasons")} style={{ ...styles.accentButton, background: publicCategoryTheme.accent }}>Voir le calendrier</button>
       </section>
       <SeasonSummary selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} />
       <div style={styles.publicHomeColumns}>
@@ -4745,14 +4767,14 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
             })}
             {!previewDrivers.length && <Empty text="Aucun classement pilote pour cette saison." />}
           </div>
-          <button type="button" onClick={() => onNavigate?.("standings")} style={styles.textButton}>Classement complet</button>
+          <button type="button" onClick={() => onNavigate?.("standings")} style={{ ...styles.textButton, color: publicCategoryTheme.accentText }}>Classement complet</button>
         </Card>
         <Card title="Courses de la saison" icon="🏁">
           <div style={styles.publicPreviewRows}>
             {previewRaces.map((race) => <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{race.country || race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>)}
             {!previewRaces.length && <Empty text="Aucune course dans cette saison." />}
           </div>
-          <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.textButton}>Tout voir</button>
+          <button type="button" onClick={() => onNavigate?.("seasons")} style={{ ...styles.textButton, color: publicCategoryTheme.accentText }}>Tout voir</button>
         </Card>
       </div>
       <div style={styles.publicHomeColumns}>
@@ -4761,7 +4783,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
             {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} className="urtt-public-preview-row" style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={team.name} image={team.logo} color={team.color || "#293046"} /><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span className="urtt-public-preview-points" style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
             {!seasonOnlyTeams.length && <Empty text="Aucun classement écurie pour cette saison." />}
           </div>
-          <button type="button" onClick={() => onNavigate?.("teams")} style={styles.textButton}>Voir les écuries</button>
+          <button type="button" onClick={() => onNavigate?.("teams")} style={{ ...styles.textButton, color: publicCategoryTheme.accentText }}>Voir les écuries</button>
         </Card>
         <RaceCountdown races={countdownRaces} events={calendarEvents} />
       </div>
@@ -7479,8 +7501,8 @@ const styles = {
   publicNavGroup: { display: "grid", gap: 4, marginTop: 18 },
   publicNavLabel: { color: "#707b91", textTransform: "uppercase", letterSpacing: ".14em", fontSize: 11, fontWeight: 800, padding: "0 14px 11px" },
   publicSideNavButton: { border: 0, background: "transparent", color: "#a7b0c1", display: "flex", alignItems: "center", gap: 13, textAlign: "left", width: "100%", borderRadius: 9, padding: "12px 13px", fontSize: 14, fontWeight: 700, cursor: "pointer" },
-  publicSideNavButtonActive: { color: "white", background: "#29203a" },
-  publicSideNavIcon: { width: 20, display: "inline-grid", placeItems: "center", color: "#d954f4" },
+  publicSideNavButtonActive: { color: "white", background: "var(--urtt-nav-active, #29203a)" },
+  publicSideNavIcon: { width: 20, display: "inline-grid", placeItems: "center", color: "var(--urtt-accent-text, #d954f4)" },
   publicSidebarBottom: { marginTop: "auto", padding: "15px 12px", borderTop: "1px solid #242a38", color: "#8b96aa", fontSize: 12, lineHeight: 1.6, display: "grid", gap: 4 },
   publicContentShell: { minWidth: 0, padding: "0 43px 70px" },
   publicTopbar: { minHeight: 76, borderBottom: "1px solid #33405a", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16 },
@@ -7496,11 +7518,11 @@ const styles = {
   accessChoiceButton: { width: "100%", border: "1px solid #33415f", background: "#141a28", color: "#eef1f7", borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 900, textAlign: "left", cursor: "pointer" },
   publicAdminBubble: { width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
   publicHeading: { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, margin: "36px 0 25px" },
-  publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "#d954f4", fontWeight: 900, textTransform: "uppercase" },
+  publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "var(--urtt-accent-text, #d954f4)", fontWeight: 900, textTransform: "uppercase" },
   publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
   publicDashboardSubtitle: { color: "#939eb2", margin: 0, fontSize: 14 },
-  publicSpotlight: { background: "linear-gradient(118deg,#263153 0%,#202b4a 47%,#452266 100%)", border: "1px solid #4a5270", borderRadius: 16, padding: "27px 30px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 15, position: "relative", overflow: "hidden" },
-  publicSpotlightKicker: { color: "#dca4f8", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 11, fontWeight: 900 },
+  publicSpotlight: { background: "var(--urtt-spotlight, linear-gradient(118deg,#263153 0%,#202b4a 47%,#452266 100%))", border: "1px solid #4a5270", borderRadius: 16, padding: "27px 30px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", alignItems: "center", gap: 15, position: "relative", overflow: "hidden" },
+  publicSpotlightKicker: { color: "var(--urtt-accent-soft, #dca4f8)", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 11, fontWeight: 900 },
   publicSpotlightTitle: { fontSize: 29, letterSpacing: "-.045em", margin: "8px 0" },
   publicSpotlightText: { color: "#bec5d3", fontSize: 14, margin: 0 },
   publicHomeColumns: { display: "grid", gridTemplateColumns: "minmax(0, 1.35fr) minmax(280px, 1fr)", gap: 18 },
@@ -7513,9 +7535,9 @@ const styles = {
   publicPreviewRound: { height: 38, width: 38, background: "#222a39", color: "#c5cedf", borderRadius: 9, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 900 },
   publicPreviewIdentity: { minWidth: 0, display: "grid", gap: 3 },
   publicPreviewPoints: { fontSize: 14, fontWeight: 950, color: "#eef1f7" },
-  publicPreviewMeta: { marginLeft: "auto", textAlign: "right", display: "grid", gap: 3, color: "#d99af5", fontSize: 11, fontWeight: 900 },
-  accentButton: { border: 0, background: "#b900e4", color: "white", borderRadius: 9, padding: "12px 17px", fontSize: 13, fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer" },
-  textButton: { border: 0, background: "transparent", color: "#cf6bea", fontWeight: 850, fontSize: 12, justifySelf: "start", cursor: "pointer", padding: "10px 4px 0" },
+  publicPreviewMeta: { marginLeft: "auto", textAlign: "right", display: "grid", gap: 3, color: "var(--urtt-accent-text, #d99af5)", fontSize: 11, fontWeight: 900 },
+  accentButton: { border: 0, background: "var(--urtt-accent, #b900e4)", color: "white", borderRadius: 9, padding: "12px 17px", fontSize: 13, fontWeight: 900, whiteSpace: "nowrap", cursor: "pointer" },
+  textButton: { border: 0, background: "transparent", color: "var(--urtt-accent-text, #cf6bea)", fontWeight: 850, fontSize: 12, justifySelf: "start", cursor: "pointer", padding: "10px 4px 0" },
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicSessionBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 },
   accountBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 },
