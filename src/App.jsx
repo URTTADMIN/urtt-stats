@@ -4360,7 +4360,6 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const championClicksRef = useRef([]);
   const pendingPublicNavigationRef = useRef(null);
   const publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId);
-  const categoryColor = publicCategoryTheme.accent;
   const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
   const publicPages = PUBLIC_PAGE_OPTIONS
     .filter((page) => page.id !== "development" || isDevelopmentCategory(selectedCategoryId))
@@ -4373,7 +4372,17 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const publicMobilePages = ["home", ...publicNavGroups.flatMap((group) => group.pages)].filter((pageId, index, list) => publicPages.includes(pageId) && list.indexOf(pageId) === index);
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
   const offSeasonLogos = { lemans24: "/urtt-wec.png", indy300: "/urtt-ic.png" };
-  const displayedPublicTheme = offSeasonLogos[activePublicPage] ? { ...publicCategoryTheme, logo: offSeasonLogos[activePublicPage] } : publicCategoryTheme;
+  const offSeasonThemeOverrides = {
+    lemans24: {
+      accent: "#0077ff",
+      accentSoft: "#bfdbfe",
+      accentText: "#38bdf8",
+      navActive: "#132b46",
+      spotlight: "linear-gradient(118deg,#10243d 0%,#123a61 47%,#075985 100%)",
+    },
+  };
+  const displayedPublicTheme = offSeasonLogos[activePublicPage] ? { ...publicCategoryTheme, ...offSeasonThemeOverrides[activePublicPage], logo: offSeasonLogos[activePublicPage] } : publicCategoryTheme;
+  const categoryColor = displayedPublicTheme.accent;
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
@@ -4464,7 +4473,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     championClicksRef.current = recentClicks;
   };
   return (
-    <div className={`urtt-public-page urtt-public-theme-${publicTheme}${championMode ? " urtt-champion-mode" : ""}`} style={{ ...styles.publicPage, "--urtt-accent": publicCategoryTheme.accent, "--urtt-accent-soft": publicCategoryTheme.accentSoft, "--urtt-accent-text": publicCategoryTheme.accentText, "--urtt-nav-active": publicCategoryTheme.navActive, "--urtt-spotlight": publicCategoryTheme.spotlight }}>
+    <div className={`urtt-public-page urtt-public-theme-${publicTheme}${championMode ? " urtt-champion-mode" : ""}`} style={{ ...styles.publicPage, "--urtt-accent": displayedPublicTheme.accent, "--urtt-accent-soft": displayedPublicTheme.accentSoft, "--urtt-accent-text": displayedPublicTheme.accentText, "--urtt-nav-active": displayedPublicTheme.navActive, "--urtt-spotlight": displayedPublicTheme.spotlight }}>
       <div className="urtt-public-app" style={styles.publicAppShell}>
         <aside className="urtt-public-sidebar" style={styles.publicSidebar}>
           <div style={styles.publicBrand}>
@@ -4474,14 +4483,14 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           </div>
           <nav className="urtt-site-nav" style={styles.publicSideNav}>
             {publicPages.includes("home") && (
-              <button type="button" onClick={() => activePublicPage !== "home" && requestPublicNavigation(() => setPublicPage("home"))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === "home" ? { ...styles.publicSideNavButtonActive, background: publicCategoryTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon("home")}</span>Accueil</button>
+              <button type="button" onClick={() => activePublicPage !== "home" && requestPublicNavigation(() => setPublicPage("home"))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === "home" ? { ...styles.publicSideNavButtonActive, background: displayedPublicTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon("home")}</span>Accueil</button>
             )}
             {publicNavGroups.map((group) => (
               <div key={group.id} style={styles.publicNavGroup}>
                 <span style={styles.publicNavLabel}>{group.label}</span>
                 {group.pages.map((key) => {
                   const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-                  return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, background: publicCategoryTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
+                  return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, background: displayedPublicTheme.navActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
                 })}
               </div>
             ))}
