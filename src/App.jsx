@@ -64,7 +64,10 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "predictions", label: "Pronos" },
   { id: "guess-driver", label: "Défi pilote" },
   { id: "easter-eggs", label: "Livre secret" },
-  { id: "world", label: "Carte" },
+];
+const PUBLIC_NAV_GROUPS = [
+  { id: "championship", label: "Championnat", pages: ["standings", "drivers", "teams", "editions", "development"] },
+  { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
 const EASTER_EGG_BOOK = [
   { id: "kolti-s7", title: "Célébration annulée", hint: "Saison 7 · Classements · Kolti", unlockedText: "Kolti S7 : les confettis commencent, puis la célébration remonte et disparaît." },
@@ -92,7 +95,6 @@ function getPublicPageIcon(pageId) {
     predictions: "◇",
     "guess-driver": "?",
     "easter-eggs": "□",
-    world: "◎",
   }[pageId] || "•";
 }
 
@@ -3974,6 +3976,11 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     .filter((page) => page.id !== "development" || isDevelopmentCategory(selectedCategoryId))
     .filter((page) => isAdminPreview || publicVisibility[page.id] !== false)
     .map((page) => page.id);
+  const publicNavGroups = PUBLIC_NAV_GROUPS.map((group) => ({
+    ...group,
+    pages: group.pages.filter((pageId) => publicPages.includes(pageId)),
+  })).filter((group) => group.pages.length);
+  const publicMobilePages = ["home", ...publicNavGroups.flatMap((group) => group.pages)].filter((pageId, index, list) => publicPages.includes(pageId) && list.indexOf(pageId) === index);
   const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
@@ -4070,11 +4077,18 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </button>
           </div>
           <nav className="urtt-site-nav" style={styles.publicSideNav}>
-            <span style={styles.publicNavLabel}>Navigation</span>
-            {publicPages.map((key) => {
-              const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-              return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
-            })}
+            {publicPages.includes("home") && (
+              <button type="button" onClick={() => activePublicPage !== "home" && requestPublicNavigation(() => setPublicPage("home"))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === "home" ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon("home")}</span>Accueil</button>
+            )}
+            {publicNavGroups.map((group) => (
+              <div key={group.id} style={styles.publicNavGroup}>
+                <span style={styles.publicNavLabel}>{group.label}</span>
+                {group.pages.map((key) => {
+                  const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
+                  return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicSideNavButton, ...(activePublicPage === key ? { ...styles.publicSideNavButtonActive, boxShadow: `inset 3px 0 ${categoryColor}` } : {}) }}><span style={styles.publicSideNavIcon}>{getPublicPageIcon(key)}</span>{label}</button>;
+                })}
+              </div>
+            ))}
           </nav>
           <div style={styles.publicSidebarBottom}>
             <strong>{selectedCategoryId} · {seasonName(selectedSeasonId)}</strong>
@@ -4093,7 +4107,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           </header>
           <nav className="urtt-public-mobile-nav" style={styles.publicMobileNav}>
-            {publicPages.map((key) => {
+            {publicMobilePages.map((key) => {
               const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
               return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicMobileNavButton, ...(activePublicPage === key ? { ...styles.publicMobileNavButtonActive, background: categoryColor } : {}) }}>{label}</button>;
             })}
@@ -4117,7 +4131,6 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
         {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} attemptsHistory={guessDriverAttempts} onSaveWin={onSaveGuessDriverWin} onSaveAttempt={onSaveGuessDriverAttempt} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
-        {activePublicPage === "world" && <WorldCircuitsPage races={races} raceLibrary={raceLibrary} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} />}
           </main>
         </div>
       </div>
@@ -7051,6 +7064,7 @@ const styles = {
   publicBrandTitle: { border: 0, background: "transparent", color: "#eef1f7", padding: 0, fontWeight: 950, letterSpacing: "-.06em", fontStyle: "italic", fontSize: 27, cursor: "pointer" },
   publicBrandSubtitle: { display: "block", fontWeight: 700, fontStyle: "normal", letterSpacing: ".13em", color: "#929bad", fontSize: 9, margin: "4px 0 0 1px" },
   publicSideNav: { display: "grid", gap: 4 },
+  publicNavGroup: { display: "grid", gap: 4, marginTop: 18 },
   publicNavLabel: { color: "#707b91", textTransform: "uppercase", letterSpacing: ".14em", fontSize: 11, fontWeight: 800, padding: "0 14px 11px" },
   publicSideNavButton: { border: 0, background: "transparent", color: "#a7b0c1", display: "flex", alignItems: "center", gap: 13, textAlign: "left", width: "100%", borderRadius: 9, padding: "12px 13px", fontSize: 14, fontWeight: 700, cursor: "pointer" },
   publicSideNavButtonActive: { color: "white", background: "#29203a" },
