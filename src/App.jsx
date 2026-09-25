@@ -42,6 +42,14 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "permissions", icon: "🔐", label: "Permissions" },
   { id: "settings", icon: "⚙️", label: "Réglages" },
 ];
+const ADMIN_PAGE_GROUPS = [
+  { id: "overview", label: "Vue générale", icon: "🏠", pages: ["dashboard", "supabase", "search"] },
+  { id: "management", label: "Gestion P & C", icon: "🏎️", pages: ["titles", "drivers", "teams", "development"] },
+  { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "results"] },
+  { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
+  { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["games", "channel-points", "guess-attempts", "easter-egg-admin"] },
+  { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "permissions", "settings"] },
+];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
 const PUBLIC_PAGE_OPTIONS = [
@@ -1595,19 +1603,8 @@ export default function URTTAdminPanel() {
           padding: 14px 14px 32px !important;
           gap: 14px !important;
         }
-        .urtt-admin-page {
-          display: block !important;
-        }
-        .urtt-admin-sidebar {
-          position: sticky !important;
-          top: 0 !important;
-          z-index: 20 !important;
-          border-right: 0 !important;
-          border-bottom: 1px solid #27272a !important;
-          padding: 12px 14px !important;
-        }
         .urtt-admin-logo {
-          margin-bottom: 12px !important;
+          margin-bottom: 0 !important;
         }
         .urtt-admin-nav {
           display: flex !important;
@@ -1622,7 +1619,7 @@ export default function URTTAdminPanel() {
           border-radius: 12px !important;
         }
         .urtt-admin-main {
-          padding: 18px 14px 32px !important;
+          padding: 14px 14px 32px !important;
         }
         .urtt-admin-header {
           display: grid !important;
@@ -5043,22 +5040,46 @@ function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames, thanksT
 }
 
 function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, adminPageOptions = ADMIN_PAGE_OPTIONS, onPublic, onLogout, children }) {
+  const pagesById = new Map(adminPageOptions.map((page) => [page.id, page]));
+  const visibleGroups = ADMIN_PAGE_GROUPS.map((group) => ({
+    ...group,
+    pageOptions: group.pages.map((pageId) => pagesById.get(pageId)).filter(Boolean),
+  })).filter((group) => group.pageOptions.length > 0);
+  const activeGroup = visibleGroups.find((group) => group.pageOptions.some((page) => page.id === active)) || visibleGroups[0];
+  const activePage = pagesById.get(active);
+
   return (
     <div className="urtt-admin-page" style={styles.page}>
-      <aside className="urtt-admin-sidebar" style={styles.sidebar}>
-        <div className="urtt-admin-logo" style={styles.logoRow}>
-          <div style={styles.logo}>UR</div>
-          <div><h1 style={styles.logoTitle}>URTT Admin</h1><p style={styles.logoSubtitle}>Panel privé</p></div>
-        </div>
-        <nav className="urtt-admin-nav" style={styles.nav}>
-          {adminPageOptions.map(({ id, icon, label }) => <button className="urtt-admin-nav-button" key={id} onClick={() => setActive(id)} style={{ ...styles.navButton, ...(active === id ? styles.navButtonActive : {}) }}><span>{icon}</span><span>{label}</span></button>)}
-        </nav>
-      </aside>
       <main className="urtt-admin-main" style={styles.main}>
         <header className="urtt-admin-header" style={styles.header}>
-          <div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email} · Catégories : {normalizeAllowedCategories(adminPermissions.allowedCategories).join(", ")}</p>}</div>
+          <div className="urtt-admin-logo" style={styles.logoRow}>
+          <div style={styles.logo}>UR</div>
+            <div><p style={styles.kicker}>PANEL ADMIN</p><h2 style={styles.title}>Gestion URTT</h2>{adminUser?.email && <p style={styles.mutedSmall}>Connecté : {adminUser.email} · Catégories : {normalizeAllowedCategories(adminPermissions.allowedCategories).join(", ")}</p>}</div>
+          </div>
           <div className="urtt-admin-actions" style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div>
         </header>
+        <section style={styles.adminTopNavPanel}>
+          <nav className="urtt-admin-nav" style={styles.adminGroupNav}>
+            {visibleGroups.map((group) => (
+              <button key={group.id} type="button" onClick={() => setActive(group.pageOptions[0].id)} style={{ ...styles.adminGroupButton, ...(activeGroup?.id === group.id ? styles.adminGroupButtonActive : {}) }}>
+                <span>{group.icon}</span>
+                <span>{group.label}</span>
+              </button>
+            ))}
+          </nav>
+          <div style={styles.adminSubNavHeader}>
+            <strong>{activeGroup?.label || "Navigation"}</strong>
+            <span style={styles.mutedSmall}>{activePage?.label || "Choisis un onglet"}</span>
+          </div>
+          <nav style={styles.adminSubNav}>
+            {(activeGroup?.pageOptions || []).map(({ id, icon, label }) => (
+              <button className="urtt-admin-nav-button" key={id} onClick={() => setActive(id)} style={{ ...styles.adminSubNavButton, ...(active === id ? styles.adminSubNavButtonActive : {}) }}>
+                <span>{icon}</span>
+                <span>{label}</span>
+              </button>
+            ))}
+          </nav>
+        </section>
         {children}
       </main>
     </div>
@@ -6863,18 +6884,26 @@ const styles = {
   publicNav: { maxWidth: 1280, margin: "0 auto", padding: "0 28px 18px", display: "flex", gap: 10, flexWrap: "wrap" },
   publicNavButton: { background: "#18181b", border: "1px solid #27272a", color: "#d4d4d8", padding: "12px 16px", borderRadius: 999, fontWeight: 900, cursor: "pointer" },
   publicNavActive: { background: "#dc2626", color: "white", borderColor: "#dc2626" },
-  page: { minHeight: "100vh", background: "#09090b", color: "#f4f4f5", display: "grid", gridTemplateColumns: "260px 1fr", fontFamily: "Inter, system-ui, Arial" },
+  page: { minHeight: "100vh", background: "#09090b", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
   sidebar: { background: "#18181b", borderRight: "1px solid #27272a", padding: 24 },
-  main: { padding: 32, overflow: "auto" },
-  logoRow: { display: "flex", gap: 12, alignItems: "center", marginBottom: 32 },
+  main: { maxWidth: 1680, margin: "0 auto", padding: 32, overflow: "auto" },
+  logoRow: { display: "flex", gap: 12, alignItems: "center", marginBottom: 0 },
   logo: { width: 44, height: 44, borderRadius: 16, background: "#dc2626", display: "grid", placeItems: "center", fontWeight: 900 },
   logoTitle: { margin: 0, fontSize: 22 },
   logoSubtitle: { margin: 0, color: "#a1a1aa", fontSize: 13 },
-  nav: { display: "grid", gap: 10 },
+  nav: { display: "flex", gap: 10, flexWrap: "wrap" },
   navButton: { display: "flex", alignItems: "center", gap: 12, border: 0, color: "#d4d4d8", background: "transparent", padding: "13px 14px", borderRadius: 16, cursor: "pointer", fontWeight: 800 },
   navButtonActive: { background: "#dc2626", color: "white" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginBottom: 28 },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginBottom: 18, background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 20 },
   headerActions: { display: "flex", gap: 10, alignItems: "center" },
+  adminTopNavPanel: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 16, marginBottom: 24, display: "grid", gap: 14, position: "sticky", top: 0, zIndex: 18 },
+  adminGroupNav: { display: "flex", gap: 10, flexWrap: "wrap" },
+  adminGroupButton: { display: "inline-flex", alignItems: "center", gap: 8, background: "#27272a", border: "1px solid #3f3f46", color: "#e4e4e7", borderRadius: 999, padding: "11px 14px", fontWeight: 950, cursor: "pointer" },
+  adminGroupButtonActive: { background: "#dc2626", borderColor: "#ef4444", color: "white", boxShadow: "0 12px 30px rgba(220,38,38,.22)" },
+  adminSubNavHeader: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderTop: "1px solid #27272a", paddingTop: 14, flexWrap: "wrap" },
+  adminSubNav: { display: "flex", gap: 10, flexWrap: "wrap" },
+  adminSubNavButton: { display: "inline-flex", alignItems: "center", gap: 8, background: "#09090b", border: "1px solid #27272a", color: "#d4d4d8", borderRadius: 14, padding: "10px 12px", fontWeight: 900, cursor: "pointer" },
+  adminSubNavButtonActive: { background: "rgba(239,68,68,.16)", borderColor: "#ef4444", color: "white" },
   kicker: { color: "#f87171", letterSpacing: 4, fontSize: 12, fontWeight: 900, margin: 0 },
   title: { margin: "8px 0 0", fontSize: 38, lineHeight: 1.05 },
   loginPage: { minHeight: "100vh", background: "#09090b", color: "#f4f4f5", display: "grid", placeItems: "center", fontFamily: "Inter, system-ui, Arial", padding: 24 },
