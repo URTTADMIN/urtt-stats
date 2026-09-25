@@ -1380,6 +1380,62 @@ export default function URTTAdminPanel() {
       .urtt-public-theme-light .urtt-public-main .urtt-stat-card {
         box-shadow: 0 18px 50px rgba(15,23,42,.08) !important;
       }
+      .urtt-public-theme-light .urtt-stat-card p:first-child {
+        color: #64748b !important;
+      }
+      .urtt-public-theme-light .urtt-stat-card p:last-child {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light .urtt-public-spotlight h2,
+      .urtt-public-theme-light .urtt-public-spotlight strong {
+        color: #ffffff !important;
+      }
+      .urtt-public-theme-light .urtt-public-spotlight span {
+        color: #f0abfc !important;
+      }
+      .urtt-public-theme-light .urtt-public-spotlight button {
+        color: #ffffff !important;
+      }
+      .urtt-public-theme-light .urtt-public-preview-row {
+        border-color: rgba(15,23,42,.22) !important;
+      }
+      .urtt-public-theme-light .urtt-public-preview-row small,
+      .urtt-public-theme-light .urtt-public-preview-row p {
+        color: #475569 !important;
+      }
+      .urtt-public-theme-light .urtt-public-preview-points,
+      .urtt-public-theme-light .urtt-public-preview-points em {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light .urtt-public-preview-meta,
+      .urtt-public-theme-light .urtt-public-preview-meta span,
+      .urtt-public-theme-light .urtt-public-preview-meta small {
+        color: #a21caf !important;
+      }
+      .urtt-public-theme-light .urtt-card [style*="border-bottom"] {
+        border-color: rgba(15,23,42,.22) !important;
+      }
+      .urtt-public-theme-light .urtt-card [style*="background: rgb(39, 39, 42)"],
+      .urtt-public-theme-light .urtt-card [style*="background:#27272a"],
+      .urtt-public-theme-light .urtt-card [style*="background: #27272a"] {
+        background: #f8fafc !important;
+        border-color: rgba(148,163,184,.55) !important;
+      }
+      .urtt-public-theme-light .urtt-card [style*="color: rgb(238, 241, 247)"] {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light [style*="background: rgb(24, 24, 27)"],
+      .urtt-public-theme-light [style*="background:#18181b"],
+      .urtt-public-theme-light [style*="background: #18181b"] {
+        background: #f8fafc !important;
+        border-color: rgba(148,163,184,.55) !important;
+      }
+      .urtt-public-theme-light [style*="background: rgb(63, 63, 70)"],
+      .urtt-public-theme-light [style*="background:#3f3f46"],
+      .urtt-public-theme-light [style*="background: #3f3f46"] {
+        background: #e2e8f0 !important;
+        color: #334155 !important;
+      }
       .urtt-champion-banner {
         max-width: 1280px;
         margin: 0 auto 10px;
@@ -4632,7 +4688,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
           <p style={styles.publicDashboardSubtitle}>Résultats, classements et prochaines courses au même endroit.</p>
         </div>
       </div>
-      <section style={styles.publicSpotlight}>
+      <section className="urtt-public-spotlight" style={styles.publicSpotlight}>
         <div>
           <span style={styles.publicSpotlightKicker}>À l'affiche · {seasonName(selectedSeasonId)}</span>
           <h2 style={styles.publicSpotlightTitle}>{seasonName(selectedSeasonId)}</h2>
@@ -4645,7 +4701,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
           <div style={styles.publicPreviewRows}>
             {previewDrivers.map((driver, index) => {
               const team = getDriverSeasonTeam(driver, selectedSeasonId, teams);
-              return <div key={driver.id || driver.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={driver.name} image={driver.avatar || team?.logo} color={team?.color || driver.color} /><div style={styles.publicPreviewIdentity}><strong>{driver.name}</strong><small>{team?.name || driver.teamName || "Sans écurie"}</small></div><span style={styles.publicPreviewPoints}>{driver.points || 0} <em>pts</em></span></div>;
+              return <div key={driver.id || driver.name} className="urtt-public-preview-row" style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={driver.name} image={driver.avatar || team?.logo} color={team?.color || driver.color} /><div style={styles.publicPreviewIdentity}><strong>{driver.name}</strong><small>{team?.name || driver.teamName || "Sans écurie"}</small></div><span className="urtt-public-preview-points" style={styles.publicPreviewPoints}>{driver.points || 0} <em>pts</em></span></div>;
             })}
             {!previewDrivers.length && <Empty text="Aucun classement pilote pour cette saison." />}
           </div>
@@ -4653,7 +4709,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
         </Card>
         <Card title="Courses de la saison" icon="🏁">
           <div style={styles.publicPreviewRows}>
-            {previewRaces.map((race) => <div key={race.id} style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{race.country || race.track || "Circuit à définir"}</small></div><div style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>)}
+            {previewRaces.map((race) => <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{race.country || race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>)}
             {!previewRaces.length && <Empty text="Aucune course dans cette saison." />}
           </div>
           <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.textButton}>Tout voir</button>
@@ -4662,7 +4718,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
       <div style={styles.publicHomeColumns}>
         <Card title="Écuries en vue" icon="🏎️">
           <div style={styles.publicPreviewRows}>
-            {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={team.name} image={team.logo} color={team.color || "#293046"} /><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
+            {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} className="urtt-public-preview-row" style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={team.name} image={team.logo} color={team.color || "#293046"} /><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span className="urtt-public-preview-points" style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
             {!seasonOnlyTeams.length && <Empty text="Aucun classement écurie pour cette saison." />}
           </div>
           <button type="button" onClick={() => onNavigate?.("teams")} style={styles.textButton}>Voir les écuries</button>
