@@ -43,7 +43,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "settings", icon: "⚙️", label: "Réglages" },
 ];
 const ADMIN_PAGE_GROUPS = [
-  { id: "overview", label: "Vue générale", icon: "🏠", pages: ["dashboard", "supabase", "search"] },
+  { id: "overview", label: "Vue générale", icon: "🏠", pages: ["dashboard", "supabase"] },
   { id: "management", label: "Gestion P & C", icon: "🏎️", pages: ["titles", "drivers", "teams", "development"] },
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
@@ -3504,6 +3504,8 @@ export default function URTTAdminPanel() {
           adminUser={adminUser}
           adminPermissions={adminPermissions}
           adminPageOptions={adminPageOptions}
+          adminSearch={adminGlobalSearch}
+          setAdminSearch={setAdminGlobalSearch}
           onPublic={() => { setIsAdminPreview(true); setView("front"); }}
           onLogout={async () => {
             await supabase.auth.signOut();
@@ -5039,7 +5041,7 @@ function MediaLinksCard({ thanksNames = defaultSiteSettings.thanksNames, thanksT
   );
 }
 
-function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, adminPageOptions = ADMIN_PAGE_OPTIONS, onPublic, onLogout, children }) {
+function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultAdminPermissions, adminPageOptions = ADMIN_PAGE_OPTIONS, adminSearch = "", setAdminSearch, onPublic, onLogout, children }) {
   const pagesById = new Map(adminPageOptions.map((page) => [page.id, page]));
   const visibleGroups = ADMIN_PAGE_GROUPS.map((group) => ({
     ...group,
@@ -5047,6 +5049,11 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
   })).filter((group) => group.pageOptions.length > 0);
   const activeGroup = visibleGroups.find((group) => group.pageOptions.some((page) => page.id === active)) || visibleGroups[0];
   const activePage = pagesById.get(active);
+  const canSearch = pagesById.has("search");
+  const updateQuickSearch = (value) => {
+    setAdminSearch?.(value);
+    if (canSearch && active !== "search") setActive("search");
+  };
 
   return (
     <div className="urtt-admin-page" style={styles.page}>
@@ -5059,14 +5066,22 @@ function AdminLayout({ active, setActive, adminUser, adminPermissions = defaultA
           <div className="urtt-admin-actions" style={styles.headerActions}><button onClick={onPublic} style={styles.secondaryButton}>Voir le public</button><button onClick={onLogout} style={styles.primaryButton}>Déconnexion</button></div>
         </header>
         <section style={styles.adminTopNavPanel}>
-          <nav className="urtt-admin-nav" style={styles.adminGroupNav}>
-            {visibleGroups.map((group) => (
-              <button key={group.id} type="button" onClick={() => setActive(group.pageOptions[0].id)} style={{ ...styles.adminGroupButton, ...(activeGroup?.id === group.id ? styles.adminGroupButtonActive : {}) }}>
-                <span>{group.icon}</span>
-                <span>{group.label}</span>
-              </button>
-            ))}
-          </nav>
+          <div style={styles.adminGroupRow}>
+            <nav className="urtt-admin-nav" style={styles.adminGroupNav}>
+              {visibleGroups.map((group) => (
+                <button key={group.id} type="button" onClick={() => setActive(group.pageOptions[0].id)} style={{ ...styles.adminGroupButton, ...(activeGroup?.id === group.id ? styles.adminGroupButtonActive : {}) }}>
+                  <span>{group.icon}</span>
+                  <span>{group.label}</span>
+                </button>
+              ))}
+            </nav>
+            {canSearch && (
+              <label style={styles.adminQuickSearch}>
+                <span>🔎</span>
+                <input value={adminSearch} onFocus={() => setActive("search")} onChange={(event) => updateQuickSearch(event.target.value)} placeholder="Rechercher un pilote, une écurie..." style={styles.adminQuickSearchInput} />
+              </label>
+            )}
+          </div>
           <div style={styles.adminSubNavHeader}>
             <strong>{activeGroup?.label || "Navigation"}</strong>
             <span style={styles.mutedSmall}>{activePage?.label || "Choisis un onglet"}</span>
@@ -6897,9 +6912,12 @@ const styles = {
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginBottom: 18, background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 20 },
   headerActions: { display: "flex", gap: 10, alignItems: "center" },
   adminTopNavPanel: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 16, marginBottom: 24, display: "grid", gap: 14, position: "sticky", top: 0, zIndex: 18 },
+  adminGroupRow: { display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" },
   adminGroupNav: { display: "flex", gap: 10, flexWrap: "wrap" },
   adminGroupButton: { display: "inline-flex", alignItems: "center", gap: 8, background: "#27272a", border: "1px solid #3f3f46", color: "#e4e4e7", borderRadius: 999, padding: "11px 14px", fontWeight: 950, cursor: "pointer" },
   adminGroupButtonActive: { background: "#dc2626", borderColor: "#ef4444", color: "white", boxShadow: "0 12px 30px rgba(220,38,38,.22)" },
+  adminQuickSearch: { minWidth: 280, flex: "1 1 320px", maxWidth: 460, display: "flex", alignItems: "center", gap: 10, background: "#09090b", border: "1px solid #3f3f46", borderRadius: 999, padding: "10px 14px", color: "#a1a1aa" },
+  adminQuickSearchInput: { width: "100%", background: "transparent", border: 0, outline: "none", color: "white", fontWeight: 800, fontSize: 14 },
   adminSubNavHeader: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 12, borderTop: "1px solid #27272a", paddingTop: 14, flexWrap: "wrap" },
   adminSubNav: { display: "flex", gap: 10, flexWrap: "wrap" },
   adminSubNavButton: { display: "inline-flex", alignItems: "center", gap: 8, background: "#09090b", border: "1px solid #27272a", color: "#d4d4d8", borderRadius: 14, padding: "10px 12px", fontWeight: 900, cursor: "pointer" },
