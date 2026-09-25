@@ -4020,6 +4020,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const [driverStatsSearch, setDriverStatsSearch] = useState("");
   const [multiStatsDriverId, setMultiStatsDriverId] = useState("");
   const [championMode, setChampionMode] = useState(false);
+  const [showAccessMenu, setShowAccessMenu] = useState(false);
   const [publicTheme, setPublicTheme] = useState(() => {
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem(PUBLIC_THEME_STORAGE_KEY) === "light" ? "light" : "dark";
@@ -4172,10 +4173,17 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             <div style={styles.publicTopbarActions}>
               <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
               <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-              <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton}>{isLightTheme ? "Sombre" : "Clair"}</button>
+              <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾" : "☀"}</button>
               {adminUser?.email && <span style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
-              <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} />
-              <button onClick={() => requestPublicNavigation(onOpenAdmin)} style={styles.publicAdminBubble} aria-label="Accès admin">UR</button>
+              <div style={styles.publicAccessWrap}>
+                <button onClick={() => setShowAccessMenu((current) => !current)} style={styles.publicAdminBubble} aria-label="Interface utilisateur et admin">INT</button>
+                {showAccessMenu && (
+                  <div style={styles.publicAccessMenu}>
+                    <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} compact triggerLabel="Utilisateur" triggerStyle={styles.accessChoiceButton} />
+                    <button type="button" onClick={() => requestPublicNavigation(onOpenAdmin)} style={styles.accessChoiceButton}>Admin</button>
+                  </div>
+                )}
+              </div>
             </div>
           </header>
           <nav className="urtt-public-mobile-nav" style={styles.publicMobileNav}>
@@ -4230,7 +4238,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   );
 }
 
-function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
+function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving, compact = false, triggerLabel = "", triggerStyle = null }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState("login");
   const [form, setForm] = useState({ pseudo: "", discordName: "", accessCode: "" });
@@ -4246,10 +4254,10 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving }) {
 
   return (
     <div style={styles.accountBox}>
-      {profile?.pseudo && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span>}
+      {profile?.pseudo && !compact && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span>}
       <div style={styles.headerActions}>
-        <button type="button" onClick={() => setOpen(true)} style={styles.secondaryButton}>{profile ? "Compte" : "Connexion"}</button>
-        {profile && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
+        <button type="button" onClick={() => setOpen(true)} style={triggerStyle || styles.secondaryButton}>{triggerLabel || (profile ? "Compte" : "Connexion")}</button>
+        {profile && !compact && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
       {open && (
         <div style={styles.detailOverlay} onMouseDown={() => setOpen(false)}>
@@ -7150,8 +7158,11 @@ const styles = {
   publicMobileNav: { display: "none", overflowX: "auto", gap: 7, padding: "9px 0", borderBottom: "1px solid #252d3c" },
   publicMobileNavButton: { whiteSpace: "nowrap", background: "#1a2130", border: 0, color: "#c0cadb", borderRadius: 7, padding: "9px 12px", fontSize: 12, fontWeight: 800 },
   publicMobileNavButtonActive: { color: "white" },
-  themeToggleButton: { border: "1px solid #30394b", background: "#141a28", color: "#e5eaf3", borderRadius: 999, padding: "10px 13px", fontSize: 12, fontWeight: 900, cursor: "pointer" },
-  publicAdminBubble: { width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 12, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
+  themeToggleButton: { width: 34, height: 34, border: "1px solid #30394b", background: "#141a28", color: "#e5eaf3", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, fontWeight: 900, cursor: "pointer" },
+  publicAccessWrap: { position: "relative", display: "grid", placeItems: "center" },
+  publicAccessMenu: { position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 80, minWidth: 190, background: "rgba(17,24,43,.98)", border: "1px solid #33415f", borderRadius: 16, padding: 10, display: "grid", gap: 8, boxShadow: "0 18px 45px rgba(0,0,0,.28)" },
+  accessChoiceButton: { width: "100%", border: "1px solid #33415f", background: "#141a28", color: "#eef1f7", borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 900, textAlign: "left", cursor: "pointer" },
+  publicAdminBubble: { width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
   publicHeading: { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, margin: "36px 0 25px" },
   publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "#d954f4", fontWeight: 900, textTransform: "uppercase" },
   publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
