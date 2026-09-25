@@ -4462,8 +4462,8 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
       <section style={styles.publicSpotlight}>
         <div>
           <span style={styles.publicSpotlightKicker}>À l'affiche · {seasonName(selectedSeasonId)}</span>
-          <h2 style={styles.publicSpotlightTitle}>La grille {selectedCategoryId} se dessine.</h2>
-          <p style={styles.publicSpotlightText}>Suivez la lutte pour le titre avec {leaderDriver} côté pilotes et {leaderTeam} côté écuries.</p>
+          <h2 style={styles.publicSpotlightTitle}>{seasonName(selectedSeasonId)}</h2>
+          <p style={styles.publicSpotlightText}>Augustin qui va tenter de back to back en F1.</p>
         </div>
         <button type="button" onClick={() => onNavigate?.("seasons")} style={styles.accentButton}>Voir le calendrier</button>
       </section>
