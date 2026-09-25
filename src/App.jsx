@@ -4541,7 +4541,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -4896,9 +4896,12 @@ function PreviewLogo({ name, image, color = "#293046" }) {
   return image ? <img src={image} alt={name} style={{ ...styles.publicPreviewLogo, borderColor: color }} /> : <span style={{ ...styles.publicPreviewInitials, background: color }}>{getInitials(name)}</span>;
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId), leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId), leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], drivers = [], developmentEntries = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   const previewDrivers = seasonOnlyDrivers.slice(0, 5);
   const previewRaces = races.slice(0, 5);
+  const hasDevelopment = isDevelopmentCategory(selectedCategoryId);
+  const selectedDevelopmentEntries = hasDevelopment ? getDevelopmentEntriesForSelection(developmentEntries, selectedSeasonId, selectedCategoryId) : [];
+  const developmentTeams = hasDevelopment ? getSeasonCategoryTeams(teams, drivers, selectedSeasonId, selectedCategoryId) : [];
   return (
     <div style={styles.section}>
       <div style={styles.publicHeading}>
@@ -4936,7 +4939,7 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
         </Card>
       </div>
       <div style={styles.publicHomeColumns}>
-        <Card title="Écuries en vue" icon="🏎️">
+        <Card title="Classement Constructeur" icon="🏎️">
           <div style={styles.publicPreviewRows}>
             {seasonOnlyTeams.slice(0, 5).map((team, index) => <div key={team.id || team.name} className="urtt-public-preview-row" style={styles.publicPreviewDriver}><span style={styles.publicPreviewRank}>{String(index + 1).padStart(2, "0")}</span><PreviewLogo name={team.name} image={team.logo} color={team.color || "#293046"} /><div style={styles.publicPreviewIdentity}><strong>{team.name}</strong><small>{team.wins || 0} victoire(s)</small></div><span className="urtt-public-preview-points" style={styles.publicPreviewPoints}>{team.points || 0} <em>pts</em></span></div>)}
             {!seasonOnlyTeams.length && <Empty text="Aucun classement écurie pour cette saison." />}
@@ -4945,6 +4948,11 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
         </Card>
         <RaceCountdown races={countdownRaces} events={calendarEvents} />
       </div>
+      {hasDevelopment && (
+        <Card title={`Développement — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="📈">
+          <DevelopmentChart teams={developmentTeams} entries={selectedDevelopmentEntries} />
+        </Card>
+      )}
       <MediaLinksCard thanksNames={thanksNames} thanksText={thanksText} />
     </div>
   );
