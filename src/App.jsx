@@ -7034,7 +7034,31 @@ function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style
 function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} · F2 {team.teamTitlesF2 || 0} · F3 {team.teamTitlesF3 || 0} · FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function DriverIdentity({ driver, teamColor, teamLogo, showRetired = true }) { const isRetiredVisible = showRetired && driver.retired; const imageSrc = driver.avatar || (isRetiredVisible ? "" : teamLogo); const borderColor = teamColor || driver.color || "#dc2626"; return <div className="urtt-identity" style={styles.identity}>{imageSrc ? <img src={imageSrc} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${borderColor}` }} /> : <div style={{ ...styles.fallbackLogo, background: isRetiredVisible ? "#18181b" : borderColor, border: `2px solid ${borderColor}`, fontSize: isRetiredVisible ? 20 : 12 }}>{isRetiredVisible ? RETIRED_DRIVER_MARK : (driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>{DRIVER_NUMBER_LABEL} {driver.number || "-"}{isRetiredVisible ? ` - ${RETIRED_LABEL}` : ""}</p></div></div>; }
 function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={{ ...styles.logoSmall, border: `2px solid ${team.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<div className="urtt-identity-text" style={styles.identityText}><strong className="urtt-team-name">{team.name || "Écurie"}</strong><p style={styles.mutedSmall}>Écurie</p></div></div>; }
-function TripleCrown({ crown }) { const safe = crown || { monaco: false, indy500: false, lemans: false }; return <div style={styles.crownBox}><span style={safe.monaco ? { ...styles.badgeGreen, background: "#7c3aed", color: "white" } : styles.badgeDark}>Titre F1</span><span style={safe.indy500 ? { ...styles.badgeGreen, background: "#ffff00", color: "#18181b" } : styles.badgeDark}>Indy 300</span><span style={safe.lemans ? { ...styles.badgeGreen, background: "#006ee6" } : styles.badgeDark}>2,4H du Mans</span></div>; }
+function TripleCrown({ crown }) {
+  const safe = crown || { monaco: false, indy500: false, lemans: false };
+  const stars = [
+    { key: "monaco", label: "Titre F1", color: "#8b5cf6", active: safe.monaco },
+    { key: "indy500", label: "Indy 300", color: "#ffff00", active: safe.indy500 },
+    { key: "lemans", label: "2,4H du Mans", color: "#006ee6", active: safe.lemans },
+  ];
+  return (
+    <div style={styles.crownStarBox}>
+      {stars.map((star) => (
+        <span
+          key={star.key}
+          title={star.label}
+          aria-label={star.label}
+          style={{
+            ...styles.crownStar,
+            ...(star.active ? { color: star.color, borderColor: star.color, boxShadow: `0 0 16px ${star.color}55` } : styles.crownStarInactive),
+          }}
+        >
+          ★
+        </span>
+      ))}
+    </div>
+  );
+}
 function MaintenancePage({ adminUser, onOpenAdmin }) {
   return <div style={styles.maintenancePage}><section style={styles.maintenanceCard}><div style={{ ...styles.logo, justifySelf: "center" }}>UR</div><p style={styles.kicker}>URTT DATABASE</p><h1 style={styles.maintenanceTitle}>Site en maintenance</h1><p style={styles.maintenanceText}>Une nouvelle version du site est en préparation. L'accès public est temporairement fermé.</p><button type="button" onClick={onOpenAdmin} style={styles.primaryButton}>{adminUser?.email ? "Ouvrir le panel admin" : "Accès admin"}</button><p style={styles.maintenanceHint}>Les admins peuvent continuer à accéder à la partie en développement depuis le panel.</p></section></div>;
 }
@@ -7477,6 +7501,9 @@ const styles = {
 },
   fallbackLogo: { width: 44, height: 44, borderRadius: 12, display: "grid", placeItems: "center", color: "white", fontWeight: 900, fontSize: 12, boxSizing: "border-box", lineHeight: 1 },
   crownBox: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" },
+  crownStarBox: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap", minWidth: 82 },
+  crownStar: { width: 26, height: 26, borderRadius: "50%", border: "1px solid currentColor", background: "rgba(255,255,255,.06)", display: "inline-grid", placeItems: "center", fontSize: 17, lineHeight: 1, fontWeight: 950 },
+  crownStarInactive: { color: "#71717a", borderColor: "#3f3f46", boxShadow: "none", opacity: .55 },
   badgeGreen: { background: "rgba(34,197,94,.15)", color: "#86efac", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
   badgeRed: { background: "rgba(239,68,68,.16)", color: "#fecaca", border: "1px solid rgba(248,113,113,.45)", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
   badgeDark: { background: "#3f3f46", color: "#d4d4d8", padding: "6px 10px", borderRadius: 999, fontSize: 12, fontWeight: 900, display: "inline-block", margin: 2 },
