@@ -1436,6 +1436,46 @@ export default function URTTAdminPanel() {
         background: #e2e8f0 !important;
         color: #334155 !important;
       }
+      .urtt-public-theme-light .urtt-development-bar-chart {
+        background: #f8fafc !important;
+        border-color: rgba(148,163,184,.65) !important;
+      }
+      .urtt-public-theme-light .urtt-development-bar-track {
+        background: #e2e8f0 !important;
+        border-color: rgba(100,116,139,.35) !important;
+      }
+      .urtt-public-theme-light .urtt-development-bar-fill span,
+      .urtt-public-theme-light .urtt-development-bar-fill strong {
+        color: #020617 !important;
+        text-shadow: 0 1px rgba(255,255,255,.45) !important;
+      }
+      .urtt-public-theme-light .urtt-development-card {
+        background: #ffffff !important;
+        border-color: rgba(148,163,184,.65) !important;
+        box-shadow: 0 18px 45px rgba(15,23,42,.12) !important;
+      }
+      .urtt-public-theme-light .urtt-development-card .urtt-identity-name,
+      .urtt-public-theme-light .urtt-development-card strong {
+        color: #0f172a !important;
+      }
+      .urtt-public-theme-light .urtt-development-card p,
+      .urtt-public-theme-light .urtt-development-card small,
+      .urtt-public-theme-light .urtt-development-card span {
+        color: #475569 !important;
+      }
+      .urtt-public-theme-light .urtt-development-round-badge {
+        color: #ffffff !important;
+      }
+      .urtt-public-theme-light .urtt-development-stat {
+        background: #f1f5f9 !important;
+        border-color: rgba(148,163,184,.65) !important;
+      }
+      .urtt-public-theme-light .urtt-development-stat-label {
+        color: #475569 !important;
+      }
+      .urtt-public-theme-light .urtt-development-stat-value {
+        color: #0f172a !important;
+      }
       .urtt-champion-banner {
         max-width: 1280px;
         margin: 0 auto 10px;
@@ -5289,14 +5329,14 @@ function DevelopmentBarChart({ rows = [] }) {
   if (!rows.length) return <Empty text="Aucune écurie inscrite pour cette saison/catégorie." />;
 
   return (
-    <div style={styles.developmentBarChart}>
+    <div className="urtt-development-bar-chart" style={styles.developmentBarChart}>
       {rows.map(({ team, entry }, index) => {
         const value = getDevelopmentCoef(entry);
         const width = `${Math.max(8, (value / maxValue) * 100)}%`;
         return (
-          <div key={team.id} style={styles.developmentBarRow}>
-            <div style={styles.developmentBarTrack}>
-              <div style={{ ...styles.developmentBarFill, width, background: team.color || "#dc2626" }}>
+          <div key={team.id} className="urtt-development-bar-row" style={styles.developmentBarRow}>
+            <div className="urtt-development-bar-track" style={styles.developmentBarTrack}>
+              <div className="urtt-development-bar-fill" style={{ ...styles.developmentBarFill, width, background: team.color || "#dc2626" }}>
                 <span style={styles.developmentBarRank}>#{index + 1}</span>
                 <span style={styles.developmentBarName}>{team.name}</span>
                 <strong style={styles.developmentBarValue}>{formatDevelopmentValue(value)}</strong>
@@ -5354,10 +5394,10 @@ function DevelopmentChart({ teams, entries = [] }) {
 
 function DevelopmentTeamCard({ team, entry, previous }) {
   return (
-    <div style={{ ...styles.developmentCard, borderTop: `4px solid ${team.color || "#dc2626"}` }}>
+    <div className="urtt-development-card" style={{ ...styles.developmentCard, borderTop: `4px solid ${team.color || "#dc2626"}` }}>
       <div style={styles.developmentCardHeader}>
         <TeamIdentity team={team} />
-        <span style={{ ...styles.badgeDark, background: team.color || "#3f3f46" }}>R{entry.round}</span>
+        <span className="urtt-development-round-badge" style={{ ...styles.badgeDark, background: team.color || "#3f3f46" }}>R{entry.round}</span>
       </div>
       <div style={styles.developmentStats}>
         <DevelopmentStat label="Speed" value={entry.speed} previous={previous?.speed} />
@@ -5372,10 +5412,10 @@ function DevelopmentTeamCard({ team, entry, previous }) {
 function DevelopmentStat({ label, value, previous }) {
   const delta = Number(value) - Number(previous || value);
   return (
-    <div style={styles.developmentStat}>
-      <span style={styles.developmentStatLabel}>{label}</span>
+    <div className="urtt-development-stat" style={styles.developmentStat}>
+      <span className="urtt-development-stat-label" style={styles.developmentStatLabel}>{label}</span>
       <span style={styles.developmentDeltaSlot}>{delta !== 0 && <span style={delta > 0 ? styles.devDeltaUp : styles.devDeltaDown}>{delta > 0 ? "▲" : "▼"} {Math.abs(delta)}</span>}</span>
-      <strong style={styles.developmentStatValue}>{value}</strong>
+      <strong className="urtt-development-stat-value" style={styles.developmentStatValue}>{value}</strong>
     </div>
   );
 }
