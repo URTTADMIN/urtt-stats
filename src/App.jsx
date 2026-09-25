@@ -4380,6 +4380,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
       navActive: "#132b46",
       spotlight: "linear-gradient(118deg,#10243d 0%,#123a61 47%,#075985 100%)",
     },
+    indy300: {
+      accent: "#ffff00",
+      accentSoft: "#fef08a",
+      accentText: "#facc15",
+      navActive: "#3b3514",
+      spotlight: "linear-gradient(118deg,#2f2a10 0%,#4a3f12 47%,#a16207 100%)",
+    },
   };
   const displayedPublicTheme = offSeasonLogos[activePublicPage] ? { ...publicCategoryTheme, ...offSeasonThemeOverrides[activePublicPage], logo: offSeasonLogos[activePublicPage] } : publicCategoryTheme;
   const categoryColor = displayedPublicTheme.accent;
