@@ -4255,7 +4255,7 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving, comp
   return (
     <div style={styles.accountBox}>
       {profile?.pseudo && !compact && <span style={styles.sessionBadge}>Joueur : <strong>{profile.pseudo}</strong>{profile.discordName ? ` · ${profile.discordName}` : ""}</span>}
-      <div style={styles.headerActions}>
+      <div style={compact ? styles.compactAccountActions : styles.headerActions}>
         <button type="button" onClick={() => setOpen(true)} style={triggerStyle || styles.secondaryButton}>{triggerLabel || (profile ? "Compte" : "Connexion")}</button>
         {profile && !compact && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
@@ -7207,6 +7207,7 @@ const styles = {
   navButtonActive: { background: "#dc2626", color: "white" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginBottom: 18, background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 20 },
   headerActions: { display: "flex", gap: 10, alignItems: "center" },
+  compactAccountActions: { display: "grid", width: "100%", gap: 0 },
   adminTopNavPanel: { background: "#18181b", border: "1px solid #27272a", borderRadius: 24, padding: 16, marginBottom: 24, display: "grid", gap: 14, position: "sticky", top: 0, zIndex: 18 },
   adminGroupRow: { display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between", flexWrap: "wrap" },
   adminGroupNav: { display: "flex", gap: 10, flexWrap: "wrap" },
