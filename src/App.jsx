@@ -22,7 +22,7 @@ const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
-const RETIRED_DRIVER_MARK = String.fromCodePoint(0x1f465);
+const RETIRED_DRIVER_LOGO = "/retired-driver.png";
 const ADMIN_PAGE_OPTIONS = [
   { id: "dashboard", icon: "🏠", label: "Dashboard" },
   { id: "supabase", icon: "🗄️", label: "Supabase" },
@@ -7193,7 +7193,7 @@ function RaceTable({ races, onDelete, onMoveRace, onUpdateStartAt, isSavingRace 
 }
 function DriverAdminCard({ driver, team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${driver.color}` }}><DriverIdentity driver={driver} /><p style={styles.mutedSmall}>Écurie : {team?.name || "—"}</p><div style={styles.actions}><button onClick={() => onEdit(driver)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(driver.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
 function TeamAdminCard({ team, onEdit, onDelete }) { return <div style={{ ...styles.teamCard, borderTop: `5px solid ${team.color}` }}><TeamIdentity team={team} /><p style={styles.mutedSmall}>Constructeur : F1 {team.teamTitlesF1 ?? team.teamTitles ?? 0} · F2 {team.teamTitlesF2 || 0} · F3 {team.teamTitlesF3 || 0} · FE {team.teamTitlesFE || 0}</p><div style={styles.actions}><button onClick={() => onEdit(team)} style={styles.editButton}>Modifier</button><button onClick={() => onDelete(team.id)} style={styles.dangerButton}>Supprimer</button></div></div>; }
-function DriverIdentity({ driver, teamColor, teamLogo, showRetired = true }) { const isRetiredVisible = showRetired && driver.retired; const imageSrc = driver.avatar || (isRetiredVisible ? "" : teamLogo); const borderColor = teamColor || driver.color || "#dc2626"; return <div className="urtt-identity" style={styles.identity}>{imageSrc ? <img src={imageSrc} alt={driver.name} style={{ ...styles.logoSmall, border: `2px solid ${borderColor}` }} /> : <div style={{ ...styles.fallbackLogo, background: isRetiredVisible ? "#18181b" : borderColor, border: `2px solid ${borderColor}`, fontSize: isRetiredVisible ? 20 : 12 }}>{isRetiredVisible ? RETIRED_DRIVER_MARK : (driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>{DRIVER_NUMBER_LABEL} {driver.number || "-"}{isRetiredVisible ? ` - ${RETIRED_LABEL}` : ""}</p></div></div>; }
+function DriverIdentity({ driver, teamColor, teamLogo, showRetired = true }) { const isRetiredVisible = showRetired && driver.retired; const imageSrc = driver.avatar || (isRetiredVisible ? RETIRED_DRIVER_LOGO : teamLogo); const borderColor = teamColor || driver.color || "#dc2626"; return <div className="urtt-identity" style={styles.identity}>{imageSrc ? <img src={imageSrc} alt={isRetiredVisible ? RETIRED_LABEL : driver.name} style={{ ...styles.logoSmall, ...(isRetiredVisible ? styles.retiredLogoSmall : {}), border: `2px solid ${borderColor}` }} /> : <div style={{ ...styles.fallbackLogo, background: borderColor, border: `2px solid ${borderColor}` }}>{(driver.name || "??").slice(0, 2).toUpperCase()}</div>}<div style={styles.identityText}><strong className="urtt-identity-name">{driver.name || "Pilote"}</strong><p style={styles.mutedSmall}>{DRIVER_NUMBER_LABEL} {driver.number || "-"}{isRetiredVisible ? ` - ${RETIRED_LABEL}` : ""}</p></div></div>; }
 function TeamIdentity({ team }) { return <div className="urtt-identity" style={styles.identity}>{team.logo ? <img src={team.logo} alt={team.name} style={{ ...styles.logoSmall, border: `2px solid ${team.color || "#dc2626"}` }} /> : <div style={{ ...styles.fallbackLogo, background: team.color || "#dc2626" }}>{(team.name || "??").slice(0, 2).toUpperCase()}</div>}<div className="urtt-identity-text" style={styles.identityText}><strong className="urtt-team-name">{team.name || "Écurie"}</strong><p style={styles.mutedSmall}>Écurie</p></div></div>; }
 function TripleCrown({ crown }) {
   const safe = crown || { monaco: false, indy500: false, lemans: false };
@@ -7708,6 +7708,7 @@ const styles = {
   background: "#111827",
   padding: 4,
 },
+  retiredLogoSmall: { background: "#050505", padding: 2 },
   fallbackLogo: { width: 44, height: 44, borderRadius: 12, display: "grid", placeItems: "center", color: "white", fontWeight: 900, fontSize: 12, boxSizing: "border-box", lineHeight: 1 },
   crownBox: { display: "flex", gap: 4, alignItems: "center", flexWrap: "wrap" },
   crownStarBox: { display: "flex", alignItems: "center", justifyContent: "center", gap: 6, flexWrap: "wrap", minWidth: 82 },
