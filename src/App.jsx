@@ -3149,6 +3149,41 @@ export default function URTTAdminPanel() {
     setPopup({ type: "success", title: "Ligne supprimee", message: "Le participant a ete retire du classement." });
   }
 
+  async function transferOffSeasonSeason({ eventType, fromSeasonId, toSeasonId }) {
+    if (!adminUser) {
+      setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier ce championnat." });
+      return false;
+    }
+
+    const normalizedFromSeasonId = normalizeSeasonId(fromSeasonId);
+    const normalizedToSeasonId = normalizeSeasonId(toSeasonId);
+    if (!eventType || normalizedFromSeasonId === normalizedToSeasonId) {
+      setPopup({ type: "error", title: "Transfert impossible", message: "Choisis deux saisons differentes." });
+      return false;
+    }
+
+    setIsSavingOffSeasonEntry(true);
+    const { data, error } = await supabase
+      .from("off_season_championship_entries")
+      .update({ season_id: normalizedToSeasonId })
+      .eq("event_type", eventType)
+      .eq("season_id", normalizedFromSeasonId)
+      .select();
+    setIsSavingOffSeasonEntry(false);
+
+    if (error) {
+      console.error("Erreur transfert championnat hors saison:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: `Impossible de transferer les lignes. ${formatSupabaseError(error)}` });
+      return false;
+    }
+
+    const movedEntries = (data || []).map(mapOffSeasonEntryFromDb);
+    const movedIds = new Set(movedEntries.map((entry) => String(entry.id)));
+    setOffSeasonEntries((current) => [...current.filter((entry) => !movedIds.has(String(entry.id))), ...movedEntries]);
+    setPopup({ type: "success", title: "Saison transferee", message: `${movedEntries.length} ligne(s) ${getSpecialEventName(eventType)} de ${seasonName(normalizedFromSeasonId)} vers ${seasonName(normalizedToSeasonId)}.` });
+    return true;
+  }
+
   async function saveDevelopmentEntry(rows = []) {
     if (!adminUser) {
       setPopup({ type: "error", title: "Acces refuse", message: "Connecte-toi avec un compte admin avant de modifier le developpement." });
@@ -4026,8 +4061,8 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
           {visibleAdminPage === "editions" && <SpecialEditionsAdmin editions={specialEditions} drivers={drivers} form={specialEditionForm} setForm={setSpecialEditionForm} editingId={editingSpecialEditionId} setEditingId={setEditingSpecialEditionId} onSave={saveSpecialEdition} onDelete={deleteSpecialEdition} isSaving={isSaving} />}
-          {visibleAdminPage === "offseason-lemans" && <OffSeasonChampionshipAdmin eventType="LEMANS24" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} isSaving={isSavingOffSeasonEntry} />}
-          {visibleAdminPage === "offseason-indy" && <OffSeasonChampionshipAdmin eventType="INDY300" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} isSaving={isSavingOffSeasonEntry} />}
+          {visibleAdminPage === "offseason-lemans" && <OffSeasonChampionshipAdmin eventType="LEMANS24" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} onTransferSeason={transferOffSeasonSeason} isSaving={isSavingOffSeasonEntry} />}
+          {visibleAdminPage === "offseason-indy" && <OffSeasonChampionshipAdmin eventType="INDY300" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} onTransferSeason={transferOffSeasonSeason} isSaving={isSavingOffSeasonEntry} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
@@ -5631,13 +5666,19 @@ function PositionDeltaBadge({ delta = 0 }) {
   return <span style={styles.positionDeltaEqual}>=</span>;
 }
 
-function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId, seasonOptions = [], onSave, onDelete, isSaving }) {
+function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId, seasonOptions = [], onSave, onDelete, onTransferSeason, isSaving }) {
   const event = getSpecialEvent(eventType);
   const [localSeasonId, setLocalSeasonId] = useState(selectedSeasonId);
   const [form, setForm] = useState({ ...emptyOffSeasonEntry, eventType, seasonId: selectedSeasonId });
+  const [transferTargetSeasonId, setTransferTargetSeasonId] = useState("");
   const [editingId, setEditingId] = useState(null);
+  const availableSeasonOptions = seasonOptions.length ? seasonOptions : getSeasonOptions();
+  const transferTargetDefault = availableSeasonOptions.find((season) => getSeasonNumber(season.id) === getSeasonNumber(localSeasonId) - 1)?.id || availableSeasonOptions.find((season) => season.id !== localSeasonId)?.id || localSeasonId;
   const rows = getOffSeasonRows(entries, eventType, localSeasonId, drivers, teams);
   const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  useEffect(() => {
+    setTransferTargetSeasonId((current) => current && current !== localSeasonId ? current : transferTargetDefault);
+  }, [localSeasonId, transferTargetDefault]);
   const resetForm = () => {
     setEditingId(null);
     setForm({ ...emptyOffSeasonEntry, eventType, seasonId: localSeasonId });
@@ -5650,12 +5691,30 @@ function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], tea
     const saved = await onSave?.({ ...form, eventType, seasonId: localSeasonId }, editingId);
     if (saved) resetForm();
   };
+  const transferSeason = async () => {
+    if (!rows.length || localSeasonId === transferTargetSeasonId) return;
+    if (!window.confirm(`Transferer ${rows.length} ligne(s) ${event.name} de ${seasonName(localSeasonId)} vers ${seasonName(transferTargetSeasonId)} ?`)) return;
+    const transferred = await onTransferSeason?.({ eventType, fromSeasonId: localSeasonId, toSeasonId: transferTargetSeasonId });
+    if (transferred) {
+      setLocalSeasonId(transferTargetSeasonId);
+      setForm((current) => ({ ...current, seasonId: transferTargetSeasonId }));
+      setEditingId(null);
+    }
+  };
 
   return (
     <div style={styles.twoColumnsSmallLeft}>
       <Card title={`${event.name} — participant`} icon="➕">
         <div style={styles.stack}>
-          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={localSeasonId} onChange={(changeEvent) => { setLocalSeasonId(changeEvent.target.value); setForm((current) => ({ ...current, seasonId: changeEvent.target.value })); setEditingId(null); }} style={styles.input}>{(seasonOptions.length ? seasonOptions : getSeasonOptions()).map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={localSeasonId} onChange={(changeEvent) => { setLocalSeasonId(changeEvent.target.value); setForm((current) => ({ ...current, seasonId: changeEvent.target.value })); setEditingId(null); }} style={styles.input}>{availableSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+          <div style={styles.quickResultBox}>
+            <strong>Transférer ce classement</strong>
+            <p style={styles.mutedSmall}>Déplace toutes les lignes {event.name} de la saison affichée vers une autre saison.</p>
+            <div style={styles.formGrid}>
+              <label style={styles.label}><span style={styles.labelText}>Vers</span><select value={transferTargetSeasonId} onChange={(changeEvent) => setTransferTargetSeasonId(changeEvent.target.value)} style={styles.input}>{availableSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
+              <button type="button" onClick={transferSeason} disabled={isSaving || !rows.length || localSeasonId === transferTargetSeasonId} style={styles.secondaryButton}>{isSaving ? "Transfert..." : `Transférer ${rows.length} ligne(s)`}</button>
+            </div>
+          </div>
           <DriverSelect label="Pilote" value={form.driverId} onChange={(value) => update("driverId", value)} drivers={drivers} />
           <TeamSelect label="Écurie" value={form.teamId} onChange={(value) => update("teamId", value)} teams={teams} />
           <div style={styles.formGrid}>
