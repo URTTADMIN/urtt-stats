@@ -14,8 +14,6 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
-const SITE_MAINTENANCE_ENABLED = true;
-const MAINTENANCE_PUBLIC_ACCESS_PSEUDOS = ["kolti"];
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
@@ -298,7 +296,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { maintenanceEnabled: SITE_MAINTENANCE_ENABLED, publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -544,10 +542,6 @@ function normalizeResultText(value) {
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
-}
-function canBypassMaintenanceWithPlayer(profile) {
-  const pseudo = normalizeResultText(profile?.pseudo);
-  return Boolean(profile?.id && MAINTENANCE_PUBLIC_ACCESS_PSEUDOS.some((allowedPseudo) => normalizeResultText(allowedPseudo) === pseudo));
 }
 function cleanQuickResultLine(value) {
   return String(value || "")
@@ -3955,16 +3949,11 @@ export default function URTTAdminPanel() {
   }
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
-  const canPlayerOpenMaintenanceSite = canBypassMaintenanceWithPlayer(playerProfile);
-  const showMaintenancePage = siteSettings.maintenanceEnabled !== false && !canPlayerOpenMaintenanceSite && !(isAdminPreview && Boolean(adminUser));
 
   return (
     <>
       {view === "front" && (
-        showMaintenancePage ? (
-          <MaintenancePage adminUser={adminUser} onOpenAdmin={openAdminAccess} onPlayerLogin={loginPlayerAccount} isSavingPlayerAccount={isSavingPlayerAccount} />
-        ) : (
-          <PublicSite
+        <PublicSite
           teams={teams}
           selectedCategoryId={selectedCategoryId}
           setSelectedCategoryId={setSelectedCategoryId}
@@ -4008,8 +3997,7 @@ export default function URTTAdminPanel() {
           isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
           onOpenAdmin={openAdminAccess}
-          />
-        )
+        />
       )}
       {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
       {view === "admin" && (
@@ -7172,15 +7160,6 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
           <Setting title="Données modifiables" description="Tu peux créer pilotes, écuries et GP." active />
         </div>
       </Card>
-      <Card title="Maintenance" icon="🚧">
-        <div style={styles.itemBox}>
-          <div>
-            <strong>Page maintenance {siteSettings.maintenanceEnabled !== false ? "active" : "désactivée"}</strong>
-            <p style={styles.mutedSmall}>Quand elle est active, le public voit la page maintenance. Les admins et le compte Kolti gardent l'accès.</p>
-          </div>
-          <label style={styles.checkboxPill}><input type="checkbox" checked={siteSettings.maintenanceEnabled !== false} onChange={(event) => onUpdateSetting("maintenanceEnabled", event.target.checked)} /> Maintenance active</label>
-        </div>
-      </Card>
       <Card title="Saisons" icon="📅">
         <div style={styles.itemBox}>
           <div>
@@ -7683,54 +7662,6 @@ function TripleCrown({ crown }) {
     </div>
   );
 }
-function MaintenancePage({ adminUser, onOpenAdmin, onPlayerLogin, isSavingPlayerAccount }) {
-  return (
-    <div style={styles.maintenancePage}>
-      <section style={styles.maintenanceCard}>
-        <div style={{ ...styles.logo, justifySelf: "center" }}>UR</div>
-        <p style={styles.kicker}>URTT DATABASE</p>
-        <h1 style={styles.maintenanceTitle}>Site en maintenance</h1>
-        <p style={styles.maintenanceText}>Une nouvelle version du site est en préparation. L'accès public est temporairement fermé.</p>
-        <div style={styles.maintenanceAccessGrid}>
-          <div style={styles.maintenanceAccessBox}>
-            <strong>Compte utilisateur</strong>
-            <p style={styles.maintenanceHint}>Accès temporaire réservé au compte Kolti, sans permission admin.</p>
-            <MaintenancePlayerLogin onLogin={onPlayerLogin} isSaving={isSavingPlayerAccount} />
-          </div>
-          <div style={styles.maintenanceAccessBox}>
-            <strong>Panel admin</strong>
-            <p style={styles.maintenanceHint}>Réservé aux comptes avec permissions admin.</p>
-            <button type="button" onClick={onOpenAdmin} style={styles.secondaryButton}>{adminUser?.email ? "Ouvrir le panel admin" : "Accès admin"}</button>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-}
-function MaintenancePlayerLogin({ onLogin, isSaving }) {
-  const [form, setForm] = useState({ pseudo: "Kolti", accessCode: "" });
-  const [status, setStatus] = useState("");
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const submit = async (event) => {
-    event.preventDefault();
-    setStatus("");
-    if (normalizeResultText(form.pseudo) !== "kolti") {
-      setStatus("Seul le compte Kolti peut accéder au site pendant la maintenance.");
-      return;
-    }
-    const response = await onLogin?.(form);
-    setStatus(response?.message || "");
-  };
-
-  return (
-    <form onSubmit={submit} style={styles.maintenanceLoginForm}>
-      <input value={form.pseudo} onChange={(event) => update("pseudo", event.target.value)} placeholder="Pseudo" style={styles.input} />
-      <input type="password" value={form.accessCode} onChange={(event) => update("accessCode", event.target.value)} placeholder="Code secret" style={styles.input} />
-      {status && <p style={styles.maintenanceHint}>{status}</p>}
-      <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Connexion..." : "Entrer avec Kolti"}</button>
-    </form>
-  );
-}
 function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes à créer dans Supabase Auth.</p></form></div>; }
 function TitlesPanel({
   drivers,
@@ -8059,14 +7990,6 @@ const styles = {
   adminSubNavButtonActive: { background: "rgba(239,68,68,.16)", borderColor: "#ef4444", color: "white" },
   kicker: { color: "#f87171", letterSpacing: 4, fontSize: 12, fontWeight: 900, margin: 0 },
   title: { margin: "8px 0 0", fontSize: 38, lineHeight: 1.05 },
-  maintenancePage: { minHeight: "100vh", background: "radial-gradient(circle at top, #2b0909, #09090b 48%)", color: "#f4f4f5", display: "grid", placeItems: "center", fontFamily: "Inter, system-ui, Arial", padding: 24 },
-  maintenanceCard: { width: "100%", maxWidth: 560, background: "rgba(24,24,27,.95)", border: "1px solid #27272a", borderRadius: 28, padding: 32, display: "grid", gap: 16, textAlign: "center", boxShadow: "0 24px 80px rgba(0,0,0,.45)" },
-  maintenanceTitle: { margin: 0, fontSize: 44, lineHeight: 1, fontWeight: 950 },
-  maintenanceText: { margin: 0, color: "#d4d4d8", fontSize: 17, lineHeight: 1.5 },
-  maintenanceHint: { color: "#a1a1aa", margin: 0, fontSize: 13, lineHeight: 1.45 },
-  maintenanceAccessGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14, textAlign: "left" },
-  maintenanceAccessBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 12 },
-  maintenanceLoginForm: { display: "grid", gap: 10 },
   loginPage: { minHeight: "100vh", background: "#09090b", color: "#f4f4f5", display: "grid", placeItems: "center", fontFamily: "Inter, system-ui, Arial", padding: 24 },
   loginCard: { width: "100%", maxWidth: 420, background: "#18181b", border: "1px solid #27272a", borderRadius: 28, padding: 28, display: "grid", gap: 14 },
   loginTitle: { margin: 0, fontSize: 32 },
