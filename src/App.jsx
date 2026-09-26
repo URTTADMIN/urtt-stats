@@ -582,6 +582,25 @@ function getDriverSpecialEditionRows(driver, editions = []) {
     .filter((edition) => edition.roles.length)
     .sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
 }
+function getDriverOffSeasonRows(driver, entries = [], teams = []) {
+  return entries
+    .filter((entry) => idsEqual(entry.driverId, driver.id))
+    .map((entry) => {
+      const racePosition = Number(entry.racePosition) || 0;
+      const qualifyingPosition = Number(entry.qualifyingPosition) || 0;
+      const team = teams.find((item) => idsEqual(item.id, entry.teamId));
+      return {
+        ...entry,
+        team,
+        points: getOffSeasonPoints(racePosition),
+        delta: getOffSeasonPositionDelta(entry),
+        resultLabel: racePosition === 1 ? "Vainqueur" : racePosition ? `P${racePosition}` : "À venir",
+        qualifyingLabel: qualifyingPosition ? `P${qualifyingPosition}` : "—",
+        raceLabel: racePosition ? `P${racePosition}` : "—",
+      };
+    })
+    .sort((a, b) => a.eventType.localeCompare(b.eventType) || getSeasonNumber(a.seasonId) - getSeasonNumber(b.seasonId));
+}
 function mapTeamFromDb(team) {
   return {
     id: team.id,
@@ -4599,7 +4618,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
-        {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
+        {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
         {activePublicPage === "seasons" && <><Card title={`Calendrier complet — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceLibrary={raceLibrary} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
@@ -7316,9 +7335,9 @@ function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
   return <div style={styles.detailOverlay} onClick={onClose}><div style={styles.detailModal} onClick={(event) => event.stopPropagation()}><div style={styles.gpDetailPanel}><div style={styles.gpDetailHeader}><div><p style={styles.kicker}>FICHE GRAND PRIX</p><h2 style={styles.gpDetailTitle}>{gp.name}</h2></div><button onClick={onClose} style={styles.secondaryButton}>Fermer</button></div><div style={styles.statsGrid}><Stat label="Présences au calendrier" value={gpRaces.length} /><Stat label="Résultats validés" value={gpResults.filter((item) => item.result).length} /><Stat label="Dernier vainqueur" value={driverName(drivers, [...gpResults].reverse().find((item) => item.winner)?.winner?.driverId)} /><Stat label="Dernier poleman" value={driverName(drivers, [...gpResults].reverse().find((item) => item.poleman)?.poleman?.driverId)} /></div><div style={styles.twoColumns}><Card title="Vainqueurs" icon="🏆"><MiniCountList counts={winnerCounts} empty="Aucun vainqueur enregistré." /></Card><Card title="Polemen" icon="⚡"><MiniCountList counts={poleCounts} empty="Aucun poleman enregistré." /></Card></div><Card title="Historique du GP" icon="📜"><div style={styles.stack}>{gpResults.map((item) => <div key={item.race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>{seasonName(item.race.seasonId)} · Course #{item.race.round}</p><h3 style={styles.raceTitle}>{item.race.name}</h3></div><span style={item.result ? styles.badgeGreen : styles.badgeDark}>{item.result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, item.winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, item.poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, item.fastest?.driverId)} /><RaceStat label="Podium" value={item.podium.length ? item.podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>)}{gpResults.length === 0 && <Empty text="Aucun historique pour ce GP." />}</div></Card></div></div></div>;
 }
 
-function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, specialEditions = [], allDrivers, allRaces = [], onClose }) {
+function DriverDetails({ driver, raceResults, teams, selectedCategoryId, seasonTitles, offSeasonEntries = [], allDrivers, allRaces = [], onClose }) {
   const rows = getDriverSeasonBreakdown(driver, raceResults, teams, selectedCategoryId, seasonTitles, allDrivers, allRaces);
-  const specialRows = getDriverSpecialEditionRows(driver, specialEditions);
+  const specialRows = getDriverOffSeasonRows(driver, offSeasonEntries, teams);
   const isEtienneF2 = normalizeCategoryId(selectedCategoryId) === "F2" && normalizeResultText(driver.name) === "etienne";
   const isNoahLegend = normalizeResultText(driver.name) === "noah";
   return (
@@ -7343,7 +7362,10 @@ function EtiennePapyAnimation() {
 }
 
 function SpecialEditionDriverTable({ rows }) {
-  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Événement</th><th style={styles.th}>Édition</th><th style={styles.th}>Date</th><th style={styles.th}>Résultat</th></tr></thead><tbody>{rows.map((row) => <tr key={`${row.eventType}-${row.id}`} style={styles.tr}><td style={styles.td}><span style={{ ...styles.categoryBadge, background: SPECIAL_EVENT_OPTIONS.find((event) => event.id === row.eventType)?.color || "#7c3aed", color: row.eventType === "INDY300" ? "#18181b" : "white" }}>{getSpecialEventName(row.eventType)}</span></td><td style={styles.td}>{row.editionLabel}{row.name ? ` · ${row.name}` : ""}</td><td style={styles.td}>{row.date ? new Date(row.date).toLocaleDateString("fr-FR") : "—"}</td><td style={styles.td}><div style={styles.titleBadgeRow}>{row.roles.map((role) => <span key={role} style={styles.titleBadge}>🏆 {role}</span>)}</div></td></tr>)}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée sur ces éditions." />}</div>;
+  return <div style={styles.tableWrap}><table style={styles.table}><thead><tr style={styles.tableHead}><th style={styles.th}>Événement</th><th style={styles.th}>Saison</th><th style={styles.th}>Écurie</th><th style={styles.th}>Qualif</th><th style={styles.th}>Course</th><th style={styles.th}>Gain/Perte</th><th style={styles.th}>Résultat</th><th style={styles.th}>Points</th></tr></thead><tbody>{rows.map((row) => {
+    const event = SPECIAL_EVENT_OPTIONS.find((item) => item.id === row.eventType);
+    return <tr key={`${row.eventType}-${row.id}`} style={styles.tr}><td style={styles.td}><span style={{ ...styles.categoryBadge, background: event?.color || "#7c3aed", color: row.eventType === "INDY300" ? "#18181b" : "white" }}>{getSpecialEventName(row.eventType)}</span></td><td style={styles.td}>{seasonName(row.seasonId)}</td><td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td><td style={styles.td}>{row.qualifyingLabel}</td><td style={styles.td}>{row.raceLabel}</td><td style={styles.td}><PositionDeltaBadge delta={row.delta} /></td><td style={styles.td}><div style={styles.titleBadgeRow}><span style={styles.titleBadge}>🏆 {row.resultLabel}</span></div></td><td style={styles.td}><span style={styles.points}>{row.points}</span></td></tr>;
+  })}</tbody></table>{rows.length === 0 && <Empty text="Aucune participation enregistrée sur ces éditions." />}</div>;
 }
 
 function TeamDetails({ team, drivers, raceResults, onClose }) {
