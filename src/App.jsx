@@ -4593,7 +4593,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
-        {activePublicPage === "seasons" && <><Card title={`Calendrier complet — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {activePublicPage === "seasons" && <><Card title={`Calendrier complet — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceLibrary={raceLibrary} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "lemans24" && <OffSeasonChampionshipPage eventType="LEMANS24" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
         {activePublicPage === "indy300" && <OffSeasonChampionshipPage eventType="INDY300" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
@@ -7233,11 +7233,51 @@ function TeamRaceCell({ teamId, race, raceResults, drivers, compact = false }) {
   return <div style={styles.raceResultCell}><strong>{points} pts</strong><span style={styles.mutedSmall}>Meilleur P{bestPosition}</span>{badges.length > 0 && <span style={styles.raceBadges}>{badges.join(" · ")}</span>}</div>;
 }
 
-function PublicSeasonResults({ races, raceResults, drivers, selectedSeasonId, selectedCategoryId, onOpenGp }) {
+function PublicSeasonResults({ races, raceLibrary = [], raceResults, drivers, selectedSeasonId, selectedCategoryId, onOpenGp }) {
   const categoryId = normalizeCategoryId(selectedCategoryId || races[0]?.categoryId || "F1");
   const seasonId = normalizeSeasonId(selectedSeasonId);
   const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === seasonId && normalizeCategoryId(result.categoryId) === categoryId);
-  return <div style={styles.stack}>{races.map((race) => { const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id)); const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : []; const winner = sortedEntries.find((entry) => Number(entry.position) === 1); const poleman = sortedEntries.find((entry) => entry.pole); const fastest = sortedEntries.find((entry) => entry.fastestLap); const podium = sortedEntries.slice(0, 3); return <div key={race.id} style={styles.publicRaceCard}><div style={styles.publicRaceHeader}><div><p style={styles.mutedSmall}>Course #{race.round}</p><button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button></div><span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "Résultat validé" : "À venir"}</span></div><div style={styles.raceStatsGrid}><RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} /><RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} /><RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} /><RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} /></div></div>; })}{races.length === 0 && <Empty text="Aucun GP dans cette saison." />}</div>;
+  return (
+    <div style={styles.stack}>
+      {races.map((race) => {
+        const result = seasonResults.find((entry) => String(entry.raceId) === String(race.id));
+        const sortedEntries = result ? [...result.entries].sort((a, b) => Number(a.position) - Number(b.position)) : [];
+        const winner = sortedEntries.find((entry) => Number(entry.position) === 1);
+        const poleman = sortedEntries.find((entry) => entry.pole);
+        const fastest = sortedEntries.find((entry) => entry.fastestLap);
+        const podium = sortedEntries.slice(0, 3);
+        const country = getCanonicalCountry(getRaceCountry(race, raceLibrary));
+        const countryFlagCode = getCountryFlagCode(country);
+        const raceCardStyle = countryFlagCode
+          ? {
+              ...styles.publicRaceCard,
+              backgroundImage: `linear-gradient(90deg, rgba(39,39,42,.94), rgba(39,39,42,.88)), url(https://flagcdn.com/w320/${countryFlagCode}.png)`,
+              backgroundRepeat: "no-repeat",
+              backgroundPosition: "right center",
+              backgroundSize: "min(42%, 260px) auto",
+            }
+          : styles.publicRaceCard;
+        return (
+          <div key={race.id} style={raceCardStyle}>
+            <div style={styles.publicRaceHeader}>
+              <div>
+                <p style={styles.mutedSmall}>Course #{race.round}</p>
+                <button onClick={() => onOpenGp(race)} style={styles.raceTitleButton}>{race.name}</button>
+              </div>
+              <span style={result ? styles.badgeGreen : styles.badgeDark}>{result ? "Résultat validé" : "À venir"}</span>
+            </div>
+            <div style={styles.raceStatsGrid}>
+              <RaceStat label="Vainqueur" value={driverName(drivers, winner?.driverId)} />
+              <RaceStat label="Poleman" value={driverName(drivers, poleman?.driverId)} />
+              <RaceStat label="Meilleur tour" value={driverName(drivers, fastest?.driverId)} />
+              <RaceStat label="Podium" value={podium.length ? podium.map((entry) => driverName(drivers, entry.driverId)).join(" · ") : "—"} />
+            </div>
+          </div>
+        );
+      })}
+      {races.length === 0 && <Empty text="Aucun GP dans cette saison." />}
+    </div>
+  );
 }
 
 function GpDetails({ gp, allRaces, raceResults, drivers, onClose }) {
