@@ -298,7 +298,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
+const defaultSiteSettings = { maintenanceEnabled: SITE_MAINTENANCE_ENABLED, publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -3897,7 +3897,7 @@ export default function URTTAdminPanel() {
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
   const canPlayerOpenMaintenanceSite = canBypassMaintenanceWithPlayer(playerProfile);
-  const showMaintenancePage = SITE_MAINTENANCE_ENABLED && !canPlayerOpenMaintenanceSite && !(isAdminPreview && Boolean(adminUser));
+  const showMaintenancePage = siteSettings.maintenanceEnabled !== false && !canPlayerOpenMaintenanceSite && !(isAdminPreview && Boolean(adminUser));
 
   return (
     <>
@@ -7076,6 +7076,15 @@ function SettingsPanel({ seasons = [], siteSettings = defaultSiteSettings, onUpd
           <Setting title="Accès privé" description="Le panel admin est protégé par mot de passe." active />
           <Setting title="Stats automatiques" description="Les stats sont recalculées depuis les résultats." active />
           <Setting title="Données modifiables" description="Tu peux créer pilotes, écuries et GP." active />
+        </div>
+      </Card>
+      <Card title="Maintenance" icon="🚧">
+        <div style={styles.itemBox}>
+          <div>
+            <strong>Page maintenance {siteSettings.maintenanceEnabled !== false ? "active" : "désactivée"}</strong>
+            <p style={styles.mutedSmall}>Quand elle est active, le public voit la page maintenance. Les admins et le compte Kolti gardent l'accès.</p>
+          </div>
+          <label style={styles.checkboxPill}><input type="checkbox" checked={siteSettings.maintenanceEnabled !== false} onChange={(event) => onUpdateSetting("maintenanceEnabled", event.target.checked)} /> Maintenance active</label>
         </div>
       </Card>
       <Card title="Saisons" icon="📅">
