@@ -63,7 +63,7 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "standings", label: "Classements" },
   { id: "drivers", label: "Stats pilotes" },
   { id: "teams", label: "Stats écuries" },
-  { id: "seasons", label: "Saison" },
+  { id: "seasons", label: "Calendrier" },
   { id: "editions", label: "Hors Saison" },
   { id: "lemans24", label: "2,4h du Mans" },
   { id: "indy300", label: "Indy 300" },
@@ -74,7 +74,7 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
-  { id: "championship", label: "Championnat", pages: ["standings", "drivers", "teams", "development"] },
+  { id: "championship", label: "Championnat", pages: ["standings", "seasons", "drivers", "teams", "development"] },
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
@@ -4593,7 +4593,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
-        {activePublicPage === "seasons" && <><Card title={`Résultats — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
+        {activePublicPage === "seasons" && <><Card title={`Calendrier complet — ${seasonName(selectedSeasonId)}`} icon="🏁"><PublicSeasonResults races={races} raceResults={raceResults} drivers={allDrivers} selectedSeasonId={selectedSeasonId} onOpenGp={setSelectedGp} /></Card>{selectedGp && <GpDetails gp={selectedGp} allRaces={allRaces} raceResults={raceResults} drivers={allDrivers} onClose={() => setSelectedGp(null)} />}</>}
         {activePublicPage === "editions" && <SpecialEditionsPage editions={specialEditions} drivers={allDrivers} />}
         {activePublicPage === "lemans24" && <OffSeasonChampionshipPage eventType="LEMANS24" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
         {activePublicPage === "indy300" && <OffSeasonChampionshipPage eventType="INDY300" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
