@@ -527,6 +527,11 @@ function getOffSeasonRows(entries = [], eventType, seasonId, drivers = [], teams
     })
     .sort((a, b) => b.points - a.points || Number(a.racePosition || 999) - Number(b.racePosition || 999) || Number(a.qualifyingPosition || 999) - Number(b.qualifyingPosition || 999));
 }
+function getOffSeasonPositionDelta(row) {
+  const qualifyingPosition = Number(row?.qualifyingPosition) || 0;
+  const racePosition = Number(row?.racePosition) || 0;
+  return qualifyingPosition && racePosition ? qualifyingPosition - racePosition : 0;
+}
 function seasonName(id) {
   return getSeasonOptions().find((season) => season.id === normalizeSeasonId(id))?.name || id;
 }
@@ -5576,24 +5581,35 @@ function OffSeasonStandingsTable({ rows = [], eventColor = "#7c3aed" }) {
             <th style={styles.th}>Écurie</th>
             <th style={styles.th}>Qualif</th>
             <th style={styles.th}>Course</th>
+            <th style={styles.th}>Gain/Perte</th>
             <th style={styles.th}>Points</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((row, index) => (
-            <tr key={row.id || `${row.driverId}-${row.eventType}`} style={styles.tr}>
-              <td style={styles.td}><strong>#{index + 1}</strong></td>
-              <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} showRetired={false} /> : "—"}</td>
-              <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
-              <td style={styles.td}><span style={{ ...styles.badgeDark, background: eventColor, color: eventColor === "#ffff00" ? "#18181b" : "white" }}>P{row.qualifyingPosition || "—"}</span></td>
-              <td style={styles.td}>P{row.racePosition || "—"}</td>
-              <td style={styles.td}><span style={styles.points}>{row.points}</span></td>
-            </tr>
-          ))}
+          {rows.map((row, index) => {
+            const delta = getOffSeasonPositionDelta(row);
+            return (
+              <tr key={row.id || `${row.driverId}-${row.eventType}`} style={styles.tr}>
+                <td style={styles.td}><strong>#{index + 1}</strong></td>
+                <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} showRetired={false} /> : "—"}</td>
+                <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
+                <td style={styles.td}><span style={{ ...styles.badgeDark, background: eventColor, color: eventColor === "#ffff00" ? "#18181b" : "white" }}>P{row.qualifyingPosition || "—"}</span></td>
+                <td style={styles.td}>P{row.racePosition || "—"}</td>
+                <td style={styles.td}><PositionDeltaBadge delta={delta} /></td>
+                <td style={styles.td}><span style={styles.points}>{row.points}</span></td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>
   );
+}
+
+function PositionDeltaBadge({ delta = 0 }) {
+  if (delta > 0) return <span style={styles.positionDeltaUp}>↑ {delta}</span>;
+  if (delta < 0) return <span style={styles.positionDeltaDown}>↓ {Math.abs(delta)}</span>;
+  return <span style={styles.positionDeltaEqual}>=</span>;
 }
 
 function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId, seasonOptions = [], onSave, onDelete, isSaving }) {
@@ -8087,6 +8103,9 @@ const styles = {
   titleBadgeRow: { display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" },
   titleBadge: { background: "rgba(168,85,247,.16)", color: "#c084fc", border: "1px solid rgba(168,85,247,.45)", padding: "6px 9px", borderRadius: 999, fontSize: 12, fontWeight: 950, whiteSpace: "nowrap" },
   teamShareBadge: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 48, background: "rgba(168,85,247,.16)", border: "1px solid rgba(216,180,254,.36)", color: "#f5d0fe", borderRadius: 999, padding: "5px 8px", fontWeight: 950, fontSize: 12 },
+  positionDeltaUp: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 54, background: "rgba(34,197,94,.16)", border: "1px solid rgba(134,239,172,.45)", color: "#86efac", borderRadius: 999, padding: "6px 10px", fontWeight: 950, fontSize: 13 },
+  positionDeltaDown: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 54, background: "rgba(239,68,68,.16)", border: "1px solid rgba(248,113,113,.45)", color: "#fecaca", borderRadius: 999, padding: "6px 10px", fontWeight: 950, fontSize: 13 },
+  positionDeltaEqual: { display: "inline-flex", alignItems: "center", justifyContent: "center", minWidth: 54, background: "rgba(161,161,170,.14)", border: "1px solid rgba(212,212,216,.24)", color: "#d4d4d8", borderRadius: 999, padding: "6px 10px", fontWeight: 950, fontSize: 13 },
   seasonSelect: { background: "#18181b", border: "1px solid #27272a", color: "white", padding: "12px 16px", borderRadius: 999, fontWeight: 900, outline: "none", cursor: "pointer" },
   categorySelect: { background: "#18181b", border: "1px solid #27272a", color: "white", padding: "12px 16px", borderRadius: 999, fontWeight: 900, outline: "none", cursor: "pointer" },
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
