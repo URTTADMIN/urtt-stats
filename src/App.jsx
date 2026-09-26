@@ -504,7 +504,7 @@ function getPublicCategoryTheme(categoryId) {
     accentSoft: "#f0abfc",
     accentText: "#d954f4",
     navActive: "#29203a",
-    spotlight: "linear-gradient(118deg,#263153 0%,#202b4a 47%,#452266 100%)",
+    spotlight: "linear-gradient(118deg,#2f1748 0%,#4a1768 47%,#7e22ce 100%)",
   };
 }
 function getSpecialEventName(eventType) {
