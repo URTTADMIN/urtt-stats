@@ -4302,35 +4302,35 @@ const COUNTRY_FRENCH_NAMES = {
   "United States of America": "Etats-Unis",
 };
 
-const COUNTRY_FLAGS = {
-  Australia: "🇦🇺",
-  Austria: "🇦🇹",
-  Azerbaijan: "🇦🇿",
-  Bahrain: "🇧🇭",
-  Belgium: "🇧🇪",
-  Brazil: "🇧🇷",
-  Canada: "🇨🇦",
-  China: "🇨🇳",
-  Denmark: "🇩🇰",
-  France: "🇫🇷",
-  Germany: "🇩🇪",
-  Hungary: "🇭🇺",
-  Italy: "🇮🇹",
-  Japan: "🇯🇵",
-  Mexico: "🇲🇽",
-  Monaco: "🇲🇨",
-  Netherlands: "🇳🇱",
-  Portugal: "🇵🇹",
-  Qatar: "🇶🇦",
-  "Saudi Arabia": "🇸🇦",
-  Singapore: "🇸🇬",
-  "South Africa": "🇿🇦",
-  "South Korea": "🇰🇷",
-  Spain: "🇪🇸",
-  Turkey: "🇹🇷",
-  "United Arab Emirates": "🇦🇪",
-  "United Kingdom": "🇬🇧",
-  "United States of America": "🇺🇸",
+const COUNTRY_FLAG_CODES = {
+  Australia: "au",
+  Austria: "at",
+  Azerbaijan: "az",
+  Bahrain: "bh",
+  Belgium: "be",
+  Brazil: "br",
+  Canada: "ca",
+  China: "cn",
+  Denmark: "dk",
+  France: "fr",
+  Germany: "de",
+  Hungary: "hu",
+  Italy: "it",
+  Japan: "jp",
+  Mexico: "mx",
+  Monaco: "mc",
+  Netherlands: "nl",
+  Portugal: "pt",
+  Qatar: "qa",
+  "Saudi Arabia": "sa",
+  Singapore: "sg",
+  "South Africa": "za",
+  "South Korea": "kr",
+  Spain: "es",
+  Turkey: "tr",
+  "United Arab Emirates": "ae",
+  "United Kingdom": "gb",
+  "United States of America": "us",
 };
 
 function getCountryKey(country) {
@@ -4347,9 +4347,9 @@ function getCountryDisplayName(country) {
   return COUNTRY_FRENCH_NAMES[country] || country;
 }
 
-function getCountryFlag(country) {
+function getCountryFlagCode(country) {
   const canonicalCountry = getCanonicalCountry(country);
-  return COUNTRY_FLAGS[canonicalCountry] || "";
+  return COUNTRY_FLAG_CODES[canonicalCountry] || "";
 }
 
 function getRaceCountry(race, raceLibrary) {
@@ -4976,8 +4976,8 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
           <div style={styles.publicPreviewRows}>
             {previewRaces.map((race) => {
               const country = getCanonicalCountry(getRaceCountry(race, raceLibrary));
-              const countryFlag = getCountryFlag(country);
-              return <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{countryFlag || String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{country ? getCountryDisplayName(country) : race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>;
+              const countryFlagCode = getCountryFlagCode(country);
+              return <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{countryFlagCode ? <img src={`https://flagcdn.com/w40/${countryFlagCode}.png`} alt={getCountryDisplayName(country)} style={styles.publicPreviewFlag} /> : String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{country ? getCountryDisplayName(country) : race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>;
             })}
             {!previewRaces.length && <Empty text="Aucune course dans cette saison." />}
           </div>
@@ -7861,6 +7861,7 @@ const styles = {
   publicPreviewInitials: { height: 30, width: 30, borderRadius: 7, background: "#293046", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 900, color: "#eef1f7" },
   publicPreviewLogo: { height: 32, width: 32, borderRadius: 8, objectFit: "contain", background: "rgba(255,255,255,.08)", border: "2px solid #293046", padding: 2 },
   publicPreviewRound: { height: 38, width: 38, background: "#222a39", color: "#c5cedf", borderRadius: 9, display: "grid", placeItems: "center", fontSize: 12, fontWeight: 900 },
+  publicPreviewFlag: { width: 28, height: 20, borderRadius: 4, objectFit: "cover", boxShadow: "0 0 0 1px rgba(255,255,255,.18)" },
   publicPreviewIdentity: { minWidth: 0, display: "grid", gap: 3 },
   publicPreviewPoints: { fontSize: 14, fontWeight: 950, color: "#eef1f7" },
   publicPreviewMeta: { marginLeft: "auto", textAlign: "right", display: "grid", gap: 3, color: "var(--urtt-accent-text, #d99af5)", fontSize: 11, fontWeight: 900 },
