@@ -4245,6 +4245,8 @@ const COUNTRY_ALIASES = {
   bresil: "Brazil",
   canada: "Canada",
   chine: "China",
+  coreedusud: "South Korea",
+  koreedusud: "South Korea",
   danemark: "Denmark",
   denmark: "Denmark",
   emiratsarabesunis: "United Arab Emirates",
@@ -4292,11 +4294,43 @@ const COUNTRY_FRENCH_NAMES = {
   "Saudi Arabia": "Arabie saoudite",
   Singapore: "Singapour",
   "South Africa": "Afrique du Sud",
+  "South Korea": "Corée du Sud",
   Spain: "Espagne",
   Turkey: "Turquie",
   "United Arab Emirates": "Emirats arabes unis",
   "United Kingdom": "Royaume-Uni",
   "United States of America": "Etats-Unis",
+};
+
+const COUNTRY_FLAGS = {
+  Australia: "🇦🇺",
+  Austria: "🇦🇹",
+  Azerbaijan: "🇦🇿",
+  Bahrain: "🇧🇭",
+  Belgium: "🇧🇪",
+  Brazil: "🇧🇷",
+  Canada: "🇨🇦",
+  China: "🇨🇳",
+  Denmark: "🇩🇰",
+  France: "🇫🇷",
+  Germany: "🇩🇪",
+  Hungary: "🇭🇺",
+  Italy: "🇮🇹",
+  Japan: "🇯🇵",
+  Mexico: "🇲🇽",
+  Monaco: "🇲🇨",
+  Netherlands: "🇳🇱",
+  Portugal: "🇵🇹",
+  Qatar: "🇶🇦",
+  "Saudi Arabia": "🇸🇦",
+  Singapore: "🇸🇬",
+  "South Africa": "🇿🇦",
+  "South Korea": "🇰🇷",
+  Spain: "🇪🇸",
+  Turkey: "🇹🇷",
+  "United Arab Emirates": "🇦🇪",
+  "United Kingdom": "🇬🇧",
+  "United States of America": "🇺🇸",
 };
 
 function getCountryKey(country) {
@@ -4311,6 +4345,11 @@ function getCanonicalCountry(country) {
 
 function getCountryDisplayName(country) {
   return COUNTRY_FRENCH_NAMES[country] || country;
+}
+
+function getCountryFlag(country) {
+  const canonicalCountry = getCanonicalCountry(country);
+  return COUNTRY_FLAGS[canonicalCountry] || "";
 }
 
 function getRaceCountry(race, raceLibrary) {
@@ -4544,7 +4583,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
-        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
+        {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} specialEditions={specialEditions} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
         {activePublicPage === "teams" && <><Card title={`Stats écuries cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="🏎️"><TeamTable teams={cumulativeTeams} detailed showExtendedStats selectedCategoryId={selectedCategoryId} onTeamClick={(team) => setSelectedTeam(teams.find((item) => item.id === team.id) || team)} /></Card>{selectedTeam && <TeamDetails team={selectedTeam} drivers={allDrivers} raceResults={raceResults} onClose={() => setSelectedTeam(null)} />}</>}
@@ -4899,7 +4938,7 @@ function PreviewLogo({ name, image, color = "#293046" }) {
   return image ? <img src={image} alt={name} style={{ ...styles.publicPreviewLogo, borderColor: color }} /> : <span style={{ ...styles.publicPreviewInitials, background: color }}>{getInitials(name)}</span>;
 }
 
-function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId), leaderDriver, leaderTeam, races = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], drivers = [], developmentEntries = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
+function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, selectedCategoryId, publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId), leaderDriver, leaderTeam, races = [], raceLibrary = [], seasonOnlyDrivers = [], seasonOnlyTeams = [], teams = [], drivers = [], developmentEntries = [], onNavigate, thanksNames = defaultSiteSettings.thanksNames, thanksText = "" }) {
   const previewDrivers = seasonOnlyDrivers.slice(0, 5);
   const previewRaces = races.slice(0, 5);
   const hasDevelopment = isDevelopmentCategory(selectedCategoryId);
@@ -4935,7 +4974,11 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
         </Card>
         <Card title="Courses de la saison" icon="🏁">
           <div style={styles.publicPreviewRows}>
-            {previewRaces.map((race) => <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{race.country || race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>)}
+            {previewRaces.map((race) => {
+              const country = getCanonicalCountry(getRaceCountry(race, raceLibrary));
+              const countryFlag = getCountryFlag(country);
+              return <div key={race.id} className="urtt-public-preview-row" style={styles.publicPreviewRace}><span style={styles.publicPreviewRound}>{countryFlag || String(race.round || "").padStart(2, "0")}</span><div style={styles.publicPreviewIdentity}><strong>{race.name}</strong><small>{country ? getCountryDisplayName(country) : race.track || "Circuit à définir"}</small></div><div className="urtt-public-preview-meta" style={styles.publicPreviewMeta}><span>URTT</span><small>{formatRaceDate(race.startAt)}</small></div></div>;
+            })}
             {!previewRaces.length && <Empty text="Aucune course dans cette saison." />}
           </div>
           <button type="button" onClick={() => onNavigate?.("seasons")} style={{ ...styles.textButton, color: publicCategoryTheme.accentText }}>Tout voir</button>
@@ -5531,7 +5574,7 @@ function OffSeasonStandingsTable({ rows = [], eventColor = "#7c3aed" }) {
           {rows.map((row, index) => (
             <tr key={row.id || `${row.driverId}-${row.eventType}`} style={styles.tr}>
               <td style={styles.td}><strong>#{index + 1}</strong></td>
-              <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} /> : "—"}</td>
+              <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} showRetired={false} /> : "—"}</td>
               <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
               <td style={styles.td}><span style={{ ...styles.badgeDark, background: eventColor, color: eventColor === "#ffff00" ? "#18181b" : "white" }}>P{row.qualifyingPosition || "—"}</span></td>
               <td style={styles.td}>P{row.racePosition || "—"}</td>
