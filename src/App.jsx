@@ -4170,7 +4170,7 @@ function computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonT
     seasonDriverStats = seasonDriverStats.map((driver) => ({
       ...driver,
       driverTitles: driverChampionIds.has(String(driver.id)) ? 1 : 0,
-      teamTitles: constructorChampionDriverIds.size ? (constructorChampionDriverIds.has(String(driver.id)) ? 1 : 0) : (constructorChampionTeamIds.size && constructorChampionTeamIds.has(String(driver.teamId)) ? 1 : 0),
+      teamTitles: constructorChampionDriverIds.has(String(driver.id)) ? 1 : 0,
       seasons: 1,
     }));
     seasonTeamStats = seasonTeamStats.map((team) => ({
@@ -7809,6 +7809,7 @@ function TitlesPanel({
             ))}
             {constructorCandidateDrivers.length === 0 && <p style={styles.mutedSmall}>Choisis une ecurie championne ou inscris des pilotes sur cette saison/categorie.</p>}
           </div>
+          <button type="button" onClick={() => setConstructorTitleDriverIds?.([])} disabled={selectedConstructorDriverIds.length === 0} style={{ ...styles.secondaryButton, marginTop: 12 }}>Vider les pilotes constructeur</button>
         </div>
 
         <button className="urtt-button" onClick={() => onSaveSeasonTitle?.({ driverId: effectiveTitleDriverId, teamId: effectiveTitleTeamId, constructorDriverIds: selectedConstructorDriverIds })} disabled={isSaving} style={{ marginTop: 24 }}>
