@@ -7673,10 +7673,14 @@ function TitlesPanel({
   const currentTeam = teams.find((team) => idsEqual(team.id, currentSeasonTitle?.teamId));
   const effectiveTitleDriverId = titleDriverId || currentSeasonTitle?.driverId || "";
   const effectiveTitleTeamId = titleTeamId || currentSeasonTitle?.teamId || "";
-  const selectedConstructorDriverIds = normalizeIdList(constructorTitleDriverIds.length ? constructorTitleDriverIds : currentSeasonTitle?.constructorDriverIds);
+  const currentConstructorDriverIds = normalizeIdList(currentSeasonTitle?.constructorDriverIds);
+  const selectedConstructorDriverIds = normalizeIdList(constructorTitleDriverIds);
   const currentConstructorDrivers = normalizeIdList(currentSeasonTitle?.constructorDriverIds)
     .map((driverId) => drivers.find((driver) => idsEqual(driver.id, driverId)))
     .filter(Boolean);
+  useEffect(() => {
+    setConstructorTitleDriverIds?.(currentConstructorDriverIds);
+  }, [selectedSeasonId, selectedCategoryId, currentSeasonTitle?.id, currentConstructorDriverIds.join("|")]);
   const seasonCategoryDrivers = drivers.filter((driver) => (driver.participations?.[selectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(selectedCategoryId)));
   const constructorCandidateDrivers = effectiveTitleTeamId
     ? seasonCategoryDrivers.filter((driver) => idsEqual(driver.teamHistory?.[selectedSeasonId] || driver.teamId, effectiveTitleTeamId))
