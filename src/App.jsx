@@ -2230,8 +2230,6 @@ export default function URTTAdminPanel() {
 
       if (error) {
         if (error.code !== "42P01") console.error("Erreur profil joueur:", error);
-        window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
-        setPlayerProfile(null);
         return;
       }
 
@@ -7439,6 +7437,7 @@ function FeedbackWidget({ playerProfile = null }) {
     }
 
     setIsSending(true);
+    const preservedPlayerSessionId = playerProfile?.id ? String(playerProfile.id) : "";
     try {
       let savedInSupabase = false;
       const numericPlayerId = Number(playerProfile?.id);
@@ -7486,6 +7485,7 @@ function FeedbackWidget({ playerProfile = null }) {
       console.error("Erreur feedback:", error);
       setStatus("Impossible d'envoyer pour le moment.");
     } finally {
+      if (preservedPlayerSessionId) window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, preservedPlayerSessionId);
       setIsSending(false);
     }
   }
