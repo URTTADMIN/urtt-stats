@@ -1262,11 +1262,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
     const manualTeamTitle = matchingTitles.find((title) => title.teamId);
     const manualConstructorDriverIds = normalizeIdList(manualTeamTitle?.constructorDriverIds);
     const driverChampion = Boolean(manualDriverTitle && idsEqual(manualDriverTitle.driverId, driver.id));
-    const constructorChampion = Boolean(participatesInActiveCategory && manualTeamTitle && (
-      manualConstructorDriverIds.length
-        ? manualConstructorDriverIds.some((driverId) => idsEqual(driverId, driver.id))
-        : idsEqual(manualTeamTitle.teamId, seasonTeam?.id || driver?.teamHistory?.[season.id] || driver?.teamId)
-    ));
+    const constructorChampion = Boolean(participatesInActiveCategory && manualTeamTitle && manualConstructorDriverIds.some((driverId) => idsEqual(driverId, driver.id)));
     const resultOnlyRaces = seasonResults.map((result, index) => ({ id: result.raceId, name: result.raceName || `Course ${index + 1}`, round: index + 1, seasonId: result.seasonId, categoryId: result.categoryId }));
     const raceDetailSource = seasonCalendarRaces.length ? seasonCalendarRaces : resultOnlyRaces;
     const raceDetails = raceDetailSource.map((race, index) => {
@@ -7818,7 +7814,7 @@ function TitlesPanel({
         <div style={{ ...styles.itemBox, marginTop: 16 }}>
           <span>{seasonName(selectedSeasonId)} · {selectedCategoryId}</span>
           <strong>Pilote : {currentDriver?.name || "Aucun"} / Constructeur : {currentTeam?.name || "Aucune ecurie"}</strong>
-          <p style={styles.mutedSmall}>Pilotes constructeur : {currentConstructorDrivers.length ? currentConstructorDrivers.map((driver) => driver.name).join(", ") : "Non precise, attribution par ecurie"}</p>
+          <p style={styles.mutedSmall}>Pilotes constructeur : {currentConstructorDrivers.length ? currentConstructorDrivers.map((driver) => driver.name).join(", ") : "Aucun pilote precise"}</p>
         </div>
       </div>
 
