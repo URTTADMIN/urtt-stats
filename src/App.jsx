@@ -4596,10 +4596,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
               <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾" : "☀"}</button>
               {adminUser?.email && <span style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
               <div style={styles.publicAccessWrap}>
-                <button onClick={() => setShowAccessMenu((current) => !current)} style={styles.publicAdminBubble} aria-label="Interface utilisateur et admin">INT</button>
+                <button onClick={() => setShowAccessMenu((current) => !current)} style={styles.publicAdminBubble} aria-label="Interface utilisateur et admin">INT<span style={{ ...styles.publicUserStatusDot, ...(playerProfile?.id ? styles.publicUserStatusDotConnected : styles.publicUserStatusDotDisconnected) }} /></button>
                 {showAccessMenu && (
                   <div style={styles.publicAccessMenu}>
-                    <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} compact triggerLabel="Utilisateur" triggerStyle={styles.accessChoiceButton} />
+                    <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} compact triggerLabel={playerProfile?.pseudo ? `Utilisateur · ${playerProfile.pseudo}` : "Utilisateur"} triggerStyle={{ ...styles.accessChoiceButton, ...(playerProfile?.id ? styles.accessChoiceButtonConnected : styles.accessChoiceButtonDisconnected) }} />
                     <button type="button" onClick={() => requestPublicNavigation(onOpenAdmin)} style={styles.accessChoiceButton}>Admin</button>
                   </div>
                 )}
@@ -7919,7 +7919,12 @@ const styles = {
   publicAccessWrap: { position: "relative", display: "grid", placeItems: "center" },
   publicAccessMenu: { position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 80, minWidth: 190, background: "rgba(17,24,43,.98)", border: "1px solid #33415f", borderRadius: 16, padding: 10, display: "grid", gap: 8, boxShadow: "0 18px 45px rgba(0,0,0,.28)" },
   accessChoiceButton: { width: "100%", border: "1px solid #33415f", background: "#141a28", color: "#eef1f7", borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 900, textAlign: "left", cursor: "pointer" },
-  publicAdminBubble: { width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
+  accessChoiceButtonDisconnected: { borderColor: "rgba(236,72,153,.7)", background: "rgba(190,24,93,.24)", color: "#fbcfe8" },
+  accessChoiceButtonConnected: { borderColor: "rgba(34,197,94,.75)", background: "rgba(22,101,52,.3)", color: "#bbf7d0" },
+  publicAdminBubble: { position: "relative", width: 34, height: 34, borderRadius: "50%", border: 0, background: "#302b49", color: "#e8c5f5", display: "grid", placeItems: "center", fontSize: 11, fontWeight: 950, cursor: "pointer", boxShadow: "0 8px 22px rgba(0,0,0,.18)" },
+  publicUserStatusDot: { position: "absolute", right: -1, bottom: -1, width: 10, height: 10, borderRadius: "50%", border: "2px solid #11182b", boxShadow: "0 0 0 1px rgba(255,255,255,.12)" },
+  publicUserStatusDotDisconnected: { background: "#ec4899" },
+  publicUserStatusDotConnected: { background: "#22c55e" },
   publicHeading: { display: "flex", alignItems: "end", justifyContent: "space-between", gap: 16, margin: "36px 0 25px" },
   publicEyebrow: { fontSize: 11, letterSpacing: ".19em", color: "var(--urtt-accent-text, #d954f4)", fontWeight: 900, textTransform: "uppercase" },
   publicDashboardTitle: { fontSize: "clamp(29px, 4vw, 42px)", letterSpacing: "-.06em", margin: "8px 0 4px", lineHeight: 1.1 },
