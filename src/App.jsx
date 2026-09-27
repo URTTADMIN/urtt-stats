@@ -1221,14 +1221,16 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
   const driverPool = allDrivers.length ? allDrivers : [driver];
   return getSeasonOptions().map((season) => {
     const seasonCategories = getDriverSeasonCategories(driver, season.id);
-    const categories = activeCategoryId ? seasonCategories.filter((category) => normalizeCategoryId(category) === activeCategoryId) : seasonCategories;
-    const participatesInActiveCategory = activeCategoryId ? categories.length > 0 : seasonCategories.length > 0;
-    const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(result.categoryId) === activeCategoryId));
+    const normalizedSeasonCategories = seasonCategories.map(normalizeCategoryId).filter(Boolean);
+    const rowCategoryId = activeCategoryId || (normalizedSeasonCategories.length === 1 ? normalizedSeasonCategories[0] : "");
+    const categories = rowCategoryId ? normalizedSeasonCategories.filter((category) => normalizeCategoryId(category) === rowCategoryId) : normalizedSeasonCategories;
+    const participatesInActiveCategory = rowCategoryId ? categories.length > 0 : normalizedSeasonCategories.length > 0;
+    const seasonResults = raceResults.filter((result) => normalizeSeasonId(result.seasonId) === season.id && (!rowCategoryId || normalizeCategoryId(result.categoryId) === rowCategoryId));
     const seasonCalendarRaces = allRaces
-      .filter((race) => normalizeSeasonId(race.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(race.categoryId) === activeCategoryId))
+      .filter((race) => normalizeSeasonId(race.seasonId) === season.id && (!rowCategoryId || normalizeCategoryId(race.categoryId) === rowCategoryId))
       .sort((a, b) => Number(a.round) - Number(b.round));
     const seasonTeam = getDriverSeasonTeam(driver, season.id, teams);
-    const matchingTitles = seasonTitles.filter((title) => normalizeSeasonId(title.seasonId) === season.id && (!activeCategoryId || normalizeCategoryId(title.categoryId) === activeCategoryId));
+    const matchingTitles = seasonTitles.filter((title) => normalizeSeasonId(title.seasonId) === season.id && (!rowCategoryId || normalizeCategoryId(title.categoryId) === rowCategoryId));
     let points = 0;
     let wins = 0;
     let podiums = 0;
