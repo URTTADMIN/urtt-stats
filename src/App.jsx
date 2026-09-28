@@ -1216,6 +1216,11 @@ function isRecordValue(records, key, value) {
 function RecordValue({ value, record }) {
   return <span className={`urtt-stat-value${record ? " urtt-record-value" : ""}`} style={record ? styles.recordValue : undefined}>{value}</span>;
 }
+function getDisplayedDriverRaceRound(race) {
+  const round = Number(race?.round) || 0;
+  if (normalizeSeasonId(race?.seasonId) === "S11" && normalizeCategoryId(race?.categoryId) === "F3" && round >= 4) return round + 3;
+  return round;
+}
 function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "", seasonTitles = [], allDrivers = [], allRaces = []) {
   const activeCategoryId = selectedCategoryId ? normalizeCategoryId(selectedCategoryId) : "";
   return getSeasonOptions().map((season) => {
@@ -1273,7 +1278,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
       const hasEntry = Boolean(entry);
       return {
         id: race.id || `${season.id}-${index}`,
-        round: Number(race.round) || index + 1,
+        round: getDisplayedDriverRaceRound(race) || index + 1,
         name: race.name || result?.raceName || `Course ${index + 1}`,
         startAt: race.startAt || "",
         validated: hasResult,
