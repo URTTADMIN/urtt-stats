@@ -1218,7 +1218,10 @@ function RecordValue({ value, record }) {
 }
 function getDisplayedDriverRaceRound(race) {
   const round = Number(race?.round) || 0;
-  if (normalizeSeasonId(race?.seasonId) === "S11" && normalizeCategoryId(race?.categoryId) === "F3" && round >= 4) return round + 3;
+  const isSeason11F3 = normalizeSeasonId(race?.seasonId) === "S11" && normalizeCategoryId(race?.categoryId) === "F3";
+  const raceName = normalizeResultText(race?.name || "");
+  if (isSeason11F3 && round === 4 && raceName.includes("monza")) return 7;
+  if (isSeason11F3 && round > 4 && round <= 7) return round - 1;
   return round;
 }
 function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCategoryId = "", seasonTitles = [], allDrivers = [], allRaces = []) {
@@ -1289,7 +1292,7 @@ function getDriverSeasonBreakdown(driver, raceResults, teams = [], selectedCateg
         fastestLap: Boolean(entry?.fastestLap),
         hatTrick: Number(position) === 1 && entry?.pole && entry?.fastestLap,
       };
-    });
+    }).sort((a, b) => Number(a.round) - Number(b.round));
     return { seasonId: season.id, position: positionIndex >= 0 ? positionIndex + 1 : null, team: seasonTeam, teamName: getTeamNameById(teams, driver?.teamHistory?.[season.id] || driver?.teamId), categories, driverChampion, constructorChampion, points, wins, podiums, poles, fastestLaps, hatTricks, raceDetails };
   }).filter((row) => row.categories.length || row.driverChampion || row.constructorChampion || row.points || row.wins || row.podiums || row.poles || row.fastestLaps || row.hatTricks);
 }
