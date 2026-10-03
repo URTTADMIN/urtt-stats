@@ -99,12 +99,12 @@ const SPECIAL_EVENT_OPTIONS = [
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
 ];
 const CARD_RARITY_PRESETS = [
-  { id: "C", name: "Commune", weight: 50, color: "#94a3b8", minScore: 55, maxScore: 69 },
-  { id: "PC", name: "Peu commune", weight: 36, color: "#22c55e", minScore: 60, maxScore: 73 },
-  { id: "R", name: "Rare", weight: 27, color: "#38bdf8", minScore: 65, maxScore: 78 },
-  { id: "SR", name: "Super rare", weight: 14, color: "#a855f7", minScore: 74, maxScore: 86 },
-  { id: "UR", name: "Ultra rare", weight: 7, color: "#f59e0b", minScore: 82, maxScore: 93 },
-  { id: "L", name: "Légendaire", weight: 2, color: "#f43f5e", minScore: 90, maxScore: 99 },
+  { id: "C", name: "Commune", weight: 50, color: "#979797", minScore: 55, maxScore: 69 },
+  { id: "PC", name: "Peu commune", weight: 36, color: "#3fde00", minScore: 60, maxScore: 73 },
+  { id: "R", name: "Rare", weight: 27, color: "#fa7100", minScore: 65, maxScore: 78 },
+  { id: "SR", name: "Super rare", weight: 14, color: "#ee0000", minScore: 74, maxScore: 86 },
+  { id: "UR", name: "Ultra rare", weight: 7, color: "#cc00ff", minScore: 82, maxScore: 93 },
+  { id: "L", name: "Légendaire", weight: 2, color: "#f8c72f", minScore: 90, maxScore: 99 },
 ];
 const CARD_LAB_FALLBACK_POOL = [
   { id: "lab-alain", name: "Alain", teamName: "McLaren", points: 312, wins: 6, podiums: 11, poles: 3 },
