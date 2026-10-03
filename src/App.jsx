@@ -18,6 +18,8 @@ const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
+const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
+const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_LOGO = "/retired-driver.png";
@@ -28,6 +30,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "titles", icon: "👑", label: "Titres" },
   { id: "drivers", icon: "👥", label: "Pilotes" },
   { id: "championship-stats", icon: "📊", label: "Stats championnats" },
+  { id: "card-generation", icon: "🃏", label: "Cartes" },
   { id: "teams", icon: "🏎️", label: "Écuries" },
   { id: "races", icon: "🏁", label: "Courses" },
   { id: "planning", icon: "⏱️", label: "Planning" },
@@ -51,7 +54,7 @@ const ADMIN_PAGE_GROUPS = [
   { id: "management", label: "Gestion P & C", icon: "🏎️", pages: ["titles", "drivers", "teams", "development"] },
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "offseason-lemans", "offseason-indy", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
-  { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["games", "channel-points", "guess-attempts", "easter-egg-admin"] },
+  { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["card-generation", "games", "channel-points", "guess-attempts", "easter-egg-admin"] },
   { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "feedback-requests", "permissions", "settings"] },
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
@@ -90,6 +93,25 @@ const SPECIAL_EVENT_OPTIONS = [
   { id: "LEMANS24", name: "2,4H du Mans", color: "#006ee6" },
   { id: "INDY300", name: "Indy 300", color: "#ffff00" },
 ];
+const CARD_RARITY_PRESETS = [
+  { id: "C", name: "Commune", weight: 50, color: "#94a3b8", minScore: 55, maxScore: 69 },
+  { id: "PC", name: "Peu commune", weight: 36, color: "#22c55e", minScore: 60, maxScore: 73 },
+  { id: "R", name: "Rare", weight: 27, color: "#38bdf8", minScore: 65, maxScore: 78 },
+  { id: "SR", name: "Super rare", weight: 14, color: "#a855f7", minScore: 74, maxScore: 86 },
+  { id: "UR", name: "Ultra rare", weight: 7, color: "#f59e0b", minScore: 82, maxScore: 93 },
+  { id: "L", name: "Légendaire", weight: 2, color: "#f43f5e", minScore: 90, maxScore: 99 },
+];
+const CARD_LAB_FALLBACK_POOL = [
+  { id: "lab-alain", name: "Alain", teamName: "McLaren", points: 312, wins: 6, podiums: 11, poles: 3 },
+  { id: "lab-augustin", name: "Augustin", teamName: "Nissan", points: 286, wins: 5, podiums: 9, poles: 5 },
+  { id: "lab-kolti", name: "Kolti", teamName: "Renault", points: 252, wins: 4, podiums: 8, poles: 2 },
+  { id: "lab-lorden", name: "Lorden", teamName: "Kolost Racing", points: 226, wins: 3, podiums: 7, poles: 1 },
+  { id: "lab-noah", name: "Noah", teamName: "Audi", points: 204, wins: 2, podiums: 6, poles: 2 },
+  { id: "lab-etienne", name: "Etienne", teamName: "BMW", points: 178, wins: 1, podiums: 4, poles: 1 },
+  { id: "lab-cahouet", name: "Cahouet", teamName: "McLaren", points: 151, wins: 1, podiums: 3, poles: 0 },
+  { id: "lab-maxelier", name: "Maxelier", teamName: "Audi", points: 126, wins: 0, podiums: 2, poles: 0 },
+];
+const CARD_RARITY_ORDER = Object.fromEntries(CARD_RARITY_PRESETS.map((rarity, index) => [rarity.id, index]));
 
 function getPublicPageIcon(pageId) {
   return {
@@ -3939,6 +3961,12 @@ export default function URTTAdminPanel() {
   }
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
+  if (isCardLabRequested()) {
+    const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
+    return hasCardLabAccess
+      ? <CardRarityLab drivers={computed.globalDriverStats} teams={teams} />
+      : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={loginPlayerAccount} onPlayerSignup={signUpPlayerAccount} onPlayerLogout={logoutPlayerAccount} isSavingPlayerAccount={isSavingPlayerAccount} />;
+  }
 
   return (
     <>
@@ -4035,6 +4063,7 @@ export default function URTTAdminPanel() {
 )}
           {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {visibleAdminPage === "championship-stats" && <ChampionshipStatsAdminPanel drivers={drivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allCalendarRaces={allCalendarRaces} categoryOptions={adminCategoryOptions} seasonOptions={seasonOptions} />}
+          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} />}
           {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
@@ -4679,6 +4708,407 @@ function OtherChampionshipsPage() {
         </div>
       </Card>
     </div>
+  );
+}
+
+function isLocalHost() {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === "localhost" || host === "127.0.0.1";
+}
+
+function isCardLabRequested() {
+  if (typeof window === "undefined") return false;
+  return new URLSearchParams(window.location.search).get("lab") === "cards";
+}
+
+function canPlayerAccessCardLab(profile) {
+  const pseudo = normalizeResultText(profile?.pseudo || "");
+  return Boolean(profile?.id && CARD_LAB_ALLOWED_PLAYER_PSEUDOS.includes(pseudo));
+}
+
+function randomBetween(min, max) {
+  return Math.floor(min + Math.random() * (max - min + 1));
+}
+
+function pickWeightedRarity(rarities) {
+  const total = rarities.reduce((sum, rarity) => sum + Math.max(0, Number(rarity.weight) || 0), 0);
+  let cursor = Math.random() * Math.max(total, 1);
+  for (const rarity of rarities) {
+    cursor -= Math.max(0, Number(rarity.weight) || 0);
+    if (cursor <= 0) return rarity;
+  }
+  return rarities[0];
+}
+
+function pickWeightedItem(items, getWeight) {
+  const total = items.reduce((sum, item) => sum + Math.max(0, Number(getWeight(item)) || 0), 0);
+  let cursor = Math.random() * Math.max(total, 1);
+  for (const item of items) {
+    cursor -= Math.max(0, Number(getWeight(item)) || 0);
+    if (cursor <= 0) return item;
+  }
+  return items[0];
+}
+
+function normalizeCardPool(drivers = [], teams = []) {
+  const source = drivers.length ? drivers : CARD_LAB_FALLBACK_POOL;
+  return source.slice(0, 36).map((driver, index) => {
+    const team = teams.find((item) => idsEqual(item.id, driver.teamId)) || null;
+    return {
+      id: driver.id || `lab-${index}`,
+      name: driver.name || `Pilote ${index + 1}`,
+      teamName: driver.teamName || team?.name || CARD_LAB_FALLBACK_POOL[index % CARD_LAB_FALLBACK_POOL.length]?.teamName || "URTT",
+      teamLogo: team?.logo || driver.teamLogo || "",
+      points: Number(driver.points) || Number(driver.totalPoints) || Number(driver.careerPoints) || CARD_LAB_FALLBACK_POOL[index % CARD_LAB_FALLBACK_POOL.length]?.points || 80,
+      wins: Number(driver.wins) || 0,
+      podiums: Number(driver.podiums) || 0,
+      poles: Number(driver.poles) || 0,
+    };
+  });
+}
+
+function getLabCardRarity(driver, pool, rarities) {
+  const sorted = [...pool].sort((a, b) => (Number(b.points) || 0) - (Number(a.points) || 0));
+  const index = Math.max(0, sorted.findIndex((item) => String(item.id) === String(driver.id)));
+  const ratio = sorted.length <= 1 ? 0 : index / (sorted.length - 1);
+  const rarityId = ratio <= .06 ? "L" : ratio <= .18 ? "UR" : ratio <= .38 ? "SR" : ratio <= .58 ? "R" : ratio <= .78 ? "PC" : "C";
+  return rarities.find((rarity) => rarity.id === rarityId) || rarities[0];
+}
+
+function buildStableLabCard(driver, rarity) {
+  const performance = Math.min(18, Math.floor((Number(driver.points) || 0) / 45) + (Number(driver.wins) || 0) * 2 + Math.floor((Number(driver.podiums) || 0) / 2));
+  const score = Math.min(99, Math.max(rarity.minScore, Math.round((rarity.minScore + rarity.maxScore) / 2) + Math.floor(performance / 2)));
+  const attack = Math.min(99, Math.max(35, score + (Number(driver.wins) || 0) * 2 + (Number(driver.poles) || 0) - 4));
+  const defense = Math.min(99, Math.max(35, score + Math.floor((Number(driver.podiums) || 0) / 2) - 2));
+  return {
+    ...driver,
+    cardId: `driver-${driver.id}`,
+    rarity,
+    score,
+    attack,
+    defense,
+    marketValue: Math.round((score * score * (100 / Math.max(1, rarity.weight))) / 10),
+  };
+}
+
+function getSeasonCardRarityForPosition(position, rarities = CARD_RARITY_PRESETS) {
+  const rank = Number(position) || 0;
+  const rarityId = rank === 1 ? "L"
+    : rank <= 3 ? "UR"
+      : rank <= 5 ? "SR"
+        : rank <= 10 ? "R"
+          : rank <= 15 ? "PC"
+            : rank <= 20 ? "C"
+              : "";
+  return rarities.find((rarity) => rarity.id === rarityId) || null;
+}
+
+function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rarities = CARD_RARITY_PRESETS) {
+  const rarity = getSeasonCardRarityForPosition(position, rarities);
+  if (!rarity) return null;
+  const team = teams.find((item) => idsEqual(item.id, driver.teamId)) || teams.find((item) => item.name === driver.teamName) || null;
+  const scoreBase = rarity.minScore + Math.round(((rarity.maxScore - rarity.minScore) * Math.max(0, 20 - Number(position))) / 19);
+  const score = Math.min(rarity.maxScore, Math.max(rarity.minScore, scoreBase + Math.min(5, Math.floor((Number(driver.points) || 0) / 80))));
+  const attack = Math.min(99, Math.max(35, score + (Number(driver.wins) || 0) * 2 + (Number(driver.poles) || 0) - 3));
+  const defense = Math.min(99, Math.max(35, score + Math.floor((Number(driver.podiums) || 0) / 2) - 2));
+  return {
+    id: `${normalizeCategoryId(categoryId)}-${normalizeSeasonId(seasonId)}-${driver.id}`,
+    cardId: `season-${normalizeCategoryId(categoryId)}-${normalizeSeasonId(seasonId)}-${driver.id}`,
+    driverId: driver.id,
+    name: driver.name,
+    position: Number(position),
+    seasonId: normalizeSeasonId(seasonId),
+    categoryId: normalizeCategoryId(categoryId),
+    teamId: driver.teamId || team?.id || "",
+    teamName: driver.teamName || team?.name || "Sans écurie",
+    teamLogo: team?.logo || driver.teamLogo || "",
+    points: Number(driver.points) || 0,
+    wins: Number(driver.wins) || 0,
+    podiums: Number(driver.podiums) || 0,
+    poles: Number(driver.poles) || 0,
+    rarity,
+    score,
+    attack,
+    defense,
+    marketValue: Math.round((score * score * (100 / Math.max(1, rarity.weight))) / 10),
+  };
+}
+
+function buildSeasonCardEdition(standings = [], seasonId, categoryId, teams = [], rarities = CARD_RARITY_PRESETS) {
+  return standings
+    .slice(0, 20)
+    .map((driver, index) => buildSeasonCard(driver, index + 1, seasonId, categoryId, teams, rarities))
+    .filter(Boolean);
+}
+
+function drawLabPack(pool, rarities, count = 5) {
+  const stableCards = pool.map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)));
+  const selected = [];
+  const available = [...stableCards];
+  while (selected.length < Math.min(count, available.length + selected.length) && available.length) {
+    const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
+    selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
+    available.splice(available.findIndex((item) => item.cardId === card.cardId), 1);
+  }
+  return selected
+    .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.score - b.score);
+}
+
+function CardRarityLab({ drivers = [], teams = [] }) {
+  const [rarities, setRarities] = useState(CARD_RARITY_PRESETS);
+  const pool = useMemo(() => normalizeCardPool(drivers, teams), [drivers, teams]);
+  const cardLibrary = useMemo(() => pool
+    .map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)))
+    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || b.score - a.score || a.name.localeCompare(b.name)),
+  [pool, rarities]);
+  const rarityCounts = useMemo(() => cardLibrary.reduce((counts, card) => ({
+    ...counts,
+    [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
+  }), {}), [cardLibrary]);
+  const [pack, setPack] = useState(() => drawLabPack(normalizeCardPool([], []), CARD_RARITY_PRESETS));
+  const [revealedCount, setRevealedCount] = useState(5);
+  const [isOpeningPack, setIsOpeningPack] = useState(false);
+  const [showPackModal, setShowPackModal] = useState(false);
+  const [simulation, setSimulation] = useState(null);
+  const totalWeight = rarities.reduce((sum, rarity) => sum + Math.max(0, Number(rarity.weight) || 0), 0);
+  const rarestCard = pack[pack.length - 1];
+  useEffect(() => {
+    if (!isOpeningPack) return undefined;
+    if (revealedCount >= pack.length) {
+      const doneTimer = window.setTimeout(() => setIsOpeningPack(false), 420);
+      return () => window.clearTimeout(doneTimer);
+    }
+    const timer = window.setTimeout(() => setRevealedCount((current) => current + 1), revealedCount === 0 ? 450 : 760);
+    return () => window.clearTimeout(timer);
+  }, [isOpeningPack, revealedCount, pack.length]);
+  const updateWeight = (rarityId, value) => {
+    setRarities((current) => current.map((rarity) => rarity.id === rarityId ? { ...rarity, weight: Math.max(0, Number(value) || 0) } : rarity));
+  };
+  const openPack = () => {
+    setPack(drawLabPack(pool, rarities));
+    setRevealedCount(0);
+    setShowPackModal(true);
+    setIsOpeningPack(true);
+  };
+  const closePackModal = () => {
+    if (isOpeningPack) return;
+    setShowPackModal(false);
+  };
+  const simulate = () => {
+    const counts = Object.fromEntries(rarities.map((rarity) => [rarity.id, 0]));
+    Array.from({ length: 100 }).forEach(() => {
+      drawLabPack(pool, rarities).forEach((card) => {
+        counts[card.rarity.id] = (counts[card.rarity.id] || 0) + 1;
+      });
+    });
+    setSimulation(counts);
+  };
+  return (
+    <div style={styles.cardLabPage}>
+      <section style={styles.cardPlayerHero}>
+        <div style={styles.cardPlayerCopy}>
+          <span style={styles.cardPlayerEyebrow}>URTT Cards</span>
+          <h1 style={styles.cardPlayerTitle}>Ouvre ton pack pilote</h1>
+          <p style={styles.cardPlayerText}>Découvre 5 cartes URTT, collectionne les pilotes, garde les plus rares et prépare ton équipe avant les défis.</p>
+          <div style={styles.cardPlayerActions}>
+            <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.cardPlayerPrimary}>{isOpeningPack ? "Ouverture en cours..." : "Ouvrir un pack"}</button>
+            <span style={styles.cardPlayerHint}>La meilleure carte arrive toujours à la fin.</span>
+          </div>
+          <div style={styles.cardPlayerRarityStrip}>
+            {rarities.map((rarity) => <span key={rarity.id} style={{ ...styles.cardPlayerRarity, borderColor: rarity.color, color: rarity.color }}>{rarity.id}</span>)}
+          </div>
+        </div>
+        <div style={styles.cardPlayerPackScene} aria-hidden="true">
+          <div style={styles.cardPlayerGhostCardA}>SR</div>
+          <div style={styles.cardPlayerGhostCardB}>UR</div>
+          <div style={styles.cardPlayerPack}>
+            <strong>URTT</strong>
+            <span>PACK PILOTE</span>
+            <small>5 cartes</small>
+          </div>
+        </div>
+      </section>
+      <header style={styles.cardLabHeader}>
+        <div>
+          <p style={styles.kicker}>LAB LOCAL · NON PUBLIC</p>
+          <h1 style={styles.cardLabTitle}>Prototype cartes URTT</h1>
+          <p style={styles.muted}>Accessible uniquement en local avec <strong>?lab=cards</strong>. Aucun impact sur le site public.</p>
+        </div>
+        <div style={styles.actions}>
+          <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          <button type="button" onClick={simulate} style={styles.secondaryButton}>Simuler 100 packs</button>
+        </div>
+      </header>
+      <section style={styles.cardLabOpeningStage}>
+        <div>
+          <p style={styles.kicker}>Ouverture popup</p>
+          <h2 style={styles.cardLabStageTitle}>{showPackModal ? "Pack en cours" : "Pack prêt"}</h2>
+          <p style={styles.muted}>Le bouton ouvre une fenêtre dédiée. Les cartes restent au centre de l'écran pendant toute l'animation.</p>
+        </div>
+        {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Finale : {rarestCard.rarity.name}</span>}
+      </section>
+      <section style={styles.cardLabGrid}>
+        <Card title="Réglage rareté" icon="🎚️">
+          <div style={styles.stack}>
+            {rarities.map((rarity) => {
+              const percent = totalWeight ? Math.round((rarity.weight / totalWeight) * 1000) / 10 : 0;
+              return (
+                <label key={rarity.id} style={styles.cardLabRarityRow}>
+                  <span style={{ ...styles.cardLabRarityBadge, borderColor: rarity.color, color: rarity.color }}>{rarity.id}</span>
+                  <span><strong>{rarity.name}</strong><small style={styles.mutedSmall}>Poids de sortie : {percent}% · score {rarity.minScore}-{rarity.maxScore}</small></span>
+                  <input type="number" min="0" value={rarity.weight} onChange={(event) => updateWeight(rarity.id, event.target.value)} style={styles.positionInput} />
+                </label>
+              );
+            })}
+          </div>
+        </Card>
+        <Card title="Résultat simulation" icon="📊">
+          {!simulation && <Empty text="Lance une simulation pour voir la répartition sur 500 cartes." />}
+          {simulation && <div style={styles.stack}>{rarities.map((rarity) => {
+            const count = simulation[rarity.id] || 0;
+            const percent = Math.round((count / 500) * 1000) / 10;
+            return <div key={rarity.id} style={styles.cardLabSimRow}><span style={{ color: rarity.color, fontWeight: 950 }}>{rarity.name}</span><strong>{count} cartes · {percent}%</strong></div>;
+          })}</div>}
+        </Card>
+      </section>
+      <section style={styles.cardCollectionPanel}>
+        <div style={styles.cardCollectionHeader}>
+          <div>
+            <p style={styles.kicker}>COLLECTION COMPLETE</p>
+            <h2 style={styles.cardLabStageTitle}>Toutes les cartes pilotes</h2>
+            <p style={styles.muted}>Toutes les cartes possibles du labo, avec leur rareté fixe, leurs stats et leur valeur test.</p>
+          </div>
+          <div style={styles.cardCollectionSummary}>
+            {rarities.map((rarity) => (
+              <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
+                {rarity.id} · {rarityCounts[rarity.id] || 0}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={styles.cardCollectionGrid}>
+          {cardLibrary.map((card) => <CollectionCard key={card.cardId} card={card} />)}
+        </div>
+      </section>
+      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} />}
+    </div>
+  );
+}
+
+function CollectionCard({ card }) {
+  return (
+    <article style={{ ...styles.collectionCard, borderColor: card.rarity.color, boxShadow: `0 14px 34px rgba(0,0,0,.25), 0 0 24px ${card.rarity.color}22` }}>
+      <div style={styles.collectionCardTop}>
+        <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
+        <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
+      </div>
+      <div style={styles.collectionCardIdentity}>
+        <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
+        <div style={styles.collectionCardText}>
+          <h3 style={styles.collectionCardName}>{card.name}</h3>
+          <p style={styles.mutedSmall}>{card.teamName}</p>
+        </div>
+      </div>
+      <div style={styles.collectionCardStats}>
+        <span>GEN <strong>{card.score}</strong></span>
+        <span>ATQ <strong>{card.attack}</strong></span>
+        <span>DEF <strong>{card.defense}</strong></span>
+      </div>
+      <div style={styles.cardLabValue}>Valeur test : {card.marketValue.toLocaleString("fr-FR")}</div>
+    </article>
+  );
+}
+
+function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount }) {
+  const connectedButDenied = Boolean(playerProfile?.id && !canPlayerAccessCardLab(playerProfile));
+  return (
+    <div style={styles.cardLabPage}>
+      <section style={styles.cardPlayerHero}>
+        <div style={styles.cardPlayerCopy}>
+          <span style={styles.cardPlayerEyebrow}>Accès test privé</span>
+          <h1 style={styles.cardPlayerTitle}>URTT Cards</h1>
+          <p style={styles.cardPlayerText}>
+            Cette version de test est ouverte uniquement aux admins et aux comptes joueurs autorisés pour récupérer des retours avant la mise en public.
+          </p>
+          <div style={styles.cardPlayerActions}>
+            <PlayerAccountBox
+              profile={playerProfile}
+              onLogin={onPlayerLogin}
+              onSignup={onPlayerSignup}
+              onLogout={onPlayerLogout}
+              isSaving={isSavingPlayerAccount}
+              triggerLabel={playerProfile?.pseudo ? `Compte · ${playerProfile.pseudo}` : "Se connecter"}
+              triggerStyle={styles.cardPlayerPrimary}
+            />
+            <span style={connectedButDenied ? styles.errorText : styles.cardPlayerHint}>
+              {connectedButDenied ? "Ce compte n'est pas autorisé pour ce test." : "Connecte-toi avec le compte joueur autorisé."}
+            </span>
+          </div>
+        </div>
+        <div style={styles.cardPlayerPackScene} aria-hidden="true">
+          <div style={styles.cardPlayerGhostCardA}>SR</div>
+          <div style={styles.cardPlayerGhostCardB}>UR</div>
+          <div style={styles.cardPlayerPack}>
+            <strong>URTT</strong>
+            <span>ACCÈS TEST</span>
+            <small>privé</small>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onReplay }) {
+  const rarestCard = pack[pack.length - 1];
+  return (
+    <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
+      <div style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={styles.cardPackModalHeader}>
+          <div>
+            <p style={styles.kicker}>OUVERTURE DE PACK</p>
+            <h2 style={styles.cardPackModalTitle}>{isOpeningPack ? `Carte ${Math.min(revealedCount + 1, pack.length)} / ${pack.length}` : "Pack terminé"}</h2>
+          </div>
+          <button type="button" onClick={onClose} disabled={isOpeningPack} style={styles.secondaryButton}>{isOpeningPack ? "Patiente..." : "Fermer"}</button>
+        </div>
+        <div style={styles.cardPackModalStage}>
+          {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === revealedCount - 1} />)}
+        </div>
+        <div style={styles.cardPackModalFooter}>
+          {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Meilleure carte : {rarestCard.rarity.name}</span>}
+          {!isOpeningPack && <button type="button" onClick={onReplay} style={styles.cardPlayerPrimary}>Rouvrir un pack</button>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LabCard({ card, revealed = true, finalCard = false, active = false }) {
+  return (
+    <article style={{ ...styles.cardLabFlipShell, ...(active ? styles.cardLabFlipShellActive : {}) }}>
+      <div style={{ ...styles.cardLabFlipInner, transform: revealed ? "rotateY(180deg)" : "rotateY(0deg)" }}>
+        <div style={styles.cardLabCardBack}>
+          <strong>URTT</strong>
+          <span>Carte scellée</span>
+        </div>
+        <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: card.rarity.color, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${card.rarity.color}55` }}>
+          <div style={styles.cardLabCardTop}>
+            <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
+            <strong>{card.rarity.name}</strong>
+          </div>
+          <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
+          <h2 style={styles.cardLabCardName}>{card.name}</h2>
+          <p style={styles.mutedSmall}>{card.teamName}</p>
+          <div style={styles.cardLabStats}>
+            <span><small>ATQ</small><strong>{card.attack}</strong></span>
+            <span><small>DEF</small><strong>{card.defense}</strong></span>
+            <span><small>GEN</small><strong>{card.score}</strong></span>
+          </div>
+          <div style={styles.cardLabValue}>Valeur test : {card.marketValue.toLocaleString("fr-FR")}</div>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -7890,6 +8320,127 @@ function TitlesPanel({
     </div>
   );
 }
+function SeasonCardsAdminPanel({
+  standingsBySeason = {},
+  teams = [],
+  selectedCategoryId,
+  setSelectedCategoryId,
+  categoryOptions = CATEGORY_OPTIONS,
+  selectedSeasonId,
+  setSelectedSeasonId,
+  seasonOptions = [],
+}) {
+  const storageKey = `${normalizeCategoryId(selectedCategoryId)}-${normalizeSeasonId(selectedSeasonId)}`;
+  const [validatedGenerations, setValidatedGenerations] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(CARD_GENERATION_STORAGE_KEY) || "{}");
+    } catch {
+      return {};
+    }
+  });
+  const standings = standingsBySeason?.[normalizeSeasonId(selectedSeasonId)] || [];
+  const previewCards = useMemo(
+    () => buildSeasonCardEdition(standings, selectedSeasonId, selectedCategoryId, teams),
+    [standings, selectedSeasonId, selectedCategoryId, teams],
+  );
+  const validatedEdition = validatedGenerations[storageKey] || null;
+  const validateGeneration = () => {
+    const nextGeneration = {
+      id: storageKey,
+      categoryId: normalizeCategoryId(selectedCategoryId),
+      seasonId: normalizeSeasonId(selectedSeasonId),
+      generatedAt: new Date().toISOString(),
+      cards: previewCards,
+    };
+    const next = { ...validatedGenerations, [storageKey]: nextGeneration };
+    window.localStorage.setItem(CARD_GENERATION_STORAGE_KEY, JSON.stringify(next));
+    setValidatedGenerations(next);
+  };
+  const removeGeneration = () => {
+    const next = { ...validatedGenerations };
+    delete next[storageKey];
+    window.localStorage.setItem(CARD_GENERATION_STORAGE_KEY, JSON.stringify(next));
+    setValidatedGenerations(next);
+  };
+
+  return (
+    <div style={styles.section}>
+      <Card title="Génération des cartes saison" icon="🃏">
+        <div style={styles.stack}>
+          <div style={styles.resultsInfo}>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Catégorie</span>
+              <select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>
+                {categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+              </select>
+            </label>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Saison</span>
+              <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>
+                {(seasonOptions.length ? seasonOptions : getSeasonOptions()).map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={validateGeneration} disabled={!previewCards.length} style={styles.primaryButton}>Valider la génération</button>
+            {validatedEdition && <button type="button" onClick={removeGeneration} style={styles.dangerButton}>Retirer validation</button>}
+          </div>
+          <p style={styles.muted}>
+            Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
+          </p>
+          <div style={validatedEdition ? styles.badgeGreen : styles.badgeDark}>
+            {validatedEdition ? `Génération validée le ${formatRaceDate(validatedEdition.generatedAt)}` : "Aucune génération validée pour cette saison."}
+          </div>
+        </div>
+      </Card>
+      <Card title={`Preview ${selectedCategoryId} — ${seasonName(selectedSeasonId)}`} icon="🏆">
+        {previewCards.length === 0 ? <Empty text="Aucun classement disponible pour générer les cartes de cette saison." /> : <SeasonCardGenerationGrid cards={previewCards} />}
+      </Card>
+      {validatedEdition?.cards?.length > 0 && (
+        <Card title="Dernière génération validée" icon="✅">
+          <SeasonCardGenerationGrid cards={validatedEdition.cards} compact />
+        </Card>
+      )}
+    </div>
+  );
+}
+function SeasonCardGenerationGrid({ cards = [], compact = false }) {
+  const counts = cards.reduce((acc, card) => {
+    acc[card.rarity.id] = (acc[card.rarity.id] || 0) + 1;
+    return acc;
+  }, {});
+  return (
+    <div style={styles.stack}>
+      <div style={styles.cardCollectionSummary}>
+        {[...CARD_RARITY_PRESETS].reverse().map((rarity) => (
+          <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
+            {rarity.id} · {counts[rarity.id] || 0}
+          </span>
+        ))}
+      </div>
+      <div style={styles.cardCollectionGrid}>
+        {cards.map((card) => (
+          <article key={card.cardId} style={{ ...styles.collectionCard, ...(compact ? styles.collectionCardCompact : {}), borderColor: card.rarity.color }}>
+            <div style={styles.collectionCardTop}>
+              <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span>
+              <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
+            </div>
+            <div style={styles.collectionCardIdentity}>
+              <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
+              <div style={styles.collectionCardText}>
+                <h3 style={styles.collectionCardName}>{card.name}</h3>
+                <p style={styles.mutedSmall}>{card.teamName} · {card.points} pts</p>
+              </div>
+            </div>
+            <div style={styles.collectionCardStats}>
+              <span>GEN <strong>{card.score}</strong></span>
+              <span>ATQ <strong>{card.attack}</strong></span>
+              <span>DEF <strong>{card.defense}</strong></span>
+            </div>
+          </article>
+        ))}
+      </div>
+    </div>
+  );
+}
 function Popup({ popup, onClose }) { return <div style={styles.popupOverlay}><div style={styles.popupCard}><div style={styles.popupIcon}>{popup.type === "error" ? "⚠️" : "✅"}</div><h3 style={styles.popupTitle}>{popup.title}</h3><p style={styles.muted}>{popup.message}</p><button onClick={onClose} style={styles.fullButton}>OK</button></div></div>; }
 function Card({ title, icon, children }) { return <div className="urtt-card" style={styles.card}><div style={styles.cardHeader}><div style={styles.cardIcon}>{icon}</div><h3 style={styles.cardTitle}>{title}</h3></div>{children}</div>; }
 function Stat({ label, value }) { return <div className="urtt-stat-card" style={styles.statCard}><p style={styles.muted}>{label}</p><p style={styles.statValue}>{value}</p></div>; }
@@ -8010,6 +8561,61 @@ const styles = {
   card: { background: "rgba(22,31,54,.92)", border: "1px solid #34415c", borderRadius: 26, padding: 22, boxShadow: "0 18px 50px rgba(7,10,20,.22)" },
   cardHeader: { display: "flex", gap: 12, alignItems: "center", marginBottom: 18 },
   cardIcon: { background: "#27272a", borderRadius: 14, padding: 10, fontSize: 20 },
+  cardLabPage: { minHeight: "100vh", background: "radial-gradient(circle at 18% 0%, rgba(185,0,228,.24), transparent 30%), linear-gradient(135deg,#101827,#151d34 48%,#241a3c)", color: "#f8fafc", fontFamily: "Inter, system-ui, Arial", padding: 28, display: "grid", gap: 22, alignContent: "start" },
+  cardPlayerHero: { minHeight: 420, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 470px)", alignItems: "center", gap: 30, background: "radial-gradient(circle at 78% 42%, rgba(244,63,94,.32), transparent 34%), linear-gradient(135deg, rgba(14,22,42,.96), rgba(42,27,66,.96))", border: "1px solid #4a5a7a", borderRadius: 28, padding: "34px clamp(22px, 5vw, 54px)", overflow: "hidden", position: "relative", boxShadow: "0 30px 90px rgba(0,0,0,.35)" },
+  cardPlayerCopy: { display: "grid", gap: 16, maxWidth: 620, position: "relative", zIndex: 2 },
+  cardPlayerEyebrow: { color: "#f0abfc", fontSize: 13, fontWeight: 950, letterSpacing: ".2em", textTransform: "uppercase" },
+  cardPlayerTitle: { margin: 0, fontSize: "clamp(42px, 7vw, 86px)", lineHeight: .92, letterSpacing: "-.065em" },
+  cardPlayerText: { margin: 0, maxWidth: 520, color: "#cbd5e1", fontSize: 17, lineHeight: 1.55 },
+  cardPlayerActions: { display: "flex", gap: 13, alignItems: "center", flexWrap: "wrap", marginTop: 6 },
+  cardPlayerPrimary: { border: 0, background: "linear-gradient(135deg, #cc00ff, #ef4444)", color: "white", borderRadius: 14, padding: "15px 20px", fontWeight: 950, cursor: "pointer", boxShadow: "0 18px 38px rgba(204,0,255,.26)" },
+  cardPlayerHint: { color: "#d8b4fe", fontWeight: 850, fontSize: 13 },
+  cardPlayerRarityStrip: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 },
+  cardPlayerRarity: { width: 38, height: 34, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", fontSize: 12, fontWeight: 950, background: "rgba(255,255,255,.07)" },
+  cardPlayerPackScene: { minHeight: 330, position: "relative", display: "grid", placeItems: "center" },
+  cardPlayerPack: { width: 235, height: 315, borderRadius: 24, background: "radial-gradient(circle at 50% 24%, rgba(255,255,255,.2), transparent 24%), linear-gradient(155deg, #101827, #2e1450 55%, #cc00ff)", border: "2px solid rgba(255,255,255,.34)", display: "grid", placeItems: "center", alignContent: "center", gap: 10, transform: "rotate(5deg)", boxShadow: "0 28px 80px rgba(204,0,255,.34)", fontSize: 42, fontWeight: 950 },
+  cardPlayerGhostCardA: { position: "absolute", width: 150, height: 220, borderRadius: 22, right: 265, top: 58, transform: "rotate(-17deg)", background: "linear-gradient(155deg, rgba(15,23,42,.94), rgba(168,85,247,.72))", border: "1px solid rgba(216,180,254,.48)", display: "grid", placeItems: "center", color: "#e9d5ff", fontWeight: 950, boxShadow: "0 22px 50px rgba(0,0,0,.28)" },
+  cardPlayerGhostCardB: { position: "absolute", width: 160, height: 235, borderRadius: 22, right: 38, top: 32, transform: "rotate(18deg)", background: "linear-gradient(155deg, rgba(15,23,42,.94), rgba(245,158,11,.72))", border: "1px solid rgba(253,230,138,.48)", display: "grid", placeItems: "center", color: "#fef3c7", fontWeight: 950, boxShadow: "0 22px 50px rgba(0,0,0,.28)" },
+  cardLabHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "rgba(15,23,42,.82)", border: "1px solid #33415f", borderRadius: 22, padding: 22, boxShadow: "0 24px 70px rgba(0,0,0,.28)" },
+  cardLabTitle: { margin: "6px 0", fontSize: "clamp(30px, 5vw, 54px)", lineHeight: 1, letterSpacing: "-.055em" },
+  cardLabOpeningStage: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "linear-gradient(135deg, rgba(15,23,42,.9), rgba(76,29,149,.32))", border: "1px solid #455574", borderRadius: 22, padding: 20, boxShadow: "0 20px 60px rgba(0,0,0,.22)" },
+  cardLabStageTitle: { margin: "5px 0", fontSize: 28, letterSpacing: "-.04em" },
+  cardLabBestBadge: { border: "1px solid currentColor", borderRadius: 999, padding: "10px 13px", fontWeight: 950, background: "rgba(255,255,255,.07)" },
+  cardPackModalOverlay: { position: "fixed", inset: 0, zIndex: 7000, background: "radial-gradient(circle at center, rgba(204,0,255,.24), transparent 34%), rgba(2,6,23,.82)", display: "grid", placeItems: "center", padding: 24, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" },
+  cardPackModal: { width: "min(1220px, 100%)", maxHeight: "92vh", overflow: "auto", background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(29,20,48,.98))", border: "1px solid #52627f", borderRadius: 28, padding: 22, display: "grid", gap: 20, boxShadow: "0 35px 110px rgba(0,0,0,.55)" },
+  cardPackModalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 18 },
+  cardPackModalTitle: { margin: "5px 0 0", fontSize: 34, letterSpacing: "-.045em" },
+  cardPackModalStage: { minHeight: 380, display: "grid", gridTemplateColumns: "repeat(5, minmax(150px, 1fr))", gap: 16, alignItems: "center" },
+  cardPackModalFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  cardLabGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 18 },
+  cardLabRarityRow: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 92px", gap: 12, alignItems: "center", background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 12 },
+  cardLabRarityBadge: { minWidth: 34, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", fontSize: 12, fontWeight: 950 },
+  cardLabSimRow: { display: "flex", justifyContent: "space-between", gap: 12, background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 13, flexWrap: "wrap" },
+  cardCollectionPanel: { background: "rgba(15,23,42,.82)", border: "1px solid #33415f", borderRadius: 24, padding: 22, display: "grid", gap: 18, boxShadow: "0 24px 70px rgba(0,0,0,.22)" },
+  cardCollectionHeader: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" },
+  cardCollectionSummary: { display: "flex", gap: 8, flexWrap: "wrap" },
+  cardCollectionSummaryBadge: { border: "1px solid currentColor", borderRadius: 999, padding: "8px 10px", fontWeight: 950, background: "rgba(255,255,255,.06)" },
+  cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 },
+  collectionCard: { background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 16, padding: 14, display: "grid", gap: 12, alignContent: "start" },
+  collectionCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
+  collectionCardIdentity: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr)", gap: 11, alignItems: "center" },
+  collectionCardAvatar: { width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", fontWeight: 950, overflow: "hidden" },
+  collectionCardText: { minWidth: 0 },
+  collectionCardName: { margin: 0, fontSize: 18, letterSpacing: "-.03em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  collectionCardStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, fontSize: 12, color: "#cbd5e1" },
+  cardLabPack: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 18 },
+  cardLabFlipShell: { minHeight: 330, perspective: 1200, transform: "translateY(0) scale(1)", transition: "transform .32s ease" },
+  cardLabFlipShellActive: { transform: "translateY(-8px) scale(1.025)" },
+  cardLabFlipInner: { position: "relative", width: "100%", minHeight: 330, transformStyle: "preserve-3d", transition: "transform .72s cubic-bezier(.2,.85,.2,1)" },
+  cardLabCardBack: { position: "absolute", inset: 0, backfaceVisibility: "hidden", minHeight: 310, background: "radial-gradient(circle at 50% 20%, rgba(185,0,228,.34), transparent 34%), linear-gradient(155deg, #151f2e, #0b1020)", border: "2px solid #455574", borderRadius: 18, padding: 16, display: "grid", placeItems: "center", alignContent: "center", gap: 10, overflow: "hidden", boxShadow: "0 20px 55px rgba(0,0,0,.34)" },
+  cardLabCard: { position: "absolute", inset: 0, backfaceVisibility: "hidden", transform: "rotateY(180deg)", minHeight: 310, background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "2px solid #475569", borderRadius: 18, padding: 16, display: "grid", gap: 10, alignContent: "start", overflow: "hidden" },
+  cardLabFinalCard: { background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 34%), linear-gradient(160deg, rgba(21,26,43,.99), rgba(49,31,58,.98))" },
+  cardLabCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
+  cardLabPortrait: { height: 104, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950 },
+  cardLabLogo: { width: 76, height: 76, objectFit: "contain" },
+  cardLabCardName: { margin: 0, fontSize: 25, letterSpacing: "-.04em" },
+  cardLabStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
+  cardLabValue: { marginTop: 4, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0" },
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
