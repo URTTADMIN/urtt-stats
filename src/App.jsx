@@ -2550,6 +2550,10 @@ export default function URTTAdminPanel() {
     const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: categoryId, seasonTitles });
     return [categoryId, stats.driverStatsBySeason];
   })), [drivers, teams, raceResults, seasonTitles]);
+  const cardTeamStandingsByCategory = useMemo(() => Object.fromEntries(CARD_COLLECTION_CATEGORY_IDS.map((categoryId) => {
+    const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: categoryId, seasonTitles });
+    return [categoryId, stats.teamStatsBySeason];
+  })), [drivers, teams, raceResults, seasonTitles]);
   const seasonOnlyDrivers = computed.driverStatsBySeason[effectiveSelectedSeasonId] || [];
   const seasonOnlyTeams = computed.teamStatsBySeason[effectiveSelectedSeasonId] || [];
   const cumulativeDrivers = computed.cumulativeDriverStatsBySeason[effectiveSelectedSeasonId] || [];
@@ -4123,6 +4127,7 @@ export default function URTTAdminPanel() {
           cardLabDrivers={cardLabSeasonDrivers}
           cardLabStandingsBySeason={cardStandingsByCategory[CARD_COLLECTION_CATEGORY_ID] || {}}
           cardLabStandingsByCategory={cardStandingsByCategory}
+          cardLabTeamStandingsByCategory={cardTeamStandingsByCategory}
           cardLabSettings={cardLabSettings}
         />
       )}
@@ -4559,7 +4564,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabTeamStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -4769,7 +4774,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -4910,6 +4915,18 @@ function getSeasonCardRarityForPosition(position, rarities = CARD_RARITY_PRESETS
   return rarities.find((rarity) => rarity.id === rarityId) || null;
 }
 
+function getTeamCardRarityForPosition(position, rarities = CARD_RARITY_PRESETS) {
+  const rank = Number(position) || 0;
+  const rarityId = rank === 1 ? "L"
+    : rank === 2 ? "UR"
+      : rank <= 4 ? "SR"
+        : rank <= 6 ? "R"
+          : rank <= 8 ? "PC"
+            : rank <= 10 ? "C"
+              : "";
+  return rarities.find((rarity) => rarity.id === rarityId) || null;
+}
+
 function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rarities = CARD_RARITY_PRESETS) {
   const rarity = getSeasonCardRarityForPosition(position, rarities);
   if (!rarity) return null;
@@ -4935,6 +4952,32 @@ function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rar
   };
 }
 
+function buildSeasonTeamCard(team, position, seasonId, categoryId, rarities = CARD_RARITY_PRESETS) {
+  const rarity = getTeamCardRarityForPosition(position, rarities);
+  if (!rarity) return null;
+  const normalizedCategoryId = normalizeCategoryId(categoryId);
+  const normalizedSeasonId = normalizeSeasonId(seasonId);
+  return {
+    id: `team-${normalizedCategoryId}-${normalizedSeasonId}-${team.id}`,
+    cardId: `team-${normalizedCategoryId}-${normalizedSeasonId}-${team.id}`,
+    cardType: "team",
+    teamId: team.id,
+    name: team.name,
+    position: Number(position),
+    seasonId: normalizedSeasonId,
+    categoryId: normalizedCategoryId,
+    categoryName: getCardCategoryLabel(normalizedCategoryId),
+    teamName: "Écurie",
+    teamLogo: team.logo || "",
+    teamColor: team.color || "#334155",
+    points: Number(team.points) || 0,
+    wins: Number(team.wins) || 0,
+    podiums: Number(team.podiums) || 0,
+    poles: Number(team.poles) || 0,
+    rarity,
+  };
+}
+
 function buildSeasonCardEdition(standings = [], seasonId, categoryId, teams = [], rarities = CARD_RARITY_PRESETS) {
   return standings
     .slice(0, 20)
@@ -4944,6 +4987,17 @@ function buildSeasonCardEdition(standings = [], seasonId, categoryId, teams = []
 
 function buildSeasonCardCollection(standingsBySeason = {}, seasonIds = CARD_COLLECTION_SEASON_IDS, categoryId = CARD_COLLECTION_CATEGORY_ID, teams = [], rarities = CARD_RARITY_PRESETS) {
   return seasonIds.flatMap((seasonId) => buildSeasonCardEdition(standingsBySeason[seasonId] || [], seasonId, categoryId, teams, rarities));
+}
+
+function buildSeasonTeamCardEdition(teamStandings = [], seasonId, categoryId, rarities = CARD_RARITY_PRESETS) {
+  return teamStandings
+    .slice(0, 10)
+    .map((team, index) => buildSeasonTeamCard(team, index + 1, seasonId, categoryId, rarities))
+    .filter(Boolean);
+}
+
+function buildSeasonTeamCardCollection(teamStandingsBySeason = {}, seasonIds = CARD_COLLECTION_SEASON_IDS, categoryId = CARD_COLLECTION_CATEGORY_ID, rarities = CARD_RARITY_PRESETS) {
+  return seasonIds.flatMap((seasonId) => buildSeasonTeamCardEdition(teamStandingsBySeason[seasonId] || [], seasonId, categoryId, rarities));
 }
 
 function getCardCategoryLabel(categoryId) {
@@ -4996,6 +5050,64 @@ function buildOffSeasonCardCollection(entries = [], teams = [], drivers = [], ev
   });
 }
 
+function buildOffSeasonTeamCard(entry, position, eventType, rarities = CARD_RARITY_PRESETS) {
+  const rarity = getTeamCardRarityForPosition(position, rarities);
+  if (!rarity) return null;
+  const normalizedEventType = normalizeCategoryId(eventType);
+  const seasonId = normalizeSeasonId(entry.seasonId);
+  const team = entry.team || {};
+  return {
+    id: `team-${normalizedEventType}-${seasonId}-${team.id}`,
+    cardId: `team-${normalizedEventType}-${seasonId}-${team.id}`,
+    cardType: "team",
+    teamId: team.id,
+    name: team.name || "Sans écurie",
+    position: Number(position),
+    seasonId,
+    categoryId: normalizedEventType,
+    categoryName: getSpecialEventName(normalizedEventType),
+    teamName: "Écurie",
+    teamLogo: team.logo || "",
+    teamColor: team.color || "#334155",
+    points: Number(entry.points) || 0,
+    wins: Number(entry.wins) || 0,
+    podiums: Number(entry.podiums) || 0,
+    poles: Number(entry.poles) || 0,
+    rarity,
+  };
+}
+
+function getOffSeasonTeamStandings(entries = [], eventType, seasonId, drivers = [], teams = []) {
+  const teamMap = new Map();
+  getOffSeasonRows(entries, eventType, seasonId, drivers, teams).forEach((entry) => {
+    const team = entry.team || teams.find((item) => idsEqual(item.id, entry.teamId));
+    if (!team) return;
+    const key = String(team.id);
+    const current = teamMap.get(key) || { id: team.id, name: team.name, team, seasonId, points: 0, wins: 0, podiums: 0, poles: 0, resultCounts: {} };
+    const racePosition = Number(entry.racePosition) || 0;
+    current.points += Number(entry.points) || getOffSeasonPoints(racePosition);
+    current.wins += racePosition === 1 ? 1 : 0;
+    current.podiums += racePosition > 0 && racePosition <= 3 ? 1 : 0;
+    current.poles += Number(entry.qualifyingPosition) === 1 ? 1 : 0;
+    if (racePosition > 0) current.resultCounts[racePosition] = (current.resultCounts[racePosition] || 0) + 1;
+    teamMap.set(key, current);
+  });
+  return Array.from(teamMap.values()).sort(sortSeasonStandings);
+}
+
+function buildOffSeasonTeamCardCollection(entries = [], teams = [], drivers = [], eventIds = CARD_COLLECTION_EVENT_IDS, rarities = CARD_RARITY_PRESETS) {
+  return eventIds.flatMap((eventType) => {
+    const seasonIds = Array.from(new Set(entries
+      .filter((entry) => normalizeCategoryId(entry.eventType) === normalizeCategoryId(eventType))
+      .map((entry) => normalizeSeasonId(entry.seasonId))))
+      .sort((a, b) => getSeasonNumber(a) - getSeasonNumber(b));
+    return seasonIds.flatMap((seasonId) => getOffSeasonTeamStandings(entries, eventType, seasonId, drivers, teams)
+      .slice(0, 10)
+      .map((entry, index) => buildOffSeasonTeamCard(entry, index + 1, eventType, rarities))
+      .filter(Boolean));
+  });
+}
+
 function drawLabPack(pool, rarities, count = 5) {
   const stableCards = pool.map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)));
   const selected = [];
@@ -5021,7 +5133,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", embedded = false }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", embedded = false }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(initialView === "collection" ? "collection" : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5031,11 +5143,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const categoryStandings = Object.keys(standingsByCategory || {}).length ? standingsByCategory : { [categoryId]: standingsBySeason };
     const collection = [
       ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonCardCollection(categoryStandings[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, teams, rarities)),
+      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonTeamCardCollection(teamStandingsByCategory[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, rarities)),
       ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
+      ...buildOffSeasonTeamCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
     ];
     if (collection.length) return collection;
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
-  }, [drivers, standingsBySeason, standingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
+  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
   const [ownedCards, setOwnedCards] = useState(() => {
     try {
       return JSON.parse(window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY) || "[]");
