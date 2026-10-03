@@ -5712,7 +5712,7 @@ function CollectionCard({ card, locked = false }) {
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   const duplicateCount = Number(card.duplicateCount) || 1;
   return (
-    <article style={{ ...styles.collectionCard, borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, filter: locked ? "grayscale(.96)" : "none", opacity: locked ? .58 : 1 }}>
+    <article style={{ ...styles.collectionCard, borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
@@ -5720,17 +5720,17 @@ function CollectionCard({ card, locked = false }) {
         <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
         <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
       </div>
-      <div style={{ ...styles.collectionCardHero, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 36px rgba(255,255,255,.08), 0 0 24px ${teamColor}44` }}>
-        <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={getCardLogoStyle(card)} /> : getInitials(card.name)}</div>
-        {card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}
+      <div style={{ ...styles.collectionCardHero, background: locked ? "linear-gradient(135deg, rgba(30,41,59,.95), rgba(15,23,42,.95)), url('/card-back-urtt.png')" : `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, backgroundSize: locked ? "cover" : undefined, backgroundPosition: locked ? "center" : undefined, borderColor: locked ? "rgba(148,163,184,.45)" : `${teamColor}cc`, boxShadow: locked ? "inset 0 0 36px rgba(15,23,42,.76)" : `inset 0 0 36px rgba(255,255,255,.08), 0 0 24px ${teamColor}44` }}>
+        <div style={locked ? styles.collectionCardUnknownAvatar : styles.collectionCardAvatar}>{locked ? "?" : card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={getCardLogoStyle(card)} /> : getInitials(card.name)}</div>
+        {!locked && card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}
       </div>
       <div style={styles.collectionCardText}>
-        <h3 style={styles.collectionCardName}>{card.name}</h3>
-        <p style={styles.mutedSmall}>{card.teamName}</p>
+        <h3 style={styles.collectionCardName}>{locked ? "Carte inconnue" : card.name}</h3>
+        <p style={styles.mutedSmall}>{locked ? "À découvrir dans un pack" : card.teamName}</p>
       </div>
       <div style={styles.collectionCardInfoGrid}>
-        <span style={styles.collectionCardInfoPill}>{getCardSeasonLabel(card)}</span>
-        <span style={styles.collectionCardInfoPill}>{cardLabel}</span>
+        <span style={styles.collectionCardInfoPill}>{locked ? "???" : getCardSeasonLabel(card)}</span>
+        <span style={styles.collectionCardInfoPill}>{locked ? "???" : cardLabel}</span>
       </div>
     </article>
   );
@@ -9408,6 +9408,7 @@ const styles = {
   collectionCardTop: { position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, textTransform: "uppercase" },
   collectionCardHero: { position: "relative", zIndex: 1, minHeight: 138, borderRadius: 18, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.14)", overflow: "hidden" },
   collectionCardAvatar: { width: 94, height: 94, borderRadius: 18, display: "grid", placeItems: "center", background: "rgba(2,6,23,.34)", border: "1px solid rgba(255,255,255,.16)", fontWeight: 950, overflow: "hidden", boxShadow: "inset 0 0 28px rgba(255,255,255,.06), 0 16px 30px rgba(0,0,0,.22)" },
+  collectionCardUnknownAvatar: { width: 94, height: 94, borderRadius: 18, display: "grid", placeItems: "center", background: "rgba(2,6,23,.7)", border: "1px solid rgba(203,213,225,.28)", color: "#cbd5e1", fontSize: 44, fontWeight: 950, boxShadow: "inset 0 0 28px rgba(255,255,255,.05), 0 16px 30px rgba(0,0,0,.24)" },
   collectionCardRank: { position: "absolute", right: 10, bottom: 10, minWidth: 38, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", background: "rgba(2,6,23,.72)", fontSize: 12, fontWeight: 950 },
   collectionCardDuplicateBadge: { position: "absolute", right: 12, top: 48, zIndex: 2, minWidth: 42, height: 30, display: "inline-grid", placeItems: "center", border: "1px solid currentColor", borderRadius: 999, background: "rgba(2,6,23,.78)", boxShadow: "0 10px 24px rgba(0,0,0,.28)", fontSize: 12, fontWeight: 950 },
   collectionCardLockedBadge: { position: "absolute", right: 12, top: 48, zIndex: 3, minHeight: 30, display: "inline-grid", placeItems: "center", border: "1px solid rgba(203,213,225,.55)", borderRadius: 999, background: "rgba(15,23,42,.84)", color: "#cbd5e1", padding: "0 10px", fontSize: 11, fontWeight: 950 },
