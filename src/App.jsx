@@ -9019,7 +9019,7 @@ const styles = {
   cardLabCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
   cardLabPortrait: { position: "relative", zIndex: 1, height: 112, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950, overflow: "hidden" },
   cardLabLogo: { width: 82, height: 82, objectFit: "contain" },
-  cardTeamLogo: { width: "100%", height: "100%", objectFit: "cover", display: "block", borderRadius: 14 },
+  cardTeamLogo: { width: 82, height: 82, objectFit: "contain", display: "block" },
   cardSpecialLogo: { width: 82, height: 82, objectFit: "contain", display: "block" },
   cardLabCardName: { margin: 0, fontSize: 25, letterSpacing: "-.04em" },
   cardTitle: { margin: 0, fontSize: 22 },
