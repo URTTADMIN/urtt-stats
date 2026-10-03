@@ -5253,6 +5253,20 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const displayedCollectionCards = collectionRarityFilter === "ALL"
     ? searchFilteredCollectionCards
     : searchFilteredCollectionCards.filter((card) => card.rarity?.id === collectionRarityFilter);
+  const groupedDisplayedCollectionCards = useMemo(() => {
+    const grouped = new Map();
+    displayedCollectionCards.forEach((card) => {
+      const key = card.cardId || card.id;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.duplicateCount += 1;
+        existing.ownedCopies.push(card);
+      } else {
+        grouped.set(key, { ...card, duplicateCount: 1, ownedCopies: [card] });
+      }
+    });
+    return Array.from(grouped.values());
+  }, [displayedCollectionCards]);
   const rarityCounts = useMemo(() => ownedCards.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
@@ -5445,7 +5459,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {displayedCollectionCards.map((card) => <CollectionCard key={card.ownedId || card.id || card.cardId} card={card} />)}
+          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.cardId || card.ownedId || card.id} card={card} />)}
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
@@ -5461,9 +5475,11 @@ function CollectionCard({ card }) {
   const rarityGlowColor = getCardRarityGlowColor(card.rarity);
   const raritySurface = getCardRaritySurface(card.rarity, "38");
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
+  const duplicateCount = Number(card.duplicateCount) || 1;
   return (
     <article style={{ ...styles.collectionCard, borderColor: rarityColor, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+      {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       <div style={styles.collectionCardTop}>
         <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
         <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
@@ -9099,6 +9115,7 @@ const styles = {
   collectionCardHero: { position: "relative", zIndex: 1, minHeight: 138, borderRadius: 18, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.14)", overflow: "hidden" },
   collectionCardAvatar: { width: 94, height: 94, borderRadius: 18, display: "grid", placeItems: "center", background: "rgba(2,6,23,.34)", border: "1px solid rgba(255,255,255,.16)", fontWeight: 950, overflow: "hidden", boxShadow: "inset 0 0 28px rgba(255,255,255,.06), 0 16px 30px rgba(0,0,0,.22)" },
   collectionCardRank: { position: "absolute", right: 10, bottom: 10, minWidth: 38, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", background: "rgba(2,6,23,.72)", fontSize: 12, fontWeight: 950 },
+  collectionCardDuplicateBadge: { position: "absolute", right: 12, top: 48, zIndex: 2, minWidth: 42, height: 30, display: "inline-grid", placeItems: "center", border: "1px solid currentColor", borderRadius: 999, background: "rgba(2,6,23,.78)", boxShadow: "0 10px 24px rgba(0,0,0,.28)", fontSize: 12, fontWeight: 950 },
   collectionCardText: { minWidth: 0 },
   collectionCardName: { margin: 0, fontSize: 24, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   collectionCardInfoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, position: "relative", zIndex: 1 },
