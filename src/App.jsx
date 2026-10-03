@@ -20,9 +20,12 @@ const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_COLLECTION_STORAGE_KEY = "urtt-card-collection";
+const CARD_PACK_STOCK_STORAGE_KEY = "urtt-card-pack-stock";
 const CARD_TEST_SEASON_ID = "S1";
 const CARD_COLLECTION_CATEGORY_ID = "F1";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
+const CARD_PACK_MAX_STOCK = 5;
+const CARD_PACK_REGEN_MS = 60 * 60 * 1000;
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
@@ -145,6 +148,35 @@ function getInitials(name = "") {
   const parts = String(name).trim().split(/\s+/).filter(Boolean);
   const initials = parts.length > 1 ? parts.map((part) => part[0]).join("") : String(name).slice(0, 2);
   return initials.toUpperCase() || "UR";
+}
+
+function normalizeCardPackStock(source, now = Date.now()) {
+  const sourcePacks = Number(source?.packs);
+  const sourceUpdatedAt = Number(source?.updatedAt);
+  let packs = Number.isFinite(sourcePacks) ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor(sourcePacks))) : CARD_PACK_MAX_STOCK;
+  let updatedAt = Number.isFinite(sourceUpdatedAt) && sourceUpdatedAt > 0 ? sourceUpdatedAt : now;
+  if (packs >= CARD_PACK_MAX_STOCK) return { packs: CARD_PACK_MAX_STOCK, updatedAt };
+  const elapsed = Math.max(0, now - updatedAt);
+  const gained = Math.floor(elapsed / CARD_PACK_REGEN_MS);
+  if (gained > 0) {
+    packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
+    updatedAt = packs >= CARD_PACK_MAX_STOCK ? now : updatedAt + gained * CARD_PACK_REGEN_MS;
+  }
+  return { packs, updatedAt };
+}
+
+function readStoredCardPackStock() {
+  if (typeof window === "undefined") return normalizeCardPackStock(null);
+  try {
+    return normalizeCardPackStock(JSON.parse(window.localStorage.getItem(CARD_PACK_STOCK_STORAGE_KEY) || "null"));
+  } catch {
+    return normalizeCardPackStock(null);
+  }
+}
+
+function writeStoredCardPackStock(stock) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CARD_PACK_STOCK_STORAGE_KEY, JSON.stringify(normalizeCardPackStock(stock)));
 }
 
 function getEasterEggStorageKey(playerId = "") {
@@ -4921,6 +4953,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
+  const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
   useEffect(() => {
     setCardsView(initialView === "collection" ? "collection" : "opening");
   }, [initialView]);
@@ -4928,8 +4961,32 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     if (pack.length || !cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
   }, [cardLibrary, rarities, pack.length]);
+  useEffect(() => {
+    const refreshPackStock = () => {
+      setPackStock((current) => {
+        const next = normalizeCardPackStock(current);
+        if (next.packs !== current.packs || next.updatedAt !== current.updatedAt) writeStoredCardPackStock(next);
+        return next;
+      });
+    };
+    refreshPackStock();
+    const interval = window.setInterval(refreshPackStock, 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+  const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
   const openPack = () => {
-    if (!cardLibrary.length) return;
+    const refreshedStock = normalizeCardPackStock(packStock);
+    if (!cardLibrary.length || refreshedStock.packs <= 0) {
+      setPackStock(refreshedStock);
+      writeStoredCardPackStock(refreshedStock);
+      return;
+    }
+    const nextStock = {
+      packs: Math.max(0, refreshedStock.packs - 1),
+      updatedAt: refreshedStock.packs >= CARD_PACK_MAX_STOCK ? Date.now() : refreshedStock.updatedAt,
+    };
+    setPackStock(nextStock);
+    writeStoredCardPackStock(nextStock);
     const nextPack = drawCardPack(cardLibrary, rarities);
     const openedAt = Date.now();
     setPack(nextPack);
@@ -4963,7 +5020,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       {cardsView === "opening" && (
         <section style={styles.cardPackOnlySection}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.cardPlayerPackButton} aria-label="Ouvrir un pack URTT TGC">
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={{ ...styles.cardPlayerPackButton, ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label="Ouvrir un pack URTT TGC">
             <img src="/card-pack-urtt.png" alt="Pack URTT TGC" style={styles.cardPlayerPackImage} />
           </button>
         </section>
@@ -4975,7 +5032,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
           <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
       </header>}
       {cardsView === "collection" && <section style={styles.cardCollectionPanel}>
@@ -5001,14 +5058,14 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
               {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
             </select>
           </label>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
           {displayedCollectionCards.map((card) => <CollectionCard key={card.ownedId || card.id || card.cardId} card={card} />)}
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
-      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
+      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
     </div>
   );
 }
@@ -5068,7 +5125,7 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
   );
 }
 
-function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onReplay, onRevealNext }) {
+function PackOpeningModal({ pack, revealedCount, isOpeningPack, canOpenPack = true, onClose, onReplay, onRevealNext }) {
   return (
     <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
       <div style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
@@ -5084,7 +5141,7 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onRepla
           {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === Math.min(revealedCount, pack.length - 1)} />)}
         </div>
         <div style={styles.cardPackModalFooter}>
-          {!isOpeningPack && <button type="button" onClick={onReplay} style={styles.cardPlayerPrimary}>Rouvrir un pack</button>}
+          {!isOpeningPack && <button type="button" onClick={onReplay} disabled={!canOpenPack} style={styles.cardPlayerPrimary}>{canOpenPack ? "Rouvrir un pack" : "Plus de pack disponible"}</button>}
         </div>
       </div>
     </div>
@@ -8606,6 +8663,7 @@ const styles = {
   cardPackOnlySection: { minHeight: "min(720px, calc(100vh - 170px))", display: "grid", placeItems: "center", padding: "24px 0" },
   cardPlayerPackScene: { minHeight: 430, position: "relative", display: "grid", placeItems: "center" },
   cardPlayerPackButton: { width: "min(390px, 82vw)", aspectRatio: "1024 / 1536", border: 0, background: "transparent", padding: 0, display: "grid", placeItems: "center", cursor: "pointer", filter: "drop-shadow(0 34px 72px rgba(204,0,255,.32))", transform: "rotate(2deg)", transition: "transform .22s ease, filter .22s ease" },
+  cardPlayerPackUnavailable: { cursor: "default", opacity: .55, filter: "drop-shadow(0 20px 42px rgba(148,163,184,.18)) grayscale(.45)" },
   cardPlayerPackLocked: { cursor: "default", opacity: .74, filter: "drop-shadow(0 24px 52px rgba(204,0,255,.2)) grayscale(.1)" },
   cardPlayerPackImage: { width: "100%", height: "100%", objectFit: "contain", display: "block" },
   cardLabHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "rgba(15,23,42,.82)", border: "1px solid #33415f", borderRadius: 22, padding: 22, boxShadow: "0 24px 70px rgba(0,0,0,.28)" },
