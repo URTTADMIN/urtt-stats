@@ -9,6 +9,12 @@ create table if not exists public.player_accounts (
 
 alter table public.player_accounts enable row level security;
 
+alter table public.player_accounts
+add column if not exists card_collection jsonb not null default '[]'::jsonb;
+
+alter table public.player_accounts
+add column if not exists card_pack_stock jsonb;
+
 drop policy if exists "Public can create player accounts" on public.player_accounts;
 create policy "Public can create player accounts"
 on public.player_accounts
@@ -22,6 +28,14 @@ on public.player_accounts
 for select
 to anon, authenticated
 using (true);
+
+drop policy if exists "Public can update player accounts" on public.player_accounts;
+create policy "Public can update player accounts"
+on public.player_accounts
+for update
+to anon, authenticated
+using (true)
+with check (true);
 
 alter table public.race_predictions
 add column if not exists user_id uuid references auth.users(id) on delete set null;

@@ -216,6 +216,42 @@ function writeStoredCardPackStock(stock) {
   window.localStorage.setItem(CARD_PACK_STOCK_STORAGE_KEY, JSON.stringify(normalizeCardPackStock(stock)));
 }
 
+function readStoredCardCollection() {
+  if (typeof window === "undefined") return [];
+  try {
+    const cards = JSON.parse(window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY) || "[]");
+    return Array.isArray(cards) ? cards : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredCardCollection(cards = []) {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(CARD_COLLECTION_STORAGE_KEY, JSON.stringify(Array.isArray(cards) ? cards : []));
+}
+
+function normalizeCardCollection(value) {
+  if (typeof value === "string") {
+    try {
+      return normalizeCardCollection(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+  return Array.isArray(value) ? value : [];
+}
+
+function mergeCardCollections(primary = [], fallback = []) {
+  const seen = new Set();
+  return [...normalizeCardCollection(primary), ...normalizeCardCollection(fallback)].filter((card) => {
+    const key = String(card?.ownedId || card?.id || `${card?.cardId || ""}-${card?.obtainedAtMs || ""}`);
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function getNextCardPackInMs(stock, now = Date.now()) {
   const normalized = normalizeCardPackStock(stock, now);
   if (normalized.packs >= CARD_PACK_MAX_STOCK) return 0;
@@ -1090,6 +1126,8 @@ function mapPlayerProfileFromDb(profile) {
     pseudo: profile.pseudo || "",
     discordName: profile.discord_name || "",
     unlockedEasterEggs: normalizeEasterEggIds(profile.unlocked_easter_eggs),
+    cardCollection: normalizeCardCollection(profile.card_collection),
+    cardPackStock: profile.card_pack_stock ? normalizeCardPackStock(profile.card_pack_stock) : null,
     createdAt: profile.created_at || "",
     lastSeenAt: profile.last_seen_at || "",
   };
@@ -4804,7 +4842,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} playerProfile={playerProfile} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -5157,7 +5195,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", embedded = false }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, embedded = false }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(initialView === "collection" ? "collection" : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5174,13 +5212,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (collection.length) return collection;
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
   }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
-  const [ownedCards, setOwnedCards] = useState(() => {
-    try {
-      return JSON.parse(window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY) || "[]");
-    } catch {
-      return [];
-    }
-  });
+  const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
   const sortedOwnedCards = useMemo(() => [...ownedCards]
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || a.name.localeCompare(b.name)),
   [ownedCards]);
@@ -5212,9 +5244,31 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
+  const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
+  const savePlayerCards = async (cards, stock) => {
+    const normalizedCards = normalizeCardCollection(cards);
+    const normalizedStock = normalizeCardPackStock(stock);
+    writeStoredCardCollection(normalizedCards);
+    writeStoredCardPackStock(normalizedStock);
+    if (!playerCardAccountId) return;
+    const { error } = await supabase
+      .from("player_accounts")
+      .update({ card_collection: normalizedCards, card_pack_stock: normalizedStock, last_seen_at: new Date().toISOString() })
+      .eq("id", playerCardAccountId);
+    if (error && !["42703", "PGRST204"].includes(error.code)) console.error("Erreur sauvegarde cartes joueur:", error);
+  };
   useEffect(() => {
     setCardsView(initialView === "collection" ? "collection" : "opening");
   }, [initialView]);
+  useEffect(() => {
+    const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
+    const localCards = readStoredCardCollection();
+    const nextCards = playerCardAccountId ? mergeCardCollections(accountCards, accountCards.length ? [] : localCards) : localCards;
+    const nextStock = playerCardAccountId && playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : readStoredCardPackStock();
+    setOwnedCards(nextCards);
+    setPackStock(nextStock);
+    if (playerCardAccountId && !accountCards.length && localCards.length) savePlayerCards(nextCards, nextStock);
+  }, [playerCardAccountId]);
   useEffect(() => {
     if (pack.length || !cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
@@ -5223,14 +5277,14 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const refreshPackStock = () => {
       setPackStock((current) => {
         const next = normalizeCardPackStock(current);
-        if (next.packs !== current.packs || next.updatedAt !== current.updatedAt) writeStoredCardPackStock(next);
+        if (next.packs !== current.packs || next.updatedAt !== current.updatedAt) savePlayerCards(ownedCards, next);
         return next;
       });
     };
     refreshPackStock();
     const interval = window.setInterval(refreshPackStock, 1000);
     return () => window.clearInterval(interval);
-  }, []);
+  }, [ownedCards, playerCardAccountId]);
   const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
@@ -5239,7 +5293,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const refreshedStock = normalizeCardPackStock(packStock);
     if (!cardLibrary.length || refreshedStock.packs <= 0) {
       setPackStock(refreshedStock);
-      writeStoredCardPackStock(refreshedStock);
+      savePlayerCards(ownedCards, refreshedStock);
       return;
     }
     const nextStock = {
@@ -5248,7 +5302,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       dayKey: refreshedStock.dayKey,
     };
     setPackStock(nextStock);
-    writeStoredCardPackStock(nextStock);
     const nextPack = drawCardPack(cardLibrary, rarities);
     const openedAt = Date.now();
     setPack(nextPack);
@@ -5257,11 +5310,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         ...nextPack.map((card, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
         ...current,
       ];
-      try {
-        window.localStorage.setItem(CARD_COLLECTION_STORAGE_KEY, JSON.stringify(nextOwnedCards));
-      } catch {
-        // La collection reste visible pendant la session si le stockage local est plein ou indisponible.
-      }
+      savePlayerCards(nextOwnedCards, nextStock);
       return nextOwnedCards;
     });
     setRevealedCount(0);
