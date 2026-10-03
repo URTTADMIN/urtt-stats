@@ -5119,6 +5119,18 @@ function getCardLogoStyle(card = {}) {
   return card.cardType === "special" ? styles.cardSpecialLogo : styles.cardTeamLogo;
 }
 
+function getCollectionGroupKey(card = {}) {
+  return [
+    card.cardType || "driver",
+    normalizeCategoryId(card.categoryId),
+    normalizeSeasonId(card.seasonId),
+    normalizeResultText(card.name),
+    normalizeResultText(card.teamName),
+    Number(card.position) || 0,
+    card.rarity?.id || "",
+  ].join("|");
+}
+
 function buildOffSeasonCard(entry, position, eventType, teams = [], drivers = [], rarities = CARD_RARITY_PRESETS) {
   const rarity = getSeasonCardRarityForPosition(position, rarities);
   if (!rarity) return null;
@@ -5256,13 +5268,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const groupedDisplayedCollectionCards = useMemo(() => {
     const grouped = new Map();
     displayedCollectionCards.forEach((card) => {
-      const key = card.cardId || card.id;
+      const key = getCollectionGroupKey(card);
       const existing = grouped.get(key);
       if (existing) {
         existing.duplicateCount += 1;
         existing.ownedCopies.push(card);
       } else {
-        grouped.set(key, { ...card, duplicateCount: 1, ownedCopies: [card] });
+        grouped.set(key, { ...card, collectionGroupKey: key, duplicateCount: 1, ownedCopies: [card] });
       }
     });
     return Array.from(grouped.values());
@@ -5459,7 +5471,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.cardId || card.ownedId || card.id} card={card} />)}
+          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} />)}
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
