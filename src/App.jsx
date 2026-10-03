@@ -35,6 +35,7 @@ const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
+const EMPTY_SPECIAL_CARD_FORM = { name: "", rarityId: "C", image: "", color: "#cc00ff" };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_LOGO = "/retired-driver.png";
@@ -517,7 +518,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS, specialCards: [] };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -1116,6 +1117,42 @@ function normalizeCardLabSettings(value) {
     allowedPseudos: allowedPseudos.length ? allowedPseudos : DEFAULT_CARD_LAB_SETTINGS.allowedPseudos,
   };
 }
+function getSpecialCardId(name = "", fallback = Date.now()) {
+  const slug = normalizeResultText(name)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return slug || `special-${fallback}`;
+}
+function normalizeSpecialCards(value) {
+  const cards = Array.isArray(value) ? value : [];
+  const usedIds = new Set(CARD_SPECIAL_PRESETS.map((card) => card.id));
+  return cards
+    .map((card, index) => {
+      const name = normalizeResultText(card?.name || "");
+      const image = String(card?.image || "").trim();
+      if (!name || !image) return null;
+      const rarityId = CARD_RARITY_PRESETS.some((rarity) => rarity.id === card?.rarityId) ? card.rarityId : "C";
+      const baseId = getSpecialCardId(card?.id || name, index + 1);
+      let id = baseId;
+      let suffix = 2;
+      while (usedIds.has(id)) {
+        id = `${baseId}-${suffix}`;
+        suffix += 1;
+      }
+      usedIds.add(id);
+      return {
+        id,
+        name,
+        rarityId,
+        image,
+        color: /^#[0-9a-f]{6}$/i.test(String(card?.color || "")) ? card.color : "#cc00ff",
+      };
+    })
+    .filter(Boolean);
+}
 function mapSiteSettingsFromDb(rows = []) {
   const rawSettings = rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
   const hasPublicPagesSetting = rows.some((row) => row.key === "publicPages");
@@ -1126,6 +1163,7 @@ function mapSiteSettingsFromDb(rows = []) {
     thanksNames: normalizeThanksNames(rawSettings.thanksNames),
     thanksText: normalizeThanksText(rawSettings.thanksText),
     cardLabSettings: normalizeCardLabSettings(rawSettings.cardLabSettings),
+    specialCards: normalizeSpecialCards(rawSettings.specialCards),
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
@@ -4910,7 +4948,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} playerProfile={playerProfile} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} playerProfile={playerProfile} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -5226,8 +5264,8 @@ function buildOffSeasonCardCollection(entries = [], teams = [], drivers = [], ev
   });
 }
 
-function buildSpecialCardCollection(rarities = CARD_RARITY_PRESETS) {
-  return CARD_SPECIAL_PRESETS.map((card) => {
+function buildSpecialCardCollection(rarities = CARD_RARITY_PRESETS, customSpecialCards = []) {
+  return [...CARD_SPECIAL_PRESETS, ...normalizeSpecialCards(customSpecialCards)].map((card) => {
     const rarity = rarities.find((item) => item.id === card.rarityId) || rarities[0];
     return {
       id: `special-${card.id}`,
@@ -5275,7 +5313,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, embedded = false }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, embedded = false, specialCards = [] }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(initialView === "collection" ? "collection" : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5289,11 +5327,11 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonCardCollection(categoryStandings[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, teams, rarities)),
       ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonTeamCardCollection(teamStandingsByCategory[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, rarities)),
       ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
-      ...buildSpecialCardCollection(rarities),
+      ...buildSpecialCardCollection(rarities, specialCards),
     ];
     if (collection.length) return collection;
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
-  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
+  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities, specialCards]);
   const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
   const sortedOwnedCards = useMemo(() => [...ownedCards]
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || a.name.localeCompare(b.name)),
@@ -8884,7 +8922,9 @@ function SeasonCardsAdminPanel({
   isSaving = false,
 }) {
   const cardSettings = normalizeCardLabSettings(siteSettings.cardLabSettings);
+  const specialCards = normalizeSpecialCards(siteSettings.specialCards);
   const cardSeasonId = cardSettings.seasonId;
+  const [specialCardForm, setSpecialCardForm] = useState(EMPTY_SPECIAL_CARD_FORM);
   const [allowedDraft, setAllowedDraft] = useState(() => cardSettings.allowedPseudos.join("\n"));
   useEffect(() => {
     setAllowedDraft(cardSettings.allowedPseudos.join("\n"));
@@ -8902,7 +8942,8 @@ function SeasonCardsAdminPanel({
     () => buildSeasonCardEdition(standings, cardSeasonId, selectedCategoryId, teams),
     [standings, cardSeasonId, selectedCategoryId, teams],
   );
-  const specialPreviewCards = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS), []);
+  const specialPreviewCards = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS, specialCards), [specialCards]);
+  const specialCardPreview = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS, [specialCardForm]).find((card) => card.name === normalizeResultText(specialCardForm.name)) || null, [specialCardForm]);
   const validatedEdition = validatedGenerations[storageKey] || null;
   const validateGeneration = () => {
     const nextGeneration = {
@@ -8929,11 +8970,66 @@ function SeasonCardsAdminPanel({
   const saveAllowedPseudos = () => {
     saveCardSettings({ allowedPseudos: allowedDraft });
   };
+  const saveSpecialCard = () => {
+    const normalizedCard = normalizeSpecialCards([{ ...specialCardForm, id: getSpecialCardId(specialCardForm.name) }])[0];
+    if (!normalizedCard || !onUpdateSetting) return;
+    const nextCards = normalizeSpecialCards([...specialCards, normalizedCard]);
+    onUpdateSetting("specialCards", nextCards);
+    setSpecialCardForm(EMPTY_SPECIAL_CARD_FORM);
+  };
+  const deleteSpecialCard = (cardId) => {
+    onUpdateSetting?.("specialCards", specialCards.filter((card) => card.id !== cardId));
+  };
+  const handleSpecialCardImage = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setSpecialCardForm((current) => ({ ...current, image: String(reader.result || "") }));
+    reader.readAsDataURL(file);
+  };
 
   return (
     <div style={styles.section}>
       <Card title="Création de carte spéciale" icon="⚙️">
         <div style={styles.stack}>
+          <div style={styles.resultsInfo}>
+            <Input label="Nom de la carte" value={specialCardForm.name} onChange={(value) => setSpecialCardForm((current) => ({ ...current, name: value }))} />
+            <label style={styles.label}>
+              <span style={styles.labelText}>Rareté</span>
+              <select value={specialCardForm.rarityId} onChange={(event) => setSpecialCardForm((current) => ({ ...current, rarityId: event.target.value }))} style={styles.resultsSelect}>
+                {CARD_RARITY_PRESETS.map((rarity) => <option key={rarity.id} value={rarity.id}>{rarity.id} - {rarity.name}</option>)}
+              </select>
+            </label>
+            <ColorInput label="Couleur de fond" value={specialCardForm.color} onChange={(value) => setSpecialCardForm((current) => ({ ...current, color: value }))} />
+          </div>
+          <div style={styles.resultsInfo}>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Image</span>
+              <input type="file" accept="image/*" onChange={(event) => handleSpecialCardImage(event.target.files?.[0])} style={styles.input} />
+            </label>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Image URL / data</span>
+              <input value={specialCardForm.image} onChange={(event) => setSpecialCardForm((current) => ({ ...current, image: event.target.value }))} placeholder="/mon-image.png ou image importée" style={styles.input} />
+            </label>
+            <button type="button" onClick={saveSpecialCard} disabled={isSaving || !specialCardForm.name.trim() || !specialCardForm.image.trim() || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Créer la carte spéciale"}</button>
+          </div>
+          {specialCardPreview && <SeasonCardGenerationGrid cards={[specialCardPreview]} compact />}
+          {specialCards.length > 0 && (
+            <div style={styles.stack}>
+              <h4 style={styles.subTitle}>Cartes spéciales créées</h4>
+              <div style={styles.cardCollectionGrid}>
+                {buildSpecialCardCollection(CARD_RARITY_PRESETS, specialCards)
+                  .filter((card) => !CARD_SPECIAL_PRESETS.some((preset) => card.cardId === `special-${preset.id}`))
+                  .map((card) => (
+                    <div key={card.cardId} style={styles.stack}>
+                      <CollectionCard card={card} />
+                      <button type="button" onClick={() => deleteSpecialCard(card.cardId.replace(/^special-/, ""))} style={styles.dangerButton}>Supprimer</button>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+          <p style={styles.mutedSmall}>Ces cartes rejoignent les cartes spéciales disponibles dans les packs.</p>
+          <div style={styles.separator} />
           <div style={styles.resultsInfo}>
             <label style={styles.label}>
               <span style={styles.labelText}>Saison utilisée sur la page joueur</span>
@@ -9207,7 +9303,9 @@ const styles = {
   cardSpecialLogo: { width: 82, height: 82, objectFit: "contain", display: "block" },
   cardLabCardName: { margin: 0, fontSize: 25, letterSpacing: "-.04em" },
   cardTitle: { margin: 0, fontSize: 22 },
+  subTitle: { margin: "4px 0", fontSize: 18, fontWeight: 950 },
   stack: { display: "grid", gap: 12 },
+  separator: { height: 1, background: "rgba(255,255,255,.12)", margin: "4px 0" },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
   standingsGrid: { display: "grid", gridTemplateColumns: "1fr", gap: 22, width: "100%" },
   mediaGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 240px), 1fr))", gap: 14 },
