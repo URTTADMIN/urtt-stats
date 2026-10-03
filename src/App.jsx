@@ -3966,7 +3966,7 @@ export default function URTTAdminPanel() {
     const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
     const seasonOneCardDrivers = computed.driverStatsBySeason[CARD_TEST_SEASON_ID]?.length ? computed.driverStatsBySeason[CARD_TEST_SEASON_ID] : computed.globalDriverStats;
     return hasCardLabAccess
-      ? <CardRarityLab drivers={seasonOneCardDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} />
+      ? <CardRarityLab drivers={seasonOneCardDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} categoryId={selectedCategoryId} />
       : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={loginPlayerAccount} onPlayerSignup={signUpPlayerAccount} onPlayerLogout={logoutPlayerAccount} isSavingPlayerAccount={isSavingPlayerAccount} />;
   }
 
@@ -4857,24 +4857,38 @@ function drawLabPack(pool, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.score - b.score);
 }
 
-function CardRarityLab({ drivers = [], teams = [], seasonId = "S1" }) {
+function drawCardPack(cards, rarities, count = 5) {
+  const selected = [];
+  const available = [...cards];
+  while (selected.length < Math.min(count, available.length + selected.length) && available.length) {
+    const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
+    selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
+    available.splice(available.findIndex((item) => item.cardId === card.cardId), 1);
+  }
+  return selected
+    .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
+}
+
+function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId = "F1" }) {
   const [rarities, setRarities] = useState(CARD_RARITY_PRESETS);
-  const pool = useMemo(() => normalizeCardPool(drivers, teams), [drivers, teams]);
-  const cardLibrary = useMemo(() => pool
-    .map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)))
-    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || b.score - a.score || a.name.localeCompare(b.name)),
-  [pool, rarities]);
+  const cardLibrary = useMemo(() => buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities)
+    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || a.position - b.position || a.name.localeCompare(b.name)),
+  [drivers, teams, seasonId, categoryId, rarities]);
   const rarityCounts = useMemo(() => cardLibrary.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
   }), {}), [cardLibrary]);
-  const [pack, setPack] = useState(() => drawLabPack(normalizeCardPool([], []), CARD_RARITY_PRESETS));
+  const [pack, setPack] = useState([]);
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [simulation, setSimulation] = useState(null);
   const totalWeight = rarities.reduce((sum, rarity) => sum + Math.max(0, Number(rarity.weight) || 0), 0);
   const rarestCard = pack[pack.length - 1];
+  useEffect(() => {
+    if (pack.length || !cardLibrary.length) return;
+    setPack(drawCardPack(cardLibrary, rarities));
+  }, [cardLibrary, rarities, pack.length]);
   useEffect(() => {
     if (!isOpeningPack) return undefined;
     if (revealedCount >= pack.length) {
@@ -4888,7 +4902,7 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1" }) {
     setRarities((current) => current.map((rarity) => rarity.id === rarityId ? { ...rarity, weight: Math.max(0, Number(value) || 0) } : rarity));
   };
   const openPack = () => {
-    setPack(drawLabPack(pool, rarities));
+    setPack(drawCardPack(cardLibrary, rarities));
     setRevealedCount(0);
     setShowPackModal(true);
     setIsOpeningPack(true);
@@ -4900,7 +4914,7 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1" }) {
   const simulate = () => {
     const counts = Object.fromEntries(rarities.map((rarity) => [rarity.id, 0]));
     Array.from({ length: 100 }).forEach(() => {
-      drawLabPack(pool, rarities).forEach((card) => {
+      drawCardPack(cardLibrary, rarities).forEach((card) => {
         counts[card.rarity.id] = (counts[card.rarity.id] || 0) + 1;
       });
     });
@@ -5009,7 +5023,7 @@ function CollectionCard({ card }) {
         <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
         <div style={styles.collectionCardText}>
           <h3 style={styles.collectionCardName}>{card.name}</h3>
-          <p style={styles.mutedSmall}>{card.teamName}</p>
+          <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
         </div>
       </div>
       <div style={styles.collectionCardStats}>
@@ -5101,7 +5115,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
           </div>
           <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
-          <p style={styles.mutedSmall}>{card.teamName}</p>
+          <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
           <div style={styles.cardLabStats}>
             <span><small>ATQ</small><strong>{card.attack}</strong></span>
             <span><small>DEF</small><strong>{card.defense}</strong></span>
