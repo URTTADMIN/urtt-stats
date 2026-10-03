@@ -90,12 +90,13 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "easter-eggs", label: "Livre secret" },
   { id: "tgc-packs", label: "Packs" },
   { id: "tgc-collection", label: "Collection" },
+  { id: "tgc-pokedex", label: "Pokédex" },
   { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
   { id: "championship", label: "Championnat", pages: ["standings", "seasons", "drivers", "teams", "development"] },
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
-  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection"] },
+  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
@@ -157,6 +158,7 @@ function getPublicPageIcon(pageId) {
     "easter-eggs": "□",
     "tgc-packs": "◈",
     "tgc-collection": "▣",
+    "tgc-pokedex": "◇",
     "other-championships": "+",
   }[pageId] || "•";
 }
@@ -4799,7 +4801,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
   const activePublicPageOption = activePublicPage === "cards-lab" ? { id: "cards-lab", label: "Cartes" } : PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
-  const isTgcPage = ["cards-lab", "tgc-packs", "tgc-collection"].includes(activePublicPage);
+  const isTgcPage = ["cards-lab", "tgc-packs", "tgc-collection", "tgc-pokedex"].includes(activePublicPage);
   const isLightTheme = publicTheme === "light";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -4948,7 +4950,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : "opening"} playerProfile={playerProfile} specialCards={siteSettings.specialCards} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -5315,7 +5317,7 @@ function drawCardPack(cards, rarities, count = 5) {
 
 function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, embedded = false, specialCards = [] }) {
   const rarities = CARD_RARITY_PRESETS;
-  const [cardsView, setCardsView] = useState(initialView === "collection" ? "collection" : "opening");
+  const [cardsView, setCardsView] = useState(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
   const [collectionSeasonFilter, setCollectionSeasonFilter] = useState("ALL");
   const [collectionRarityFilter, setCollectionRarityFilter] = useState("ALL");
@@ -5333,6 +5335,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
   }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities, specialCards]);
   const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
+  const ownedCardKeys = useMemo(() => new Set(ownedCards.map((card) => getCollectionGroupKey(card))), [ownedCards]);
   const sortedOwnedCards = useMemo(() => [...ownedCards]
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || a.name.localeCompare(b.name)),
   [ownedCards]);
@@ -5384,6 +5387,46 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const collectionCategoryOptions = [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS, CARD_COLLECTION_SPECIAL_CATEGORY_ID]
     .map((id) => ({ id, label: getCardCategoryLabel(id), count: ownedCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(id)).length }))
     .filter((category) => category.count > 0);
+  const pokedexCards = useMemo(() => {
+    const grouped = new Map();
+    cardLibrary.forEach((card) => {
+      const key = getCollectionGroupKey(card);
+      if (!grouped.has(key)) grouped.set(key, { ...card, collectionGroupKey: key, owned: ownedCardKeys.has(key) });
+    });
+    return Array.from(grouped.values())
+      .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || normalizeCategoryId(a.categoryId).localeCompare(normalizeCategoryId(b.categoryId)) || getSeasonNumber(a.seasonId) - getSeasonNumber(b.seasonId) || a.position - b.position || a.name.localeCompare(b.name));
+  }, [cardLibrary, ownedCardKeys]);
+  const pokedexCategoryFilteredCards = collectionCategoryFilter === "ALL"
+    ? pokedexCards
+    : pokedexCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(collectionCategoryFilter));
+  const pokedexSeasonFilteredCards = collectionSeasonFilter === "ALL"
+    ? pokedexCategoryFilteredCards
+    : pokedexCategoryFilteredCards.filter((card) => normalizeSeasonId(card.seasonId) === normalizeSeasonId(collectionSeasonFilter));
+  const pokedexTypeFilteredCards = collectionTypeFilter === "ALL"
+    ? pokedexSeasonFilteredCards
+    : pokedexSeasonFilteredCards.filter((card) => {
+      if (collectionTypeFilter === "DRIVER") return !["team", "special"].includes(card.cardType);
+      if (collectionTypeFilter === "TEAM") return card.cardType === "team";
+      if (collectionTypeFilter === "SPECIAL") return card.cardType === "special";
+      return true;
+    });
+  const pokedexSearchFilteredCards = collectionSearch.trim()
+    ? pokedexTypeFilteredCards.filter((card) => normalizeResultText(`${card.name} ${card.teamName} ${card.categoryName || ""}`).includes(normalizeResultText(collectionSearch)))
+    : pokedexTypeFilteredCards;
+  const displayedPokedexCards = collectionRarityFilter === "ALL"
+    ? pokedexSearchFilteredCards
+    : pokedexSearchFilteredCards.filter((card) => card.rarity?.id === collectionRarityFilter);
+  const pokedexRarityCounts = useMemo(() => pokedexSearchFilteredCards.reduce((counts, card) => ({
+    ...counts,
+    [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
+  }), {}), [pokedexSearchFilteredCards]);
+  const pokedexSeasonOptions = useMemo(() => Array.from(new Set(pokedexCategoryFilteredCards.map((card) => normalizeSeasonId(card.seasonId))))
+    .map((id) => ({ id, count: pokedexCategoryFilteredCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
+    .sort((a, b) => getSeasonNumber(a.id) - getSeasonNumber(b.id) || a.id.localeCompare(b.id)), [pokedexCategoryFilteredCards]);
+  const pokedexCategoryOptions = useMemo(() => [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS, CARD_COLLECTION_SPECIAL_CATEGORY_ID]
+    .map((id) => ({ id, label: getCardCategoryLabel(id), count: pokedexCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(id)).length }))
+    .filter((category) => category.count > 0), [pokedexCards]);
+  const pokedexOwnedCount = pokedexCards.filter((card) => card.owned).length;
   const [pack, setPack] = useState([]);
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
@@ -5403,7 +5446,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (error && !["42703", "PGRST204"].includes(error.code)) console.error("Erreur sauvegarde cartes joueur:", error);
   };
   useEffect(() => {
-    setCardsView(initialView === "collection" ? "collection" : "opening");
+    setCardsView(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   }, [initialView]);
   useEffect(() => {
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
@@ -5574,12 +5617,93 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
+      {cardsView === "pokedex" && <header style={styles.cardLabHeader}>
+        <div>
+          <p style={styles.kicker}>POKÉDEX · BASE COMPLÈTE</p>
+          <h1 style={styles.cardLabTitle}>Pokédex URTT TCG</h1>
+          <p style={styles.muted}>Toutes les cartes existantes sont listées ici. Les cartes obtenues sont visibles, les autres restent grisées.</p>
+        </div>
+        <div style={styles.cardCollectionSummary}>
+          <span style={styles.cardCollectionSummaryBadge}>{pokedexOwnedCount}/{pokedexCards.length} obtenues</span>
+        </div>
+      </header>}
+      {cardsView === "pokedex" && <section style={styles.cardCollectionPanel}>
+        <div style={styles.cardCollectionHeader}>
+          <div>
+            <p style={styles.kicker}>Saisons · Championnats · Raretés</p>
+            <h2 style={styles.cardLabStageTitle}>Toutes les cartes</h2>
+            <p style={styles.muted}>Filtre par saison, championnat, type ou rareté pour voir ce qu'il te manque.</p>
+          </div>
+          <div style={styles.cardCollectionSummary}>
+            {CARD_COLLECTION_VISIBLE_RARITIES.map((rarity) => (
+              <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
+                {rarity.id} · {pokedexCards.filter((card) => card.rarity?.id === rarity.id && card.owned).length}/{pokedexCards.filter((card) => card.rarity?.id === rarity.id).length}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div style={styles.cardCollectionToolbar}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Rechercher par nom</span>
+            <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie, spéciale..." style={styles.resultsSelect} />
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Filtrer par type</span>
+            <select value={collectionTypeFilter} onChange={(event) => setCollectionTypeFilter(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Toutes les cartes ({pokedexSeasonFilteredCards.length})</option>
+              <option value="DRIVER">Pilotes ({pokedexSeasonFilteredCards.filter((card) => !["team", "special"].includes(card.cardType)).length})</option>
+              <option value="TEAM">Écuries ({pokedexSeasonFilteredCards.filter((card) => card.cardType === "team").length})</option>
+              <option value="SPECIAL">Spéciales ({pokedexSeasonFilteredCards.filter((card) => card.cardType === "special").length})</option>
+            </select>
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Filtrer par championnat</span>
+            <select value={collectionCategoryFilter} onChange={(event) => { setCollectionCategoryFilter(event.target.value); setCollectionSeasonFilter("ALL"); }} style={styles.resultsSelect}>
+              <option value="ALL">Tous les championnats ({pokedexCards.length})</option>
+              {pokedexCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.label} ({category.count})</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Filtrer par saison</span>
+            <select value={collectionSeasonFilter} onChange={(event) => setCollectionSeasonFilter(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Toutes les saisons ({pokedexCategoryFilteredCards.length})</option>
+              {pokedexSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.id === "SPECIAL" ? "Spécial" : seasonName(season.id)} ({season.count})</option>)}
+            </select>
+          </label>
+          <div style={styles.cardRarityFilterGroup}>
+            <span style={styles.labelText}>Filtrer par rareté</span>
+            <div style={styles.cardRarityFilterRow}>
+              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {pokedexSearchFilteredCards.length}</button>
+              {[...CARD_COLLECTION_VISIBLE_RARITIES].reverse().map((rarity) => (
+                <button
+                  key={rarity.id}
+                  type="button"
+                  onClick={() => setCollectionRarityFilter(rarity.id)}
+                  style={{
+                    ...styles.cardRarityFilterButton,
+                    borderColor: rarity.color,
+                    color: rarity.color,
+                    background: collectionRarityFilter === rarity.id ? `${rarity.color}22` : "rgba(255,255,255,.04)",
+                    boxShadow: collectionRarityFilter === rarity.id ? `0 0 22px ${rarity.color}44` : "none",
+                  }}
+                >
+                  {rarity.id} · {pokedexRarityCounts[rarity.id] || 0}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div style={styles.cardCollectionGrid}>
+          {displayedPokedexCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.id} card={card} locked={!card.owned} />)}
+        </div>
+        {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le Pokédex pour cette sélection." />}
+      </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
     </div>
   );
 }
 
-function CollectionCard({ card }) {
+function CollectionCard({ card, locked = false }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
   const rarityColor = getCardRarityColor(card.rarity);
@@ -5588,9 +5712,10 @@ function CollectionCard({ card }) {
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   const duplicateCount = Number(card.duplicateCount) || 1;
   return (
-    <article style={{ ...styles.collectionCard, borderColor: rarityColor, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
+    <article style={{ ...styles.collectionCard, borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, filter: locked ? "grayscale(.96)" : "none", opacity: locked ? .58 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
+      {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
       <div style={styles.collectionCardTop}>
         <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
         <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
@@ -9285,6 +9410,7 @@ const styles = {
   collectionCardAvatar: { width: 94, height: 94, borderRadius: 18, display: "grid", placeItems: "center", background: "rgba(2,6,23,.34)", border: "1px solid rgba(255,255,255,.16)", fontWeight: 950, overflow: "hidden", boxShadow: "inset 0 0 28px rgba(255,255,255,.06), 0 16px 30px rgba(0,0,0,.22)" },
   collectionCardRank: { position: "absolute", right: 10, bottom: 10, minWidth: 38, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", background: "rgba(2,6,23,.72)", fontSize: 12, fontWeight: 950 },
   collectionCardDuplicateBadge: { position: "absolute", right: 12, top: 48, zIndex: 2, minWidth: 42, height: 30, display: "inline-grid", placeItems: "center", border: "1px solid currentColor", borderRadius: 999, background: "rgba(2,6,23,.78)", boxShadow: "0 10px 24px rgba(0,0,0,.28)", fontSize: 12, fontWeight: 950 },
+  collectionCardLockedBadge: { position: "absolute", right: 12, top: 48, zIndex: 3, minHeight: 30, display: "inline-grid", placeItems: "center", border: "1px solid rgba(203,213,225,.55)", borderRadius: 999, background: "rgba(15,23,42,.84)", color: "#cbd5e1", padding: "0 10px", fontSize: 11, fontWeight: 950 },
   collectionCardText: { minWidth: 0 },
   collectionCardName: { margin: 0, fontSize: 24, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   collectionCardInfoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, position: "relative", zIndex: 1 },
