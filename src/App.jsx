@@ -4886,7 +4886,6 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
-  const rarestCard = pack[pack.length - 1];
   useEffect(() => {
     if (pack.length || !cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
@@ -4951,7 +4950,6 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
           <h2 style={styles.cardLabStageTitle}>Une série basée sur le classement</h2>
           <p style={styles.muted}>Chaque carte Saison 1 garde sa rareté officielle selon la position finale du pilote au championnat.</p>
         </div>
-        {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Pack actuel : meilleure carte {rarestCard.rarity.name}</span>}
       </section>
       <section style={styles.cardPlayerInfoGrid}>
         <Card title="Raretés Saison 1" icon="🏆">
@@ -5066,7 +5064,6 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
 }
 
 function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onReplay }) {
-  const rarestCard = pack[pack.length - 1];
   return (
     <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
       <div style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
@@ -5081,7 +5078,6 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onRepla
           {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === revealedCount - 1} />)}
         </div>
         <div style={styles.cardPackModalFooter}>
-          {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Meilleure carte : {rarestCard.rarity.name}</span>}
           {!isOpeningPack && <button type="button" onClick={onReplay} style={styles.cardPlayerPrimary}>Rouvrir un pack</button>}
         </div>
       </div>
@@ -8612,7 +8608,6 @@ const styles = {
   cardLabTitle: { margin: "6px 0", fontSize: "clamp(30px, 5vw, 54px)", lineHeight: 1, letterSpacing: "-.055em" },
   cardLabOpeningStage: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "linear-gradient(135deg, rgba(15,23,42,.9), rgba(76,29,149,.32))", border: "1px solid #455574", borderRadius: 22, padding: 20, boxShadow: "0 20px 60px rgba(0,0,0,.22)" },
   cardLabStageTitle: { margin: "5px 0", fontSize: 28, letterSpacing: "-.04em" },
-  cardLabBestBadge: { border: "1px solid currentColor", borderRadius: 999, padding: "10px 13px", fontWeight: 950, background: "rgba(255,255,255,.07)" },
   cardPackModalOverlay: { position: "fixed", inset: 0, zIndex: 7000, background: "radial-gradient(circle at center, rgba(204,0,255,.24), transparent 34%), rgba(2,6,23,.82)", display: "grid", placeItems: "center", padding: 24, backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)" },
   cardPackModal: { width: "min(1220px, 100%)", maxHeight: "92vh", overflow: "auto", background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(29,20,48,.98))", border: "1px solid #52627f", borderRadius: 28, padding: 22, display: "grid", gap: 20, boxShadow: "0 35px 110px rgba(0,0,0,.55)" },
   cardPackModalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 18 },
