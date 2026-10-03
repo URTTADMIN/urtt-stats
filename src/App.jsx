@@ -19,6 +19,7 @@ const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
+const CARD_TEST_SEASON_ID = "S1";
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
@@ -3963,8 +3964,9 @@ export default function URTTAdminPanel() {
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
   if (isCardLabRequested()) {
     const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
+    const seasonOneCardDrivers = computed.driverStatsBySeason[CARD_TEST_SEASON_ID]?.length ? computed.driverStatsBySeason[CARD_TEST_SEASON_ID] : computed.globalDriverStats;
     return hasCardLabAccess
-      ? <CardRarityLab drivers={computed.globalDriverStats} teams={teams} />
+      ? <CardRarityLab drivers={seasonOneCardDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} />
       : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={loginPlayerAccount} onPlayerSignup={signUpPlayerAccount} onPlayerLogout={logoutPlayerAccount} isSavingPlayerAccount={isSavingPlayerAccount} />;
   }
 
@@ -4855,7 +4857,7 @@ function drawLabPack(pool, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.score - b.score);
 }
 
-function CardRarityLab({ drivers = [], teams = [] }) {
+function CardRarityLab({ drivers = [], teams = [], seasonId = "S1" }) {
   const [rarities, setRarities] = useState(CARD_RARITY_PRESETS);
   const pool = useMemo(() => normalizeCardPool(drivers, teams), [drivers, teams]);
   const cardLibrary = useMemo(() => pool
@@ -4909,8 +4911,8 @@ function CardRarityLab({ drivers = [], teams = [] }) {
       <section style={styles.cardPlayerHero}>
         <div style={styles.cardPlayerCopy}>
           <span style={styles.cardPlayerEyebrow}>URTT Cards</span>
-          <h1 style={styles.cardPlayerTitle}>Ouvre ton pack pilote</h1>
-          <p style={styles.cardPlayerText}>Découvre 5 cartes URTT, collectionne les pilotes, garde les plus rares et prépare ton équipe avant les défis.</p>
+          <h1 style={styles.cardPlayerTitle}>Ouvre ton pack Saison 1</h1>
+          <p style={styles.cardPlayerText}>Découvre 5 cartes de l'édition {seasonName(seasonId)}. Pour ce test, seules les cartes de la Saison 1 sont disponibles.</p>
           <div style={styles.cardPlayerActions}>
             <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.cardPlayerPrimary}>{isOpeningPack ? "Ouverture en cours..." : "Ouvrir un pack"}</button>
             <span style={styles.cardPlayerHint}>La meilleure carte arrive toujours à la fin.</span>
@@ -4931,9 +4933,9 @@ function CardRarityLab({ drivers = [], teams = [] }) {
       </section>
       <header style={styles.cardLabHeader}>
         <div>
-          <p style={styles.kicker}>LAB LOCAL · NON PUBLIC</p>
+          <p style={styles.kicker}>TEST FERMÉ · {seasonName(seasonId).toUpperCase()}</p>
           <h1 style={styles.cardLabTitle}>Prototype cartes URTT</h1>
-          <p style={styles.muted}>Accessible uniquement en local avec <strong>?lab=cards</strong>. Aucun impact sur le site public.</p>
+          <p style={styles.muted}>Accessible avec <strong>?lab=cards</strong> uniquement pour les admins et comptes testeurs autorisés.</p>
         </div>
         <div style={styles.actions}>
           <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
@@ -8330,7 +8332,8 @@ function SeasonCardsAdminPanel({
   setSelectedSeasonId,
   seasonOptions = [],
 }) {
-  const storageKey = `${normalizeCategoryId(selectedCategoryId)}-${normalizeSeasonId(selectedSeasonId)}`;
+  const cardSeasonId = CARD_TEST_SEASON_ID;
+  const storageKey = `${normalizeCategoryId(selectedCategoryId)}-${cardSeasonId}`;
   const [validatedGenerations, setValidatedGenerations] = useState(() => {
     try {
       return JSON.parse(window.localStorage.getItem(CARD_GENERATION_STORAGE_KEY) || "{}");
@@ -8338,17 +8341,17 @@ function SeasonCardsAdminPanel({
       return {};
     }
   });
-  const standings = standingsBySeason?.[normalizeSeasonId(selectedSeasonId)] || [];
+  const standings = standingsBySeason?.[cardSeasonId] || [];
   const previewCards = useMemo(
-    () => buildSeasonCardEdition(standings, selectedSeasonId, selectedCategoryId, teams),
-    [standings, selectedSeasonId, selectedCategoryId, teams],
+    () => buildSeasonCardEdition(standings, cardSeasonId, selectedCategoryId, teams),
+    [standings, cardSeasonId, selectedCategoryId, teams],
   );
   const validatedEdition = validatedGenerations[storageKey] || null;
   const validateGeneration = () => {
     const nextGeneration = {
       id: storageKey,
       categoryId: normalizeCategoryId(selectedCategoryId),
-      seasonId: normalizeSeasonId(selectedSeasonId),
+      seasonId: cardSeasonId,
       generatedAt: new Date().toISOString(),
       cards: previewCards,
     };
@@ -8376,22 +8379,23 @@ function SeasonCardsAdminPanel({
             </label>
             <label style={styles.label}>
               <span style={styles.labelText}>Saison</span>
-              <select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>
-                {(seasonOptions.length ? seasonOptions : getSeasonOptions()).map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
+              <select value={cardSeasonId} onChange={(event) => setSelectedSeasonId?.(event.target.value)} disabled style={styles.resultsSelect}>
+                {(seasonOptions.length ? seasonOptions : getSeasonOptions()).filter((season) => normalizeSeasonId(season.id) === cardSeasonId).map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
+                {!(seasonOptions.length ? seasonOptions : getSeasonOptions()).some((season) => normalizeSeasonId(season.id) === cardSeasonId) && <option value={cardSeasonId}>{seasonName(cardSeasonId)}</option>}
               </select>
             </label>
             <button type="button" onClick={validateGeneration} disabled={!previewCards.length} style={styles.primaryButton}>Valider la génération</button>
             {validatedEdition && <button type="button" onClick={removeGeneration} style={styles.dangerButton}>Retirer validation</button>}
           </div>
           <p style={styles.muted}>
-            Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
+            Test verrouillé sur Saison 1. Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
           </p>
           <div style={validatedEdition ? styles.badgeGreen : styles.badgeDark}>
             {validatedEdition ? `Génération validée le ${formatRaceDate(validatedEdition.generatedAt)}` : "Aucune génération validée pour cette saison."}
           </div>
         </div>
       </Card>
-      <Card title={`Preview ${selectedCategoryId} — ${seasonName(selectedSeasonId)}`} icon="🏆">
+      <Card title={`Preview ${selectedCategoryId} — ${seasonName(cardSeasonId)}`} icon="🏆">
         {previewCards.length === 0 ? <Empty text="Aucun classement disponible pour générer les cartes de cette saison." /> : <SeasonCardGenerationGrid cards={previewCards} />}
       </Card>
       {validatedEdition?.cards?.length > 0 && (
