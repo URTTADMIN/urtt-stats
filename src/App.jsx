@@ -26,8 +26,8 @@ const CARD_COLLECTION_CATEGORY_ID = "F1";
 const CARD_COLLECTION_CATEGORY_IDS = ["F1", "FE"];
 const CARD_COLLECTION_EVENT_IDS = ["LEMANS24", "INDY300"];
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
-const CARD_PACK_MAX_STOCK = 5;
-const CARD_PACK_REGEN_MS = 60 * 60 * 1000;
+const CARD_PACK_MAX_STOCK = 10;
+const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
@@ -152,19 +152,43 @@ function getInitials(name = "") {
   return initials.toUpperCase() || "UR";
 }
 
+function getCardPackDayKey(now = Date.now()) {
+  const date = new Date(now);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function getCardPackDayStartMs(now = Date.now()) {
+  const date = new Date(now);
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
+}
+
+function getDailyGeneratedCardPacks(now = Date.now()) {
+  return Math.min(CARD_PACK_MAX_STOCK, Math.floor((now - getCardPackDayStartMs(now)) / CARD_PACK_REGEN_MS));
+}
+
 function normalizeCardPackStock(source, now = Date.now()) {
+  const dayKey = getCardPackDayKey(now);
+  const dayStart = getCardPackDayStartMs(now);
+  const generatedToday = getDailyGeneratedCardPacks(now);
+  if (source?.dayKey !== dayKey) {
+    return {
+      packs: generatedToday,
+      updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
+      dayKey,
+    };
+  }
   const sourcePacks = Number(source?.packs);
   const sourceUpdatedAt = Number(source?.updatedAt);
-  let packs = Number.isFinite(sourcePacks) ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor(sourcePacks))) : CARD_PACK_MAX_STOCK;
-  let updatedAt = Number.isFinite(sourceUpdatedAt) && sourceUpdatedAt > 0 ? sourceUpdatedAt : now;
-  if (packs >= CARD_PACK_MAX_STOCK) return { packs: CARD_PACK_MAX_STOCK, updatedAt };
+  let packs = Number.isFinite(sourcePacks) ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor(sourcePacks))) : generatedToday;
+  let updatedAt = Number.isFinite(sourceUpdatedAt) && sourceUpdatedAt >= dayStart ? sourceUpdatedAt : dayStart;
   const elapsed = Math.max(0, now - updatedAt);
   const gained = Math.floor(elapsed / CARD_PACK_REGEN_MS);
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
-    updatedAt = packs >= CARD_PACK_MAX_STOCK ? now : updatedAt + gained * CARD_PACK_REGEN_MS;
+    updatedAt = Math.min(dayStart + CARD_PACK_MAX_STOCK * CARD_PACK_REGEN_MS, updatedAt + gained * CARD_PACK_REGEN_MS);
   }
-  return { packs, updatedAt };
+  return { packs, updatedAt, dayKey };
 }
 
 function readStoredCardPackStock() {
@@ -181,11 +205,23 @@ function writeStoredCardPackStock(stock) {
   window.localStorage.setItem(CARD_PACK_STOCK_STORAGE_KEY, JSON.stringify(normalizeCardPackStock(stock)));
 }
 
+function getNextCardPackInMs(stock, now = Date.now()) {
+  const normalized = normalizeCardPackStock(stock, now);
+  if (normalized.packs >= CARD_PACK_MAX_STOCK) return 0;
+  const dayStart = getCardPackDayStartMs(now);
+  const generatedToday = getDailyGeneratedCardPacks(now);
+  const nextGenerationAt = generatedToday >= CARD_PACK_MAX_STOCK
+    ? dayStart + 24 * 60 * 60 * 1000 + CARD_PACK_REGEN_MS
+    : normalized.updatedAt + CARD_PACK_REGEN_MS;
+  return Math.max(0, nextGenerationAt - now);
+}
+
 function formatCardPackWait(ms) {
   const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
-  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
 function getEasterEggStorageKey(playerId = "") {
@@ -5058,7 +5094,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     return () => window.clearInterval(interval);
   }, []);
   const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
-  const nextPackInMs = packStock.packs >= CARD_PACK_MAX_STOCK ? 0 : Math.max(0, packStock.updatedAt + CARD_PACK_REGEN_MS - Date.now());
+  const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK ? "Stock maximum" : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
   const openPack = () => {
@@ -5070,7 +5106,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }
     const nextStock = {
       packs: Math.max(0, refreshedStock.packs - 1),
-      updatedAt: refreshedStock.packs >= CARD_PACK_MAX_STOCK ? Date.now() : refreshedStock.updatedAt,
+      updatedAt: refreshedStock.updatedAt,
+      dayKey: refreshedStock.dayKey,
     };
     setPackStock(nextStock);
     writeStoredCardPackStock(nextStock);
