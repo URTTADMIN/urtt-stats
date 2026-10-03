@@ -4799,18 +4799,10 @@ function getLabCardRarity(driver, pool, rarities) {
 }
 
 function buildStableLabCard(driver, rarity) {
-  const performance = Math.min(18, Math.floor((Number(driver.points) || 0) / 45) + (Number(driver.wins) || 0) * 2 + Math.floor((Number(driver.podiums) || 0) / 2));
-  const score = Math.min(99, Math.max(rarity.minScore, Math.round((rarity.minScore + rarity.maxScore) / 2) + Math.floor(performance / 2)));
-  const attack = Math.min(99, Math.max(35, score + (Number(driver.wins) || 0) * 2 + (Number(driver.poles) || 0) - 4));
-  const defense = Math.min(99, Math.max(35, score + Math.floor((Number(driver.podiums) || 0) / 2) - 2));
   return {
     ...driver,
     cardId: `driver-${driver.id}`,
     rarity,
-    score,
-    attack,
-    defense,
-    marketValue: Math.round((score * score * (100 / Math.max(1, rarity.weight))) / 10),
   };
 }
 
@@ -4830,10 +4822,6 @@ function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rar
   const rarity = getSeasonCardRarityForPosition(position, rarities);
   if (!rarity) return null;
   const team = teams.find((item) => idsEqual(item.id, driver.teamId)) || teams.find((item) => item.name === driver.teamName) || null;
-  const scoreBase = rarity.minScore + Math.round(((rarity.maxScore - rarity.minScore) * Math.max(0, 20 - Number(position))) / 19);
-  const score = Math.min(rarity.maxScore, Math.max(rarity.minScore, scoreBase + Math.min(5, Math.floor((Number(driver.points) || 0) / 80))));
-  const attack = Math.min(99, Math.max(35, score + (Number(driver.wins) || 0) * 2 + (Number(driver.poles) || 0) - 3));
-  const defense = Math.min(99, Math.max(35, score + Math.floor((Number(driver.podiums) || 0) / 2) - 2));
   return {
     id: `${normalizeCategoryId(categoryId)}-${normalizeSeasonId(seasonId)}-${driver.id}`,
     cardId: `season-${normalizeCategoryId(categoryId)}-${normalizeSeasonId(seasonId)}-${driver.id}`,
@@ -4850,10 +4838,6 @@ function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rar
     podiums: Number(driver.podiums) || 0,
     poles: Number(driver.poles) || 0,
     rarity,
-    score,
-    attack,
-    defense,
-    marketValue: Math.round((score * score * (100 / Math.max(1, rarity.weight))) / 10),
   };
 }
 
@@ -4874,7 +4858,7 @@ function drawLabPack(pool, rarities, count = 5) {
     available.splice(available.findIndex((item) => item.cardId === card.cardId), 1);
   }
   return selected
-    .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.score - b.score);
+    .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
 function drawCardPack(cards, rarities, count = 5) {
@@ -5036,12 +5020,7 @@ function CollectionCard({ card }) {
           <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
         </div>
       </div>
-      <div style={styles.collectionCardStats}>
-        <span>GEN <strong>{card.score}</strong></span>
-        <span>ATQ <strong>{card.attack}</strong></span>
-        <span>DEF <strong>{card.defense}</strong></span>
-      </div>
-      <div style={styles.cardLabValue}>Valeur test : {card.marketValue.toLocaleString("fr-FR")}</div>
+      <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryId || "URTT"}</div>
     </article>
   );
 }
@@ -5126,12 +5105,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
           <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
           <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
-          <div style={styles.cardLabStats}>
-            <span><small>ATQ</small><strong>{card.attack}</strong></span>
-            <span><small>DEF</small><strong>{card.defense}</strong></span>
-            <span><small>GEN</small><strong>{card.score}</strong></span>
-          </div>
-          <div style={styles.cardLabValue}>Valeur test : {card.marketValue.toLocaleString("fr-FR")}</div>
+          <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryId || "URTT"}</div>
         </div>
       </div>
     </article>
@@ -8491,11 +8465,7 @@ function SeasonCardGenerationGrid({ cards = [], compact = false }) {
                 <p style={styles.mutedSmall}>{card.teamName} · {card.points} pts</p>
               </div>
             </div>
-            <div style={styles.collectionCardStats}>
-              <span>GEN <strong>{card.score}</strong></span>
-              <span>ATQ <strong>{card.attack}</strong></span>
-              <span>DEF <strong>{card.defense}</strong></span>
-            </div>
+            <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryId || "URTT"}</div>
           </article>
         ))}
       </div>
@@ -8669,7 +8639,7 @@ const styles = {
   collectionCardAvatar: { width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", fontWeight: 950, overflow: "hidden" },
   collectionCardText: { minWidth: 0 },
   collectionCardName: { margin: 0, fontSize: 18, letterSpacing: "-.03em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  collectionCardStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 7, fontSize: 12, color: "#cbd5e1" },
+  cardCollectOnlyMeta: { marginTop: 4, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0", textAlign: "center" },
   cardLabPack: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 18 },
   cardLabFlipShell: { minHeight: 330, perspective: 1200, transform: "translateY(0) scale(1)", transition: "transform .32s ease" },
   cardLabFlipShellActive: { transform: "translateY(-8px) scale(1.025)" },
@@ -8681,8 +8651,6 @@ const styles = {
   cardLabPortrait: { height: 104, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950 },
   cardLabLogo: { width: 76, height: 76, objectFit: "contain" },
   cardLabCardName: { margin: 0, fontSize: 25, letterSpacing: "-.04em" },
-  cardLabStats: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 },
-  cardLabValue: { marginTop: 4, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0" },
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
   cardGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 14 },
