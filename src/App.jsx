@@ -5503,8 +5503,8 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving, comp
         {profile && !compact && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
       {open && (
-        <div style={styles.detailOverlay} onMouseDown={() => setOpen(false)}>
-          <form onSubmit={submit} style={{ ...styles.feedbackModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={styles.accountModalOverlay} onMouseDown={() => setOpen(false)}>
+          <form onSubmit={submit} style={{ ...styles.feedbackModal, ...styles.accountModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
             <div style={styles.publicRaceHeader}>
               <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "Créer un compte" : "Connexion"}</h2></div>
               <button type="button" onClick={() => setOpen(false)} style={styles.secondaryButton}>Fermer</button>
@@ -8898,6 +8898,8 @@ const styles = {
   publicHeader: { maxWidth: 1280, margin: "0 auto", padding: "48px 28px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 24 },
   publicSessionBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 },
   accountBox: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 },
+  accountModalOverlay: { position: "fixed", inset: 0, zIndex: 9000, padding: "max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom))", background: "rgba(0,0,0,.72)", display: "flex", alignItems: "center", justifyContent: "center", overflowY: "auto" },
+  accountModal: { width: "min(460px, calc(100vw - 32px))", maxHeight: "calc(100dvh - 32px)", margin: "auto" },
   sessionBadge: { background: "rgba(24, 24, 27, .92)", border: "1px solid #3f3f46", color: "#e4e4e7", borderRadius: 999, padding: "9px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" },
   publicMain: { width: "100%", maxWidth: 1280, margin: "0 auto", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
