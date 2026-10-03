@@ -187,20 +187,25 @@ function normalizeCardPackStock(source, now = Date.now()) {
     return {
       packs: generatedToday,
       updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
+      generatedToday,
       dayKey,
     };
   }
   const sourcePacks = Number(source?.packs);
   const sourceUpdatedAt = Number(source?.updatedAt);
+  const sourceGeneratedToday = Number(source?.generatedToday);
   let packs = Number.isFinite(sourcePacks) ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor(sourcePacks))) : generatedToday;
-  let updatedAt = Number.isFinite(sourceUpdatedAt) && sourceUpdatedAt >= dayStart ? sourceUpdatedAt : dayStart;
-  const elapsed = Math.max(0, now - updatedAt);
-  const gained = Math.floor(elapsed / CARD_PACK_REGEN_MS);
+  const inferredGeneratedToday = Number.isFinite(sourceUpdatedAt) && sourceUpdatedAt >= dayStart
+    ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor((sourceUpdatedAt - dayStart) / CARD_PACK_REGEN_MS)))
+    : generatedToday;
+  const previousGeneratedToday = Number.isFinite(sourceGeneratedToday)
+    ? Math.max(0, Math.min(CARD_PACK_MAX_STOCK, Math.floor(sourceGeneratedToday)))
+    : inferredGeneratedToday;
+  const gained = Math.max(0, generatedToday - previousGeneratedToday);
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
-    updatedAt = Math.min(dayStart + CARD_PACK_MAX_STOCK * CARD_PACK_REGEN_MS, updatedAt + gained * CARD_PACK_REGEN_MS);
   }
-  return { packs, updatedAt, dayKey };
+  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey };
 }
 
 function readStoredCardPackStock() {
@@ -269,9 +274,10 @@ function getNextCardPackInMs(stock, now = Date.now()) {
   if (normalized.packs >= CARD_PACK_MAX_STOCK) return 0;
   const dayStart = getCardPackDayStartMs(now);
   const generatedToday = getDailyGeneratedCardPacks(now);
-  const nextGenerationAt = generatedToday >= CARD_PACK_MAX_STOCK
+  const stockGeneratedToday = Number(normalized.generatedToday) || generatedToday;
+  const nextGenerationAt = stockGeneratedToday >= CARD_PACK_MAX_STOCK
     ? dayStart + 24 * 60 * 60 * 1000 + CARD_PACK_REGEN_MS
-    : normalized.updatedAt + CARD_PACK_REGEN_MS;
+    : dayStart + (stockGeneratedToday + 1) * CARD_PACK_REGEN_MS;
   return Math.max(0, nextGenerationAt - now);
 }
 
@@ -5342,7 +5348,11 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
-  const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK ? "Stock maximum" : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
+  const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
+    ? "Stock maximum"
+    : Number(packStock.generatedToday) >= CARD_PACK_MAX_STOCK
+      ? `Limite du jour atteinte · prochain pack dans ${formatCardPackWait(nextPackInMs)}`
+      : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
   const openPack = () => {
     const refreshedStock = normalizeCardPackStock(packStock);
     if (!cardLibrary.length || refreshedStock.packs <= 0) {
@@ -5353,6 +5363,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const nextStock = {
       packs: Math.max(0, refreshedStock.packs - 1),
       updatedAt: refreshedStock.updatedAt,
+      generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
     };
     setPackStock(nextStock);
