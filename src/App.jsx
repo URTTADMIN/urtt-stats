@@ -5080,13 +5080,28 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
               {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
             </select>
           </label>
-          <label style={styles.label}>
+          <div style={styles.cardRarityFilterGroup}>
             <span style={styles.labelText}>Filtrer par rareté</span>
-            <select value={collectionRarityFilter} onChange={(event) => setCollectionRarityFilter(event.target.value)} style={styles.resultsSelect}>
-              <option value="ALL">Toutes les raretés ({seasonFilteredCollectionCards.length})</option>
-              {[...rarities].reverse().map((rarity) => <option key={rarity.id} value={rarity.id}>{rarity.name} ({visibleRarityCounts[rarity.id] || 0})</option>)}
-            </select>
-          </label>
+            <div style={styles.cardRarityFilterRow}>
+              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {seasonFilteredCollectionCards.length}</button>
+              {[...rarities].reverse().map((rarity) => (
+                <button
+                  key={rarity.id}
+                  type="button"
+                  onClick={() => setCollectionRarityFilter(rarity.id)}
+                  style={{
+                    ...styles.cardRarityFilterButton,
+                    borderColor: rarity.color,
+                    color: rarity.color,
+                    background: collectionRarityFilter === rarity.id ? `${rarity.color}22` : "rgba(255,255,255,.04)",
+                    boxShadow: collectionRarityFilter === rarity.id ? `0 0 22px ${rarity.color}44` : "none",
+                  }}
+                >
+                  {rarity.id} · {visibleRarityCounts[rarity.id] || 0}
+                </button>
+              ))}
+            </div>
+          </div>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
@@ -8721,6 +8736,10 @@ const styles = {
   cardCollectionSummary: { display: "flex", gap: 8, flexWrap: "wrap" },
   cardCollectionSummaryBadge: { border: "1px solid currentColor", borderRadius: 999, padding: "8px 10px", fontWeight: 950, background: "rgba(255,255,255,.06)" },
   cardCollectionToolbar: { display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12, flexWrap: "wrap", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 16, padding: 14 },
+  cardRarityFilterGroup: { display: "grid", gap: 8, minWidth: "min(100%, 440px)" },
+  cardRarityFilterRow: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
+  cardRarityFilterButton: { minHeight: 36, border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "0 11px", background: "rgba(255,255,255,.04)", color: "#f8fafc", fontWeight: 950, cursor: "pointer" },
+  cardRarityFilterButtonActive: { borderColor: "#f8fafc", background: "rgba(255,255,255,.13)", boxShadow: "0 0 22px rgba(255,255,255,.12)" },
   cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 },
   collectionCard: { background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 16, padding: 14, display: "grid", gap: 12, alignContent: "start" },
   collectionCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
