@@ -1133,7 +1133,7 @@ function normalizeSpecialCards(value) {
   const usedIds = new Set(CARD_SPECIAL_PRESETS.map((card) => card.id));
   return cards
     .map((card, index) => {
-      const name = normalizeResultText(card?.name || "");
+      const name = String(card?.name || "").trim().replace(/\s+/g, " ");
       const image = String(card?.image || "").trim();
       if (!name || !image) return null;
       const rarityId = CARD_RARITY_PRESETS.some((rarity) => rarity.id === card?.rarityId) ? card.rarityId : "C";
@@ -9069,7 +9069,7 @@ function SeasonCardsAdminPanel({
     [standings, cardSeasonId, selectedCategoryId, teams],
   );
   const specialPreviewCards = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS, specialCards), [specialCards]);
-  const specialCardPreview = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS, [specialCardForm]).find((card) => card.name === normalizeResultText(specialCardForm.name)) || null, [specialCardForm]);
+  const specialCardPreview = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS, [specialCardForm]).find((card) => card.name === String(specialCardForm.name || "").trim().replace(/\s+/g, " ")) || null, [specialCardForm]);
   const validatedEdition = validatedGenerations[storageKey] || null;
   const validateGeneration = () => {
     const nextGeneration = {
