@@ -19,6 +19,7 @@ const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
+const CARD_COLLECTION_STORAGE_KEY = "urtt-card-collection";
 const CARD_TEST_SEASON_ID = "S1";
 const CARD_COLLECTION_CATEGORY_ID = "F1";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
@@ -4890,18 +4891,25 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     if (collection.length) return collection;
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
   }, [drivers, standingsBySeason, teams, seasonId, categoryId, rarities]);
-  const sortedCollectionCards = useMemo(() => [...cardLibrary]
-    .sort((a, b) => getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || a.name.localeCompare(b.name)),
-  [cardLibrary]);
+  const [ownedCards, setOwnedCards] = useState(() => {
+    try {
+      return JSON.parse(window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY) || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const sortedOwnedCards = useMemo(() => [...ownedCards]
+    .sort((a, b) => Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || a.name.localeCompare(b.name)),
+  [ownedCards]);
   const displayedCollectionCards = collectionSeasonFilter === "ALL"
-    ? sortedCollectionCards
-    : sortedCollectionCards.filter((card) => normalizeSeasonId(card.seasonId) === normalizeSeasonId(collectionSeasonFilter));
-  const rarityCounts = useMemo(() => cardLibrary.reduce((counts, card) => ({
+    ? sortedOwnedCards
+    : sortedOwnedCards.filter((card) => normalizeSeasonId(card.seasonId) === normalizeSeasonId(collectionSeasonFilter));
+  const rarityCounts = useMemo(() => ownedCards.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
-  }), {}), [cardLibrary]);
+  }), {}), [ownedCards]);
   const collectionSeasonOptions = CARD_COLLECTION_SEASON_IDS
-    .map((id) => ({ id, count: cardLibrary.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
+    .map((id) => ({ id, count: ownedCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
     .filter((season) => season.count > 0);
   const [pack, setPack] = useState([]);
   const [revealedCount, setRevealedCount] = useState(5);
@@ -4922,7 +4930,21 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
   }, [isOpeningPack, revealedCount, pack.length]);
   const openPack = () => {
     if (!cardLibrary.length) return;
-    setPack(drawCardPack(cardLibrary, rarities));
+    const nextPack = drawCardPack(cardLibrary, rarities);
+    const openedAt = Date.now();
+    setPack(nextPack);
+    setOwnedCards((current) => {
+      const nextOwnedCards = [
+        ...nextPack.map((card, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
+        ...current,
+      ];
+      try {
+        window.localStorage.setItem(CARD_COLLECTION_STORAGE_KEY, JSON.stringify(nextOwnedCards));
+      } catch {
+        // La collection reste visible pendant la session si le stockage local est plein ou indisponible.
+      }
+      return nextOwnedCards;
+    });
     setRevealedCount(0);
     setShowPackModal(true);
     setIsOpeningPack(true);
@@ -5009,8 +5031,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
         <div style={styles.cardCollectionHeader}>
           <div>
             <p style={styles.kicker}>COLLECTION F1 · S1 → S17</p>
-            <h2 style={styles.cardLabStageTitle}>Toutes les cartes disponibles</h2>
-            <p style={styles.muted}>La collection complète de l'édition test, avec toutes les cartes F1 générées depuis les classements de chaque saison.</p>
+            <h2 style={styles.cardLabStageTitle}>Tes cartes obtenues</h2>
+            <p style={styles.muted}>Ici apparaissent uniquement les cartes que tu as obtenues en ouvrant des packs sur ce navigateur.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {rarities.map((rarity) => (
@@ -5024,16 +5046,16 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par saison</span>
             <select value={collectionSeasonFilter} onChange={(event) => setCollectionSeasonFilter(event.target.value)} style={styles.resultsSelect}>
-              <option value="ALL">Toutes les saisons ({cardLibrary.length})</option>
+              <option value="ALL">Toutes les saisons ({ownedCards.length})</option>
               {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
             </select>
           </label>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {displayedCollectionCards.map((card) => <CollectionCard key={card.cardId} card={card} />)}
+          {displayedCollectionCards.map((card) => <CollectionCard key={card.ownedId || card.id || card.cardId} card={card} />)}
         </div>
-        {displayedCollectionCards.length === 0 && <Empty text="Aucune carte F1 disponible pour cette sélection." />}
+        {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} />}
     </div>
