@@ -4082,7 +4082,7 @@ export default function URTTAdminPanel() {
   const cardLabSettings = normalizeCardLabSettings(siteSettings.cardLabSettings);
   const cardLabSeasonId = cardLabSettings.seasonId;
   const cardLabRequested = isCardLabRequested();
-  const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile, cardLabSettings) || isLocalHost();
+  const hasCardLabAccess = true;
   const cardLabSeasonDrivers = cardStandingsByCategory[CARD_COLLECTION_CATEGORY_ID]?.[cardLabSeasonId]?.length ? cardStandingsByCategory[CARD_COLLECTION_CATEGORY_ID][cardLabSeasonId] : [];
 
   return (
