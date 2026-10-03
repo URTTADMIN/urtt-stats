@@ -179,10 +179,22 @@ function getDailyGeneratedCardPacks(now = Date.now()) {
   return Math.min(CARD_PACK_MAX_STOCK, Math.floor((now - getCardPackDayStartMs(now)) / CARD_PACK_REGEN_MS));
 }
 
+function getEmptyCardPackStock(now = Date.now()) {
+  const dayStart = getCardPackDayStartMs(now);
+  const generatedToday = getDailyGeneratedCardPacks(now);
+  return {
+    packs: 0,
+    updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
+    generatedToday,
+    dayKey: getCardPackDayKey(now),
+  };
+}
+
 function normalizeCardPackStock(source, now = Date.now()) {
   const dayKey = getCardPackDayKey(now);
   const dayStart = getCardPackDayStartMs(now);
   const generatedToday = getDailyGeneratedCardPacks(now);
+  if (!source || typeof source !== "object") return getEmptyCardPackStock(now);
   if (source?.dayKey !== dayKey) {
     return {
       packs: generatedToday,
@@ -209,11 +221,12 @@ function normalizeCardPackStock(source, now = Date.now()) {
 }
 
 function readStoredCardPackStock() {
-  if (typeof window === "undefined") return normalizeCardPackStock(null);
+  if (typeof window === "undefined") return getEmptyCardPackStock();
   try {
-    return normalizeCardPackStock(JSON.parse(window.localStorage.getItem(CARD_PACK_STOCK_STORAGE_KEY) || "null"));
+    const rawStock = window.localStorage.getItem(CARD_PACK_STOCK_STORAGE_KEY);
+    return rawStock ? normalizeCardPackStock(JSON.parse(rawStock)) : getEmptyCardPackStock();
   } catch {
-    return normalizeCardPackStock(null);
+    return getEmptyCardPackStock();
   }
 }
 
@@ -5324,10 +5337,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
     const localCards = readStoredCardCollection();
     const nextCards = playerCardAccountId ? mergeCardCollections(accountCards, accountCards.length ? [] : localCards) : localCards;
-    const nextStock = playerCardAccountId && playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : readStoredCardPackStock();
+    const nextStock = playerCardAccountId
+      ? (playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : getEmptyCardPackStock())
+      : readStoredCardPackStock();
     setOwnedCards(nextCards);
     setPackStock(nextStock);
-    if (playerCardAccountId && !accountCards.length && localCards.length) savePlayerCards(nextCards, nextStock);
+    if (playerCardAccountId && (!playerProfile?.cardPackStock || (!accountCards.length && localCards.length))) savePlayerCards(nextCards, nextStock);
   }, [playerCardAccountId]);
   useEffect(() => {
     if (pack.length || !cardLibrary.length) return;
