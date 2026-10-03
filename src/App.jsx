@@ -4919,15 +4919,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     if (pack.length || !cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
   }, [cardLibrary, rarities, pack.length]);
-  useEffect(() => {
-    if (!isOpeningPack) return undefined;
-    if (revealedCount >= pack.length) {
-      const doneTimer = window.setTimeout(() => setIsOpeningPack(false), 420);
-      return () => window.clearTimeout(doneTimer);
-    }
-    const timer = window.setTimeout(() => setRevealedCount((current) => current + 1), revealedCount === 0 ? 450 : 760);
-    return () => window.clearTimeout(timer);
-  }, [isOpeningPack, revealedCount, pack.length]);
   const openPack = () => {
     if (!cardLibrary.length) return;
     const nextPack = drawCardPack(cardLibrary, rarities);
@@ -4948,6 +4939,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     setRevealedCount(0);
     setShowPackModal(true);
     setIsOpeningPack(true);
+  };
+  const revealNextCard = () => {
+    if (!isOpeningPack) return;
+    const next = Math.min(revealedCount + 1, pack.length);
+    setRevealedCount(next);
+    if (next >= pack.length) setIsOpeningPack(false);
   };
   const closePackModal = () => {
     if (isOpeningPack) return;
@@ -5057,7 +5054,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
-      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} />}
+      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
     </div>
   );
 }
@@ -5121,7 +5118,7 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
   );
 }
 
-function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onReplay }) {
+function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onReplay, onRevealNext }) {
   return (
     <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
       <div style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
@@ -5129,11 +5126,12 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, onClose, onRepla
           <div>
             <p style={styles.kicker}>OUVERTURE DE PACK</p>
             <h2 style={styles.cardPackModalTitle}>{isOpeningPack ? `Carte ${Math.min(revealedCount + 1, pack.length)} / ${pack.length}` : "Pack terminé"}</h2>
+            <p style={styles.mutedSmall}>{isOpeningPack ? "Clique sur le pack pour révéler la prochaine carte." : "Toutes les cartes du pack ont été révélées."}</p>
           </div>
           <button type="button" onClick={onClose} disabled={isOpeningPack} style={styles.secondaryButton}>{isOpeningPack ? "Patiente..." : "Fermer"}</button>
         </div>
-        <div style={styles.cardPackModalStage}>
-          {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === revealedCount - 1} />)}
+        <div style={{ ...styles.cardPackModalStage, ...(isOpeningPack ? styles.cardPackModalStageClickable : {}) }} onClick={onRevealNext}>
+          {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === Math.min(revealedCount, pack.length - 1)} />)}
         </div>
         <div style={styles.cardPackModalFooter}>
           {!isOpeningPack && <button type="button" onClick={onReplay} style={styles.cardPlayerPrimary}>Rouvrir un pack</button>}
@@ -5147,10 +5145,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
   return (
     <article style={{ ...styles.cardLabFlipShell, ...(active ? styles.cardLabFlipShellActive : {}) }}>
       <div style={{ ...styles.cardLabFlipInner, transform: revealed ? "rotateY(180deg)" : "rotateY(0deg)" }}>
-        <div style={styles.cardLabCardBack}>
-          <strong>URTT</strong>
-          <span>Carte scellée</span>
-        </div>
+        <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
         <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: card.rarity.color, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${card.rarity.color}55` }}>
           <div style={styles.cardLabCardTop}>
             <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
@@ -8671,6 +8666,7 @@ const styles = {
   cardPackModalHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap", background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 20, padding: 18 },
   cardPackModalTitle: { margin: "5px 0 0", fontSize: 34, letterSpacing: "-.045em" },
   cardPackModalStage: { minHeight: 380, display: "grid", gridTemplateColumns: "repeat(5, minmax(150px, 1fr))", gap: 16, alignItems: "center" },
+  cardPackModalStageClickable: { cursor: "pointer" },
   cardPackModalFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" },
   cardLabGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 18 },
   cardLabRarityRow: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 92px", gap: 12, alignItems: "center", background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 12 },
@@ -8698,7 +8694,7 @@ const styles = {
   cardLabFlipShell: { minHeight: 330, perspective: 1200, transform: "translateY(0) scale(1)", transition: "transform .32s ease" },
   cardLabFlipShellActive: { transform: "translateY(-8px) scale(1.025)" },
   cardLabFlipInner: { position: "relative", width: "100%", minHeight: 330, transformStyle: "preserve-3d", transition: "transform .72s cubic-bezier(.2,.85,.2,1)" },
-  cardLabCardBack: { position: "absolute", inset: 0, backfaceVisibility: "hidden", minHeight: 310, background: "radial-gradient(circle at 50% 20%, rgba(185,0,228,.34), transparent 34%), linear-gradient(155deg, #151f2e, #0b1020)", border: "2px solid #455574", borderRadius: 18, padding: 16, display: "grid", placeItems: "center", alignContent: "center", gap: 10, overflow: "hidden", boxShadow: "0 20px 55px rgba(0,0,0,.34)" },
+  cardLabCardBack: { position: "absolute", inset: 0, backfaceVisibility: "hidden", minHeight: 310, backgroundImage: "url('/card-back-urtt.png')", backgroundSize: "cover", backgroundPosition: "center", border: "2px solid #455574", borderRadius: 18, padding: 16, display: "grid", placeItems: "center", alignContent: "center", gap: 10, overflow: "hidden", boxShadow: "0 20px 55px rgba(0,0,0,.34)" },
   cardLabCard: { position: "absolute", inset: 0, backfaceVisibility: "hidden", transform: "rotateY(180deg)", minHeight: 310, background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "2px solid #475569", borderRadius: 18, padding: 16, display: "grid", gap: 10, alignContent: "start", overflow: "hidden" },
   cardLabFinalCard: { background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 34%), linear-gradient(160deg, rgba(21,26,43,.99), rgba(49,31,58,.98))" },
   cardLabCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
