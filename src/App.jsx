@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { useRef } from "react";
 
@@ -5494,6 +5495,29 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving, comp
     setStatus(response?.message || "");
     if (response?.ok) setOpen(false);
   };
+  const accountModal = open ? (
+    <div style={styles.accountModalOverlay} onMouseDown={() => setOpen(false)}>
+      <form onSubmit={submit} style={{ ...styles.feedbackModal, ...styles.accountModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={styles.publicRaceHeader}>
+          <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "Créer un compte" : "Connexion"}</h2></div>
+          <button type="button" onClick={() => setOpen(false)} style={styles.secondaryButton}>Fermer</button>
+        </div>
+        <div style={styles.feedbackChoice}>
+          <button type="button" onClick={() => setMode("login")} style={{ ...styles.feedbackChoiceButton, ...(mode === "login" ? styles.feedbackChoiceActive : {}) }}>Connexion</button>
+          <button type="button" onClick={() => setMode("signup")} style={{ ...styles.feedbackChoiceButton, ...(mode === "signup" ? styles.feedbackChoiceActive : {}) }}>Inscription</button>
+        </div>
+        <Input label="Pseudo" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
+        <Input label="Code secret" type="password" value={form.accessCode} onChange={(value) => update("accessCode", value)} />
+        {mode === "signup" && (
+          <>
+            <Input label="Nom Discord" value={form.discordName} onChange={(value) => update("discordName", value)} />
+          </>
+        )}
+        <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Patiente..." : mode === "signup" ? "Créer mon compte" : "Se connecter"}</button>
+        {status && <p style={styles.mutedSmall}>{status}</p>}
+      </form>
+    </div>
+  ) : null;
 
   return (
     <div style={styles.accountBox}>
@@ -5502,29 +5526,7 @@ function PlayerAccountBox({ profile, onLogin, onSignup, onLogout, isSaving, comp
         <button type="button" onClick={() => setOpen(true)} style={triggerStyle || styles.secondaryButton}>{triggerLabel || (profile ? "Compte" : "Connexion")}</button>
         {profile && !compact && <button type="button" onClick={onLogout} style={styles.linkButton}>Déconnexion</button>}
       </div>
-      {open && (
-        <div style={styles.accountModalOverlay} onMouseDown={() => setOpen(false)}>
-          <form onSubmit={submit} style={{ ...styles.feedbackModal, ...styles.accountModal, maxWidth: 460 }} onMouseDown={(event) => event.stopPropagation()}>
-            <div style={styles.publicRaceHeader}>
-              <div><p style={styles.kicker}>COMPTE JOUEUR</p><h2 style={styles.raceTitle}>{mode === "signup" ? "Créer un compte" : "Connexion"}</h2></div>
-              <button type="button" onClick={() => setOpen(false)} style={styles.secondaryButton}>Fermer</button>
-            </div>
-            <div style={styles.feedbackChoice}>
-              <button type="button" onClick={() => setMode("login")} style={{ ...styles.feedbackChoiceButton, ...(mode === "login" ? styles.feedbackChoiceActive : {}) }}>Connexion</button>
-              <button type="button" onClick={() => setMode("signup")} style={{ ...styles.feedbackChoiceButton, ...(mode === "signup" ? styles.feedbackChoiceActive : {}) }}>Inscription</button>
-            </div>
-            <Input label="Pseudo" value={form.pseudo} onChange={(value) => update("pseudo", value)} />
-            <Input label="Code secret" type="password" value={form.accessCode} onChange={(value) => update("accessCode", value)} />
-            {mode === "signup" && (
-              <>
-                <Input label="Nom Discord" value={form.discordName} onChange={(value) => update("discordName", value)} />
-              </>
-            )}
-            <button type="submit" disabled={isSaving} style={styles.fullButton}>{isSaving ? "Patiente..." : mode === "signup" ? "Créer mon compte" : "Se connecter"}</button>
-            {status && <p style={styles.mutedSmall}>{status}</p>}
-          </form>
-        </div>
-      )}
+      {accountModal && createPortal(accountModal, document.body)}
     </div>
   );
 }
