@@ -90,7 +90,7 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "easter-eggs", label: "Livre secret" },
   { id: "tgc-packs", label: "Packs" },
   { id: "tgc-collection", label: "Collection" },
-  { id: "tgc-pokedex", label: "Pokédex" },
+  { id: "tgc-pokedex", label: "Catalogue" },
   { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
@@ -5528,8 +5528,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       {cardsView === "opening" && (
         <section style={styles.cardPackOnlySection}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={{ ...styles.cardPlayerPackButton, ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label="Ouvrir un pack URTT TGC">
-            <img src="/card-pack-urtt.png" alt="Pack URTT TGC" style={styles.cardPlayerPackImage} />
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={{ ...styles.cardPlayerPackButton, ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label="Ouvrir un pack URTT TCG">
+            <img src="/card-pack-urtt.png" alt="Pack URTT TCG" style={styles.cardPlayerPackImage} />
           </button>
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
@@ -5540,7 +5540,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       {cardsView === "collection" && <header style={styles.cardLabHeader}>
         <div>
           <p style={styles.kicker}>ÉDITION TEST · F1 / FE / HORS-SAISON</p>
-          <h1 style={styles.cardLabTitle}>Collection URTT TGC</h1>
+          <h1 style={styles.cardLabTitle}>Collection URTT TCG</h1>
           <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
@@ -5620,9 +5620,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       </section>}
       {cardsView === "pokedex" && <header style={styles.cardLabHeader}>
         <div>
-          <p style={styles.kicker}>POKÉDEX · BASE COMPLÈTE</p>
-          <h1 style={styles.cardLabTitle}>Pokédex URTT TCG</h1>
-          <p style={styles.muted}>Toutes les cartes existantes sont listées ici. Les cartes obtenues sont visibles, les autres restent grisées.</p>
+          <p style={styles.kicker}>CATALOGUE · BASE COMPLÈTE</p>
+          <h1 style={styles.cardLabTitle}>Catalogue URTT TCG</h1>
+          <p style={styles.muted}>Toutes les cartes existantes sont listées ici. Les cartes obtenues sont visibles, les autres restent cachées.</p>
         </div>
         <div style={styles.cardCollectionSummary}>
           <span style={styles.cardCollectionSummaryBadge}>{pokedexOwnedCount}/{pokedexCards.length} obtenues</span>
@@ -5697,7 +5697,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div style={styles.cardCollectionGrid}>
           {displayedPokedexCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.id} card={card} locked={!card.owned} />)}
         </div>
-        {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le Pokédex pour cette sélection." />}
+        {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
     </div>
