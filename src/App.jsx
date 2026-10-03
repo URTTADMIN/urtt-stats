@@ -118,6 +118,7 @@ const CARD_RARITY_PRESETS = [
 ];
 const CARD_SL_GRADIENT = "linear-gradient(135deg, #cc00ff 0%, #7c3aed 38%, #f8c72f 100%)";
 const CARD_SL_COLOR = "#f8c72f";
+const CARD_COLLECTION_VISIBLE_RARITIES = CARD_RARITY_PRESETS.filter((rarity) => rarity.id !== "SL");
 const CARD_SPECIAL_PRESETS = [
   { id: "fiareku", name: "FIAREKU", rarityId: "C", image: "/fiareku.png", color: "#cc00ff" },
   { id: "arekcoins", name: "AREKCOINS", rarityId: "SR", image: "/arekcoins.png", color: "#f8c72f" },
@@ -5288,7 +5289,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             <p style={styles.muted}>Ici apparaissent uniquement les cartes que tu as obtenues en ouvrant des packs sur ce navigateur.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
-            {rarities.map((rarity) => (
+            {CARD_COLLECTION_VISIBLE_RARITIES.map((rarity) => (
               <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, ...(rarity.id === "SL" ? { borderColor: CARD_SL_COLOR, background: CARD_SL_GRADIENT, color: "#0f172a" } : { borderColor: rarity.color, color: rarity.color }) }}>
                 {rarity.id} · {rarityCounts[rarity.id] || 0}
               </span>
@@ -5314,7 +5315,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             <span style={styles.labelText}>Filtrer par rareté</span>
             <div style={styles.cardRarityFilterRow}>
               <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {seasonFilteredCollectionCards.length}</button>
-              {[...rarities].reverse().map((rarity) => (
+              {[...CARD_COLLECTION_VISIBLE_RARITIES].reverse().map((rarity) => (
                 <button
                   key={rarity.id}
                   type="button"
