@@ -4870,7 +4870,7 @@ function drawCardPack(cards, rarities, count = 5) {
 }
 
 function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId = "F1" }) {
-  const [rarities, setRarities] = useState(CARD_RARITY_PRESETS);
+  const rarities = CARD_RARITY_PRESETS;
   const cardLibrary = useMemo(() => buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities)
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || a.position - b.position || a.name.localeCompare(b.name)),
   [drivers, teams, seasonId, categoryId, rarities]);
@@ -4882,8 +4882,6 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
-  const [simulation, setSimulation] = useState(null);
-  const totalWeight = rarities.reduce((sum, rarity) => sum + Math.max(0, Number(rarity.weight) || 0), 0);
   const rarestCard = pack[pack.length - 1];
   useEffect(() => {
     if (pack.length || !cardLibrary.length) return;
@@ -4898,9 +4896,6 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
     const timer = window.setTimeout(() => setRevealedCount((current) => current + 1), revealedCount === 0 ? 450 : 760);
     return () => window.clearTimeout(timer);
   }, [isOpeningPack, revealedCount, pack.length]);
-  const updateWeight = (rarityId, value) => {
-    setRarities((current) => current.map((rarity) => rarity.id === rarityId ? { ...rarity, weight: Math.max(0, Number(value) || 0) } : rarity));
-  };
   const openPack = () => {
     setPack(drawCardPack(cardLibrary, rarities));
     setRevealedCount(0);
@@ -4910,15 +4905,6 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
   const closePackModal = () => {
     if (isOpeningPack) return;
     setShowPackModal(false);
-  };
-  const simulate = () => {
-    const counts = Object.fromEntries(rarities.map((rarity) => [rarity.id, 0]));
-    Array.from({ length: 100 }).forEach(() => {
-      drawCardPack(cardLibrary, rarities).forEach((card) => {
-        counts[card.rarity.id] = (counts[card.rarity.id] || 0) + 1;
-      });
-    });
-    setSimulation(counts);
   };
   return (
     <div style={styles.cardLabPage}>
@@ -4947,53 +4933,57 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
       </section>
       <header style={styles.cardLabHeader}>
         <div>
-          <p style={styles.kicker}>TEST FERMÉ · {seasonName(seasonId).toUpperCase()}</p>
-          <h1 style={styles.cardLabTitle}>Prototype cartes URTT</h1>
-          <p style={styles.muted}>Accessible avec <strong>?lab=cards</strong> uniquement pour les admins et comptes testeurs autorisés.</p>
+          <p style={styles.kicker}>ÉDITION TEST · {seasonName(seasonId).toUpperCase()}</p>
+          <h1 style={styles.cardLabTitle}>Collection Saison 1</h1>
+          <p style={styles.muted}>Ouvre des packs, découvre les cartes pilotes et donne ton retour sur les raretés, les stats et le ressenti général.</p>
         </div>
         <div style={styles.actions}>
           <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
-          <button type="button" onClick={simulate} style={styles.secondaryButton}>Simuler 100 packs</button>
         </div>
       </header>
       <section style={styles.cardLabOpeningStage}>
         <div>
-          <p style={styles.kicker}>Ouverture popup</p>
-          <h2 style={styles.cardLabStageTitle}>{showPackModal ? "Pack en cours" : "Pack prêt"}</h2>
-          <p style={styles.muted}>Le bouton ouvre une fenêtre dédiée. Les cartes restent au centre de l'écran pendant toute l'animation.</p>
+          <p style={styles.kicker}>Comment ça marche</p>
+          <h2 style={styles.cardLabStageTitle}>Une série basée sur le classement</h2>
+          <p style={styles.muted}>Chaque carte Saison 1 garde sa rareté officielle selon la position finale du pilote au championnat.</p>
         </div>
-        {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Finale : {rarestCard.rarity.name}</span>}
+        {rarestCard && <span style={{ ...styles.cardLabBestBadge, borderColor: rarestCard.rarity.color, color: rarestCard.rarity.color }}>Pack actuel : meilleure carte {rarestCard.rarity.name}</span>}
       </section>
-      <section style={styles.cardLabGrid}>
-        <Card title="Réglage rareté" icon="🎚️">
-          <div style={styles.stack}>
-            {rarities.map((rarity) => {
-              const percent = totalWeight ? Math.round((rarity.weight / totalWeight) * 1000) / 10 : 0;
-              return (
-                <label key={rarity.id} style={styles.cardLabRarityRow}>
-                  <span style={{ ...styles.cardLabRarityBadge, borderColor: rarity.color, color: rarity.color }}>{rarity.id}</span>
-                  <span><strong>{rarity.name}</strong><small style={styles.mutedSmall}>Poids de sortie : {percent}% · score {rarity.minScore}-{rarity.maxScore}</small></span>
-                  <input type="number" min="0" value={rarity.weight} onChange={(event) => updateWeight(rarity.id, event.target.value)} style={styles.positionInput} />
-                </label>
-              );
+      <section style={styles.cardPlayerInfoGrid}>
+        <Card title="Raretés Saison 1" icon="🏆">
+          <div style={styles.cardPlayerRules}>
+            {[
+              ["#1", "Légendaire", "L"],
+              ["#2 - #3", "Ultra rare", "UR"],
+              ["#4 - #5", "Super rare", "SR"],
+              ["#6 - #10", "Rare", "R"],
+              ["#11 - #15", "Peu commune", "PC"],
+              ["#16 - #20", "Commune", "C"],
+            ].map(([range, label, rarityId]) => {
+              const rarity = rarities.find((item) => item.id === rarityId);
+              return <div key={rarityId} style={styles.cardPlayerRuleRow}><span style={{ ...styles.cardLabRarityBadge, borderColor: rarity?.color, color: rarity?.color }}>{rarityId}</span><strong>{range}</strong><span style={styles.mutedSmall}>{label}</span></div>;
             })}
           </div>
         </Card>
-        <Card title="Résultat simulation" icon="📊">
-          {!simulation && <Empty text="Lance une simulation pour voir la répartition sur 500 cartes." />}
-          {simulation && <div style={styles.stack}>{rarities.map((rarity) => {
-            const count = simulation[rarity.id] || 0;
-            const percent = Math.round((count / 500) * 1000) / 10;
-            return <div key={rarity.id} style={styles.cardLabSimRow}><span style={{ color: rarity.color, fontWeight: 950 }}>{rarity.name}</span><strong>{count} cartes · {percent}%</strong></div>;
-          })}</div>}
+        <Card title="Ton objectif" icon="🎁">
+          <div style={styles.stack}>
+            <p style={styles.muted}>Ouvre plusieurs packs et regarde si les cartes donnent envie d'être collectionnées.</p>
+            <div style={styles.cardPlayerObjectiveList}>
+              <span style={styles.cardPlayerObjectiveItem}>Raretés compréhensibles</span>
+              <span style={styles.cardPlayerObjectiveItem}>Stats crédibles</span>
+              <span style={styles.cardPlayerObjectiveItem}>Ouverture agréable</span>
+              <span style={styles.cardPlayerObjectiveItem}>Cartes lisibles mobile/PC</span>
+            </div>
+            <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.fullButton}>{isOpeningPack ? "Ouverture..." : "Tester un pack"}</button>
+          </div>
         </Card>
       </section>
       <section style={styles.cardCollectionPanel}>
         <div style={styles.cardCollectionHeader}>
           <div>
-            <p style={styles.kicker}>COLLECTION COMPLETE</p>
-            <h2 style={styles.cardLabStageTitle}>Toutes les cartes pilotes</h2>
-            <p style={styles.muted}>Toutes les cartes possibles du labo, avec leur rareté fixe, leurs stats et leur valeur test.</p>
+            <p style={styles.kicker}>COLLECTION SAISON 1</p>
+            <h2 style={styles.cardLabStageTitle}>Toutes les cartes disponibles</h2>
+            <p style={styles.muted}>La collection complète de l'édition test, triée des cartes les plus rares aux plus communes.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {rarities.map((rarity) => (
@@ -8609,6 +8599,11 @@ const styles = {
   cardLabRarityRow: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 92px", gap: 12, alignItems: "center", background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 12 },
   cardLabRarityBadge: { minWidth: 34, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", fontSize: 12, fontWeight: 950 },
   cardLabSimRow: { display: "flex", justifyContent: "space-between", gap: 12, background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 13, flexWrap: "wrap" },
+  cardPlayerInfoGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1.05fr) minmax(300px, .95fr)", gap: 18 },
+  cardPlayerRules: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 },
+  cardPlayerRuleRow: { minHeight: 74, display: "grid", gridTemplateColumns: "54px minmax(0, 1fr)", gridTemplateRows: "auto auto", alignItems: "center", columnGap: 10, background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 12 },
+  cardPlayerObjectiveList: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 9 },
+  cardPlayerObjectiveItem: { background: "#151f2e", border: "1px solid #273244", borderRadius: 12, padding: "10px 12px", fontWeight: 900 },
   cardCollectionPanel: { background: "rgba(15,23,42,.82)", border: "1px solid #33415f", borderRadius: 24, padding: 22, display: "grid", gap: 18, boxShadow: "0 24px 70px rgba(0,0,0,.22)" },
   cardCollectionHeader: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" },
   cardCollectionSummary: { display: "flex", gap: 8, flexWrap: "wrap" },
