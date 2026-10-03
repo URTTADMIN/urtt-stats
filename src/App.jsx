@@ -4975,14 +4975,10 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
             {rarities.map((rarity) => <span key={rarity.id} style={{ ...styles.cardPlayerRarity, borderColor: rarity.color, color: rarity.color }}>{rarity.id}</span>)}
           </div>
         </div>
-        <div style={styles.cardPlayerPackScene} aria-hidden="true">
-          <div style={styles.cardPlayerGhostCardA}>SR</div>
-          <div style={styles.cardPlayerGhostCardB}>UR</div>
-          <div style={styles.cardPlayerPack}>
-            <strong>URTT</strong>
-            <span>PACK PILOTE</span>
-            <small>5 cartes</small>
-          </div>
+        <div style={styles.cardPlayerPackScene}>
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.cardPlayerPackButton} aria-label="Ouvrir un pack URTT TGC">
+            <img src="/card-pack-urtt.png" alt="Pack URTT TGC" style={styles.cardPlayerPackImage} />
+          </button>
         </div>
       </section>
       <header style={styles.cardLabHeader}>
@@ -5114,12 +5110,8 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
           </div>
         </div>
         <div style={styles.cardPlayerPackScene} aria-hidden="true">
-          <div style={styles.cardPlayerGhostCardA}>SR</div>
-          <div style={styles.cardPlayerGhostCardB}>UR</div>
-          <div style={styles.cardPlayerPack}>
-            <strong>URTT</strong>
-            <span>ACCÈS TEST</span>
-            <small>privé</small>
+          <div style={{ ...styles.cardPlayerPackButton, ...styles.cardPlayerPackLocked }}>
+            <img src="/card-pack-urtt.png" alt="" style={styles.cardPlayerPackImage} />
           </div>
         </div>
       </section>
@@ -8662,10 +8654,10 @@ const styles = {
   cardPlayerHint: { color: "#d8b4fe", fontWeight: 850, fontSize: 13 },
   cardPlayerRarityStrip: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 },
   cardPlayerRarity: { width: 38, height: 34, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", fontSize: 12, fontWeight: 950, background: "rgba(255,255,255,.07)" },
-  cardPlayerPackScene: { minHeight: 330, position: "relative", display: "grid", placeItems: "center" },
-  cardPlayerPack: { width: 235, height: 315, borderRadius: 24, background: "radial-gradient(circle at 50% 24%, rgba(255,255,255,.2), transparent 24%), linear-gradient(155deg, #101827, #2e1450 55%, #cc00ff)", border: "2px solid rgba(255,255,255,.34)", display: "grid", placeItems: "center", alignContent: "center", gap: 10, transform: "rotate(5deg)", boxShadow: "0 28px 80px rgba(204,0,255,.34)", fontSize: 42, fontWeight: 950 },
-  cardPlayerGhostCardA: { position: "absolute", width: 150, height: 220, borderRadius: 22, right: 265, top: 58, transform: "rotate(-17deg)", background: "linear-gradient(155deg, rgba(15,23,42,.94), rgba(168,85,247,.72))", border: "1px solid rgba(216,180,254,.48)", display: "grid", placeItems: "center", color: "#e9d5ff", fontWeight: 950, boxShadow: "0 22px 50px rgba(0,0,0,.28)" },
-  cardPlayerGhostCardB: { position: "absolute", width: 160, height: 235, borderRadius: 22, right: 38, top: 32, transform: "rotate(18deg)", background: "linear-gradient(155deg, rgba(15,23,42,.94), rgba(245,158,11,.72))", border: "1px solid rgba(253,230,138,.48)", display: "grid", placeItems: "center", color: "#fef3c7", fontWeight: 950, boxShadow: "0 22px 50px rgba(0,0,0,.28)" },
+  cardPlayerPackScene: { minHeight: 430, position: "relative", display: "grid", placeItems: "center" },
+  cardPlayerPackButton: { width: "min(310px, 82vw)", aspectRatio: "1024 / 1536", border: 0, background: "transparent", padding: 0, display: "grid", placeItems: "center", cursor: "pointer", filter: "drop-shadow(0 34px 72px rgba(204,0,255,.32))", transform: "rotate(2deg)", transition: "transform .22s ease, filter .22s ease" },
+  cardPlayerPackLocked: { cursor: "default", opacity: .74, filter: "drop-shadow(0 24px 52px rgba(204,0,255,.2)) grayscale(.1)" },
+  cardPlayerPackImage: { width: "100%", height: "100%", objectFit: "contain", display: "block" },
   cardLabHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "rgba(15,23,42,.82)", border: "1px solid #33415f", borderRadius: 22, padding: 22, boxShadow: "0 24px 70px rgba(0,0,0,.28)" },
   cardLabTitle: { margin: "6px 0", fontSize: "clamp(30px, 5vw, 54px)", lineHeight: 1, letterSpacing: "-.055em" },
   cardLabOpeningStage: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, flexWrap: "wrap", background: "linear-gradient(135deg, rgba(15,23,42,.9), rgba(76,29,149,.32))", border: "1px solid #455574", borderRadius: 22, padding: 20, boxShadow: "0 20px 60px rgba(0,0,0,.22)" },
