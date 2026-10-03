@@ -4931,6 +4931,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(initialView === "collection" ? "collection" : "opening");
   const [collectionSeasonFilter, setCollectionSeasonFilter] = useState("ALL");
+  const [collectionRarityFilter, setCollectionRarityFilter] = useState("ALL");
   const cardLibrary = useMemo(() => {
     const collection = buildSeasonCardCollection(standingsBySeason, CARD_COLLECTION_SEASON_IDS, CARD_COLLECTION_CATEGORY_ID, teams, rarities);
     if (collection.length) return collection;
@@ -4946,13 +4947,20 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
   const sortedOwnedCards = useMemo(() => [...ownedCards]
     .sort((a, b) => Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || a.name.localeCompare(b.name)),
   [ownedCards]);
-  const displayedCollectionCards = collectionSeasonFilter === "ALL"
+  const seasonFilteredCollectionCards = collectionSeasonFilter === "ALL"
     ? sortedOwnedCards
     : sortedOwnedCards.filter((card) => normalizeSeasonId(card.seasonId) === normalizeSeasonId(collectionSeasonFilter));
+  const displayedCollectionCards = collectionRarityFilter === "ALL"
+    ? seasonFilteredCollectionCards
+    : seasonFilteredCollectionCards.filter((card) => card.rarity?.id === collectionRarityFilter);
   const rarityCounts = useMemo(() => ownedCards.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
   }), {}), [ownedCards]);
+  const visibleRarityCounts = useMemo(() => seasonFilteredCollectionCards.reduce((counts, card) => ({
+    ...counts,
+    [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
+  }), {}), [seasonFilteredCollectionCards]);
   const collectionSeasonOptions = CARD_COLLECTION_SEASON_IDS
     .map((id) => ({ id, count: ownedCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
     .filter((season) => season.count > 0);
@@ -5070,6 +5078,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
             <select value={collectionSeasonFilter} onChange={(event) => setCollectionSeasonFilter(event.target.value)} style={styles.resultsSelect}>
               <option value="ALL">Toutes les saisons ({ownedCards.length})</option>
               {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Filtrer par rareté</span>
+            <select value={collectionRarityFilter} onChange={(event) => setCollectionRarityFilter(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Toutes les raretés ({seasonFilteredCollectionCards.length})</option>
+              {[...rarities].reverse().map((rarity) => <option key={rarity.id} value={rarity.id}>{rarity.name} ({visibleRarityCounts[rarity.id] || 0})</option>)}
             </select>
           </label>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
