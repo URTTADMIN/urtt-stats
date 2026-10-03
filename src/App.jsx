@@ -5394,6 +5394,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       if (!grouped.has(key)) grouped.set(key, { ...card, collectionGroupKey: key, owned: ownedCardKeys.has(key) });
     });
     return Array.from(grouped.values())
+      .filter((card) => card.rarity?.id !== "SL" || card.owned)
       .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || normalizeCategoryId(a.categoryId).localeCompare(normalizeCategoryId(b.categoryId)) || getSeasonNumber(a.seasonId) - getSeasonNumber(b.seasonId) || a.position - b.position || a.name.localeCompare(b.name));
   }, [cardLibrary, ownedCardKeys]);
   const pokedexCategoryFilteredCards = collectionCategoryFilter === "ALL"
