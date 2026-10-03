@@ -8729,6 +8729,7 @@ function SeasonCardsAdminPanel({
     () => buildSeasonCardEdition(standings, cardSeasonId, selectedCategoryId, teams),
     [standings, cardSeasonId, selectedCategoryId, teams],
   );
+  const specialPreviewCards = useMemo(() => buildSpecialCardCollection(CARD_RARITY_PRESETS), []);
   const validatedEdition = validatedGenerations[storageKey] || null;
   const validateGeneration = () => {
     const nextGeneration = {
@@ -8806,6 +8807,9 @@ function SeasonCardsAdminPanel({
       <Card title={`Preview ${selectedCategoryId} — ${seasonName(cardSeasonId)}`} icon="🏆">
         {previewCards.length === 0 ? <Empty text="Aucun classement disponible pour générer les cartes de cette saison." /> : <SeasonCardGenerationGrid cards={previewCards} />}
       </Card>
+      <Card title="Aperçu cartes spéciales" icon="✨">
+        <SeasonCardGenerationGrid cards={specialPreviewCards} />
+      </Card>
       {validatedEdition?.cards?.length > 0 && (
         <Card title="Dernière génération validée" icon="✅">
           <SeasonCardGenerationGrid cards={validatedEdition.cards} compact />
@@ -8829,21 +8833,7 @@ function SeasonCardGenerationGrid({ cards = [], compact = false }) {
         ))}
       </div>
       <div style={styles.cardCollectionGrid}>
-        {cards.map((card) => (
-          <article key={card.cardId} style={{ ...styles.collectionCard, ...(compact ? styles.collectionCardCompact : {}), borderColor: card.rarity.color }}>
-            <div style={styles.collectionCardTop}>
-              <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span>
-              <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
-            </div>
-            <div style={styles.collectionCardIdentity}>
-              <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
-              <div style={styles.collectionCardText}>
-                <h3 style={styles.collectionCardName}>{card.name}</h3>
-                <p style={styles.mutedSmall}>{card.teamName} · {card.points} pts</p>
-              </div>
-            </div>
-          </article>
-        ))}
+        {cards.map((card) => <CollectionCard key={card.cardId} card={card} />)}
       </div>
     </div>
   );
