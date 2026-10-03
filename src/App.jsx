@@ -4890,6 +4890,7 @@ function buildSeasonCard(driver, position, seasonId, categoryId, teams = [], rar
     teamId: driver.teamId || team?.id || "",
     teamName: driver.teamName || team?.name || "Sans écurie",
     teamLogo: team?.logo || driver.teamLogo || "",
+    teamColor: team?.color || driver.color || "#334155",
     points: Number(driver.points) || 0,
     wins: Number(driver.wins) || 0,
     podiums: Number(driver.podiums) || 0,
@@ -4937,6 +4938,7 @@ function buildOffSeasonCard(entry, position, eventType, teams = [], drivers = []
     teamId: entry.teamId || team?.id || "",
     teamName: team?.name || "Sans écurie",
     teamLogo: team?.logo || "",
+    teamColor: team?.color || "#334155",
     points: Number(entry.points) || getOffSeasonPoints(entry.racePosition),
     wins: Number(entry.racePosition) === 1 ? 1 : 0,
     podiums: Number(entry.racePosition) > 0 && Number(entry.racePosition) <= 3 ? 1 : 0,
@@ -5190,6 +5192,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
 
 function CollectionCard({ card }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
+  const teamColor = card.teamColor || "#334155";
   return (
     <article style={{ ...styles.collectionCard, borderColor: card.rarity.color, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${card.rarity.color}33`, background: `radial-gradient(circle at 50% 0%, ${card.rarity.color}38, transparent 38%), linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
       <div style={{ ...styles.collectionCardAccent, background: `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
@@ -5197,7 +5200,7 @@ function CollectionCard({ card }) {
         <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}26`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
         <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
       </div>
-      <div style={styles.collectionCardHero}>
+      <div style={{ ...styles.collectionCardHero, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 36px rgba(255,255,255,.08), 0 0 24px ${teamColor}44` }}>
         <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
         {card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}
       </div>
@@ -5275,6 +5278,7 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, canOpenPack = tr
 
 function LabCard({ card, revealed = true, finalCard = false, active = false }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
+  const teamColor = card.teamColor || "#334155";
   return (
     <article style={{ ...styles.cardLabFlipShell, ...(active ? styles.cardLabFlipShellActive : {}) }}>
       <div style={{ ...styles.cardLabFlipInner, transform: revealed ? "rotateY(180deg)" : "rotateY(0deg)" }}>
@@ -5285,7 +5289,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
             <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
           </div>
-          <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}</div>
+          <div style={{ ...styles.cardLabPortrait, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 32px rgba(255,255,255,.08), 0 0 20px ${teamColor}44` }}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
           <p style={styles.mutedSmall}>{card.teamName}</p>
           <div style={styles.collectionCardInfoGrid}>
