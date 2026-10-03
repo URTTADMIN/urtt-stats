@@ -3962,13 +3962,9 @@ export default function URTTAdminPanel() {
   }
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
-  if (isCardLabRequested()) {
-    const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
-    const seasonOneCardDrivers = computed.driverStatsBySeason[CARD_TEST_SEASON_ID]?.length ? computed.driverStatsBySeason[CARD_TEST_SEASON_ID] : computed.globalDriverStats;
-    return hasCardLabAccess
-      ? <CardRarityLab drivers={seasonOneCardDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} categoryId={selectedCategoryId} />
-      : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={loginPlayerAccount} onPlayerSignup={signUpPlayerAccount} onPlayerLogout={logoutPlayerAccount} isSavingPlayerAccount={isSavingPlayerAccount} />;
-  }
+  const cardLabRequested = isCardLabRequested();
+  const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
+  const seasonOneCardDrivers = computed.driverStatsBySeason[CARD_TEST_SEASON_ID]?.length ? computed.driverStatsBySeason[CARD_TEST_SEASON_ID] : computed.globalDriverStats;
 
   return (
     <>
@@ -4017,6 +4013,9 @@ export default function URTTAdminPanel() {
           isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
           onOpenAdmin={openAdminAccess}
+          cardLabRequested={cardLabRequested}
+          hasCardLabAccess={hasCardLabAccess}
+          cardLabDrivers={seasonOneCardDrivers}
         />
       )}
       {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
@@ -4452,7 +4451,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [] }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -4489,7 +4488,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     pages: group.pages.filter((pageId) => publicPages.includes(pageId)),
   })).filter((group) => group.pages.length);
   const publicMobilePages = ["home", ...publicNavGroups.flatMap((group) => group.pages)].filter((pageId, index, list) => publicPages.includes(pageId) && list.indexOf(pageId) === index);
-  const activePublicPage = publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
+  const activePublicPage = cardLabRequested ? "cards-lab" : publicPages.includes(publicPage) ? publicPage : publicPages[0] || "home";
   const offSeasonLogos = { lemans24: "/urtt-wec.png", indy300: "/urtt-ic.png" };
   const offSeasonThemeOverrides = {
     lemans24: {
@@ -4512,7 +4511,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const seasonSelectValue = seasonOptions.some((season) => normalizeSeasonId(season.id) === normalizeSeasonId(selectedSeasonId)) ? selectedSeasonId : seasonOptions[0]?.id || "";
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
-  const activePublicPageOption = PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
+  const activePublicPageOption = activePublicPage === "cards-lab" ? { id: "cards-lab", label: "Cartes" } : PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
   const isLightTheme = publicTheme === "light";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -4660,6 +4659,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
+        {activePublicPage === "cards-lab" && (hasCardLabAccess
+          ? <CardRarityLab drivers={cardLabDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} categoryId={selectedCategoryId} embedded />
+          : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
@@ -4869,7 +4871,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId = "F1" }) {
+function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId = "F1", embedded = false }) {
   const rarities = CARD_RARITY_PRESETS;
   const cardLibrary = useMemo(() => buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities)
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || a.position - b.position || a.name.localeCompare(b.name)),
@@ -4907,7 +4909,7 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
     setShowPackModal(false);
   };
   return (
-    <div style={styles.cardLabPage}>
+    <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       <section style={styles.cardPlayerHero}>
         <div style={styles.cardPlayerCopy}>
           <span style={styles.cardPlayerEyebrow}>URTT Cards</span>
@@ -5026,10 +5028,10 @@ function CollectionCard({ card }) {
   );
 }
 
-function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount }) {
+function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount, embedded = false }) {
   const connectedButDenied = Boolean(playerProfile?.id && !canPlayerAccessCardLab(playerProfile));
   return (
-    <div style={styles.cardLabPage}>
+    <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       <section style={styles.cardPlayerHero}>
         <div style={styles.cardPlayerCopy}>
           <span style={styles.cardPlayerEyebrow}>Accès test privé</span>
@@ -8570,6 +8572,7 @@ const styles = {
   cardHeader: { display: "flex", gap: 12, alignItems: "center", marginBottom: 18 },
   cardIcon: { background: "#27272a", borderRadius: 14, padding: 10, fontSize: 20 },
   cardLabPage: { minHeight: "100vh", background: "radial-gradient(circle at 18% 0%, rgba(185,0,228,.24), transparent 30%), linear-gradient(135deg,#101827,#151d34 48%,#241a3c)", color: "#f8fafc", fontFamily: "Inter, system-ui, Arial", padding: 28, display: "grid", gap: 22, alignContent: "start" },
+  cardLabEmbeddedPage: { color: "#f8fafc", display: "grid", gap: 22, alignContent: "start" },
   cardPlayerHero: { minHeight: 420, display: "grid", gridTemplateColumns: "minmax(0, 1fr) minmax(300px, 470px)", alignItems: "center", gap: 30, background: "radial-gradient(circle at 78% 42%, rgba(244,63,94,.32), transparent 34%), linear-gradient(135deg, rgba(14,22,42,.96), rgba(42,27,66,.96))", border: "1px solid #4a5a7a", borderRadius: 28, padding: "34px clamp(22px, 5vw, 54px)", overflow: "hidden", position: "relative", boxShadow: "0 30px 90px rgba(0,0,0,.35)" },
   cardPlayerCopy: { display: "grid", gap: 16, maxWidth: 620, position: "relative", zIndex: 2 },
   cardPlayerEyebrow: { color: "#f0abfc", fontSize: 13, fontWeight: 950, letterSpacing: ".2em", textTransform: "uppercase" },
