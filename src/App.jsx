@@ -116,6 +116,8 @@ const CARD_RARITY_PRESETS = [
   { id: "L", name: "Légendaire", weight: 2, color: "#f8c72f", minScore: 90, maxScore: 99 },
   { id: "SL", name: "Spéciale légendaire", weight: 1, color: "#f8fafc", minScore: 99, maxScore: 100 },
 ];
+const CARD_SL_GRADIENT = "linear-gradient(135deg, #cc00ff 0%, #7c3aed 38%, #f8c72f 100%)";
+const CARD_SL_COLOR = "#f8c72f";
 const CARD_SPECIAL_PRESETS = [
   { id: "fiareku", name: "FIAREKU", rarityId: "C", image: "/fiareku.png", color: "#cc00ff" },
   { id: "arekcoins", name: "AREKCOINS", rarityId: "SR", image: "/arekcoins.png", color: "#f8c72f" },
@@ -5020,6 +5022,25 @@ function getCardSeasonLabel(card = {}) {
   return normalizeCategoryId(card.categoryId) === CARD_COLLECTION_SPECIAL_CATEGORY_ID ? "Spécial" : seasonName(card.seasonId);
 }
 
+function getCardRarityColor(rarity = {}) {
+  return rarity.id === "SL" ? CARD_SL_COLOR : rarity.color;
+}
+
+function getCardRarityGlowColor(rarity = {}) {
+  return rarity.id === "SL" ? "#cc00ff" : rarity.color;
+}
+
+function getCardRaritySurface(rarity = {}, alpha = "22") {
+  return rarity.id === "SL" ? CARD_SL_GRADIENT : `${rarity.color}${alpha}`;
+}
+
+function getCardRarityBadgeStyle(rarity = {}) {
+  const color = getCardRarityColor(rarity);
+  return rarity.id === "SL"
+    ? { background: CARD_SL_GRADIENT, borderColor: "#f8c72f", color: "#0f172a", boxShadow: "0 0 18px rgba(204,0,255,.36), 0 0 18px rgba(248,199,47,.26)" }
+    : { background: `${rarity.color}22`, borderColor: rarity.color, color };
+}
+
 function buildOffSeasonCard(entry, position, eventType, teams = [], drivers = [], rarities = CARD_RARITY_PRESETS) {
   const rarity = getSeasonCardRarityForPosition(position, rarities);
   if (!rarity) return null;
@@ -5323,7 +5344,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           </div>
           <div style={styles.cardCollectionSummary}>
             {rarities.map((rarity) => (
-              <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
+              <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, ...(rarity.id === "SL" ? { borderColor: CARD_SL_COLOR, background: CARD_SL_GRADIENT, color: "#0f172a" } : { borderColor: rarity.color, color: rarity.color }) }}>
                 {rarity.id} · {rarityCounts[rarity.id] || 0}
               </span>
             ))}
@@ -5355,10 +5376,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
                   onClick={() => setCollectionRarityFilter(rarity.id)}
                   style={{
                     ...styles.cardRarityFilterButton,
-                    borderColor: rarity.color,
-                    color: rarity.color,
-                    background: collectionRarityFilter === rarity.id ? `${rarity.color}22` : "rgba(255,255,255,.04)",
-                    boxShadow: collectionRarityFilter === rarity.id ? `0 0 22px ${rarity.color}44` : "none",
+                    ...(rarity.id === "SL"
+                      ? { borderColor: CARD_SL_COLOR, color: collectionRarityFilter === rarity.id ? "#0f172a" : CARD_SL_COLOR, background: collectionRarityFilter === rarity.id ? CARD_SL_GRADIENT : "rgba(255,255,255,.04)", boxShadow: collectionRarityFilter === rarity.id ? "0 0 22px rgba(204,0,255,.36)" : "none" }
+                      : { borderColor: rarity.color, color: rarity.color, background: collectionRarityFilter === rarity.id ? `${rarity.color}22` : "rgba(255,255,255,.04)", boxShadow: collectionRarityFilter === rarity.id ? `0 0 22px ${rarity.color}44` : "none" }),
                   }}
                 >
                   {rarity.id} · {visibleRarityCounts[rarity.id] || 0}
@@ -5381,16 +5401,20 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
 function CollectionCard({ card }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
+  const rarityColor = getCardRarityColor(card.rarity);
+  const rarityGlowColor = getCardRarityGlowColor(card.rarity);
+  const raritySurface = getCardRaritySurface(card.rarity, "38");
+  const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   return (
-    <article style={{ ...styles.collectionCard, borderColor: card.rarity.color, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${card.rarity.color}33`, background: `radial-gradient(circle at 50% 0%, ${card.rarity.color}38, transparent 38%), linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
-      <div style={{ ...styles.collectionCardAccent, background: `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+    <article style={{ ...styles.collectionCard, borderColor: rarityColor, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
+      <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       <div style={styles.collectionCardTop}>
-        <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}26`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
-        <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
+        <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
+        <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
       </div>
       <div style={{ ...styles.collectionCardHero, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 36px rgba(255,255,255,.08), 0 0 24px ${teamColor}44` }}>
         <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
-        {card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}
+        {card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}
       </div>
       <div style={styles.collectionCardText}>
         <h3 style={styles.collectionCardName}>{card.name}</h3>
@@ -5466,17 +5490,20 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, canOpenPack = tr
 function LabCard({ card, revealed = true, finalCard = false, active = false }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
+  const rarityColor = getCardRarityColor(card.rarity);
+  const rarityGlowColor = getCardRarityGlowColor(card.rarity);
+  const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   return (
     <article style={{ ...styles.cardLabFlipShell, ...(active ? styles.cardLabFlipShellActive : {}) }}>
       <div style={{ ...styles.cardLabFlipInner, transform: revealed ? "rotateY(180deg)" : "rotateY(0deg)" }}>
         <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
-        <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: card.rarity.color, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${card.rarity.color}55`, background: `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
-          <div style={{ ...styles.collectionCardAccent, background: `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+        <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: rarityColor, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${rarityGlowColor}55`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.24), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.26), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
+          <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
           <div style={styles.cardLabCardTop}>
-            <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
+            <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
           </div>
-          <div style={{ ...styles.cardLabPortrait, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 32px rgba(255,255,255,.08), 0 0 20px ${teamColor}44` }}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}</div>
+          <div style={{ ...styles.cardLabPortrait, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 32px rgba(255,255,255,.08), 0 0 20px ${teamColor}44` }}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
           <p style={styles.mutedSmall}>{card.teamName}</p>
           <div style={styles.collectionCardInfoGrid}>
@@ -8827,7 +8854,7 @@ function SeasonCardGenerationGrid({ cards = [], compact = false }) {
     <div style={styles.stack}>
       <div style={styles.cardCollectionSummary}>
         {[...CARD_RARITY_PRESETS].reverse().map((rarity) => (
-          <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
+          <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, ...(rarity.id === "SL" ? { borderColor: CARD_SL_COLOR, background: CARD_SL_GRADIENT, color: "#0f172a" } : { borderColor: rarity.color, color: rarity.color }) }}>
             {rarity.id} · {counts[rarity.id] || 0}
           </span>
         ))}
