@@ -5384,7 +5384,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const collectionSeasonOptions = CARD_COLLECTION_SEASON_IDS
     .map((id) => ({ id, count: categoryFilteredCollectionCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
     .filter((season) => season.count > 0);
-  const collectionCategoryOptions = [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS, CARD_COLLECTION_SPECIAL_CATEGORY_ID]
+  const collectionCategoryOptions = [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS]
     .map((id) => ({ id, label: getCardCategoryLabel(id), count: ownedCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(id)).length }))
     .filter((category) => category.count > 0);
   const pokedexCards = useMemo(() => {
@@ -5422,9 +5422,10 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
   }), {}), [pokedexSearchFilteredCards]);
   const pokedexSeasonOptions = useMemo(() => Array.from(new Set(pokedexCategoryFilteredCards.map((card) => normalizeSeasonId(card.seasonId))))
+    .filter((id) => id !== CARD_COLLECTION_SPECIAL_CATEGORY_ID)
     .map((id) => ({ id, count: pokedexCategoryFilteredCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
     .sort((a, b) => getSeasonNumber(a.id) - getSeasonNumber(b.id) || a.id.localeCompare(b.id)), [pokedexCategoryFilteredCards]);
-  const pokedexCategoryOptions = useMemo(() => [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS, CARD_COLLECTION_SPECIAL_CATEGORY_ID]
+  const pokedexCategoryOptions = useMemo(() => [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS]
     .map((id) => ({ id, label: getCardCategoryLabel(id), count: pokedexCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(id)).length }))
     .filter((category) => category.count > 0), [pokedexCards]);
   const pokedexOwnedCount = pokedexCards.filter((card) => card.owned).length;
@@ -5565,7 +5566,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
             <span style={styles.labelText}>Rechercher par nom</span>
-            <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie, spéciale..." style={styles.resultsSelect} />
+            <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie..." style={styles.resultsSelect} />
           </label>
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par type</span>
@@ -5645,7 +5646,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
             <span style={styles.labelText}>Rechercher par nom</span>
-            <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie, spéciale..." style={styles.resultsSelect} />
+            <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie..." style={styles.resultsSelect} />
           </label>
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par type</span>
