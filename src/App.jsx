@@ -5212,7 +5212,6 @@ function CollectionCard({ card }) {
         <span style={styles.collectionCardInfoPill}>{seasonName(card.seasonId)}</span>
         <span style={styles.collectionCardInfoPill}>{cardLabel}</span>
       </div>
-      <div style={{ ...styles.cardCollectOnlyMeta, borderColor: `${card.rarity.color}55`, background: `${card.rarity.color}18` }}>Carte collection</div>
     </article>
   );
 }
@@ -5296,7 +5295,6 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
             <span style={styles.collectionCardInfoPill}>{seasonName(card.seasonId)}</span>
             <span style={styles.collectionCardInfoPill}>{cardLabel}</span>
           </div>
-          <div style={{ ...styles.cardCollectOnlyMeta, borderColor: `${card.rarity.color}55`, background: `${card.rarity.color}18` }}>Carte collection</div>
         </div>
       </div>
     </article>
@@ -8656,7 +8654,6 @@ function SeasonCardGenerationGrid({ cards = [], compact = false }) {
                 <p style={styles.mutedSmall}>{card.teamName} · {card.points} pts</p>
               </div>
             </div>
-            <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryId || "URTT"}</div>
           </article>
         ))}
       </div>
@@ -8842,7 +8839,6 @@ const styles = {
   collectionCardName: { margin: 0, fontSize: 24, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
   collectionCardInfoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, position: "relative", zIndex: 1 },
   collectionCardInfoPill: { minHeight: 34, display: "grid", placeItems: "center", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 10, color: "#cbd5e1", fontSize: 12, fontWeight: 900, textAlign: "center", padding: "0 8px" },
-  cardCollectOnlyMeta: { marginTop: 0, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0", textAlign: "center" },
   cardLabPack: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 18 },
   cardLabFlipShell: { minHeight: 330, perspective: 1200, transform: "translateY(0) scale(1)", transition: "transform .32s ease" },
   cardLabFlipShellActive: { transform: "translateY(-8px) scale(1.025)" },
