@@ -4945,7 +4945,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     }
   });
   const sortedOwnedCards = useMemo(() => [...ownedCards]
-    .sort((a, b) => Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || a.name.localeCompare(b.name)),
+    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || a.name.localeCompare(b.name)),
   [ownedCards]);
   const seasonFilteredCollectionCards = collectionSeasonFilter === "ALL"
     ? sortedOwnedCards
