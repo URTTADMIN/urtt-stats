@@ -31,6 +31,8 @@ const CARD_COLLECTION_SPECIAL_CATEGORY_ID = "SPECIAL";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
 const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
+const CARD_PACK_TIME_ZONE = "Europe/Paris";
+const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
@@ -164,19 +166,48 @@ function getInitials(name = "") {
   return initials.toUpperCase() || "UR";
 }
 
+function getCardPackParisParts(now = Date.now()) {
+  const formatter = new Intl.DateTimeFormat("fr-FR", {
+    timeZone: CARD_PACK_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(new Date(now)).map((part) => [part.type, part.value]));
+  return {
+    year: Number(parts.year),
+    month: Number(parts.month),
+    day: Number(parts.day),
+    hour: Number(parts.hour),
+    minute: Number(parts.minute),
+    second: Number(parts.second),
+  };
+}
+
+function getCardPackTimeZoneOffsetMs(timestamp) {
+  const parts = getCardPackParisParts(timestamp);
+  return Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second) - timestamp;
+}
+
 function getCardPackDayKey(now = Date.now()) {
-  const date = new Date(now);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const parts = getCardPackParisParts(now);
+  return `${parts.year}-${String(parts.month).padStart(2, "0")}-${String(parts.day).padStart(2, "0")}`;
 }
 
 function getCardPackDayStartMs(now = Date.now()) {
-  const date = new Date(now);
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
+  const parts = getCardPackParisParts(now);
+  const utcGuess = Date.UTC(parts.year, parts.month - 1, parts.day, 0, 0, 0, 0);
+  return utcGuess - getCardPackTimeZoneOffsetMs(utcGuess);
 }
 
 function getDailyGeneratedCardPacks(now = Date.now()) {
-  return Math.min(CARD_PACK_MAX_STOCK, Math.floor((now - getCardPackDayStartMs(now)) / CARD_PACK_REGEN_MS));
+  const parts = getCardPackParisParts(now);
+  const elapsedMs = ((parts.hour * 60 + parts.minute) * 60 + parts.second) * 1000;
+  return Math.min(CARD_PACK_MAX_STOCK, Math.floor(elapsedMs / CARD_PACK_REGEN_MS));
 }
 
 function getEmptyCardPackStock(now = Date.now()) {
@@ -187,6 +218,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
     generatedToday,
     dayKey: getCardPackDayKey(now),
+    resetVersion: CARD_PACK_RESET_VERSION,
   };
 }
 
@@ -195,12 +227,14 @@ function normalizeCardPackStock(source, now = Date.now()) {
   const dayStart = getCardPackDayStartMs(now);
   const generatedToday = getDailyGeneratedCardPacks(now);
   if (!source || typeof source !== "object") return getEmptyCardPackStock(now);
+  if (source?.resetVersion !== CARD_PACK_RESET_VERSION) return getEmptyCardPackStock(now);
   if (source?.dayKey !== dayKey) {
     return {
       packs: generatedToday,
       updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
       generatedToday,
       dayKey,
+      resetVersion: CARD_PACK_RESET_VERSION,
     };
   }
   const sourcePacks = Number(source?.packs);
@@ -217,7 +251,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
-  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey };
+  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION };
 }
 
 function readStoredCardPackStock() {
@@ -5380,6 +5414,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
+      resetVersion: CARD_PACK_RESET_VERSION,
     };
     setPackStock(nextStock);
     const nextPack = drawCardPack(cardLibrary, rarities);

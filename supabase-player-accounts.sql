@@ -15,6 +15,15 @@ add column if not exists card_collection jsonb not null default '[]'::jsonb;
 alter table public.player_accounts
 add column if not exists card_pack_stock jsonb;
 
+update public.player_accounts
+set card_pack_stock = jsonb_build_object(
+  'packs', 0,
+  'updatedAt', floor(extract(epoch from now()) * 1000)::bigint,
+  'generatedToday', least(10, floor((extract(hour from now() at time zone 'Europe/Paris') * 60 + extract(minute from now() at time zone 'Europe/Paris')) / 120))::int,
+  'dayKey', to_char(now() at time zone 'Europe/Paris', 'YYYY-MM-DD'),
+  'resetVersion', '2026-10-03-paris-midnight-reset'
+);
+
 drop policy if exists "Public can create player accounts" on public.player_accounts;
 create policy "Public can create player accounts"
 on public.player_accounts
