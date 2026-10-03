@@ -5573,7 +5573,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
               <option value="ALL">Toutes les cartes ({seasonFilteredCollectionCards.length})</option>
               <option value="DRIVER">Pilotes ({seasonFilteredCollectionCards.filter((card) => !["team", "special"].includes(card.cardType)).length})</option>
               <option value="TEAM">Écuries ({seasonFilteredCollectionCards.filter((card) => card.cardType === "team").length})</option>
-              <option value="SPECIAL">Spéciales ({seasonFilteredCollectionCards.filter((card) => card.cardType === "special").length})</option>
             </select>
           </label>
           <label style={styles.label}>
@@ -5654,7 +5653,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
               <option value="ALL">Toutes les cartes ({pokedexSeasonFilteredCards.length})</option>
               <option value="DRIVER">Pilotes ({pokedexSeasonFilteredCards.filter((card) => !["team", "special"].includes(card.cardType)).length})</option>
               <option value="TEAM">Écuries ({pokedexSeasonFilteredCards.filter((card) => card.cardType === "team").length})</option>
-              <option value="SPECIAL">Spéciales ({pokedexSeasonFilteredCards.filter((card) => card.cardType === "special").length})</option>
             </select>
           </label>
           <label style={styles.label}>
