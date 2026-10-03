@@ -114,7 +114,7 @@ const CARD_RARITY_PRESETS = [
   { id: "SR", name: "Super rare", weight: 14, color: "#ee0000", minScore: 74, maxScore: 86 },
   { id: "UR", name: "Ultra rare", weight: 7, color: "#cc00ff", minScore: 82, maxScore: 93 },
   { id: "L", name: "Légendaire", weight: 2, color: "#f8c72f", minScore: 90, maxScore: 99 },
-  { id: "SL", name: "Spéciale légendaire", weight: 1, color: "#f8fafc", minScore: 99, maxScore: 100 },
+  { id: "SL", name: "Spéciale légendaire", weight: 0.68, color: "#f8fafc", minScore: 99, maxScore: 100 },
 ];
 const CARD_SL_GRADIENT = "linear-gradient(135deg, #cc00ff 0%, #7c3aed 38%, #f8c72f 100%)";
 const CARD_SL_COLOR = "#f8c72f";
