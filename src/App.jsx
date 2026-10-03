@@ -179,6 +179,13 @@ function writeStoredCardPackStock(stock) {
   window.localStorage.setItem(CARD_PACK_STOCK_STORAGE_KEY, JSON.stringify(normalizeCardPackStock(stock)));
 }
 
+function formatCardPackWait(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
 function getEasterEggStorageKey(playerId = "") {
   return playerId ? `${EASTER_EGG_STORAGE_KEY}:${playerId}` : EASTER_EGG_STORAGE_KEY;
 }
@@ -4974,6 +4981,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
     return () => window.clearInterval(interval);
   }, []);
   const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
+  const nextPackInMs = packStock.packs >= CARD_PACK_MAX_STOCK ? 0 : Math.max(0, packStock.updatedAt + CARD_PACK_REGEN_MS - Date.now());
+  const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
+  const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK ? "Stock maximum" : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
   const openPack = () => {
     const refreshedStock = normalizeCardPackStock(packStock);
     if (!cardLibrary.length || refreshedStock.packs <= 0) {
@@ -5023,6 +5033,10 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seaso
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={{ ...styles.cardPlayerPackButton, ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label="Ouvrir un pack URTT TGC">
             <img src="/card-pack-urtt.png" alt="Pack URTT TGC" style={styles.cardPlayerPackImage} />
           </button>
+          <div style={styles.cardPackStockPanel}>
+            <strong>{packStockText}</strong>
+            <span>{nextPackText}</span>
+          </div>
         </section>
       )}
       {cardsView === "collection" && <header style={styles.cardLabHeader}>
@@ -8660,7 +8674,8 @@ const styles = {
   cardPlayerHint: { color: "#d8b4fe", fontWeight: 850, fontSize: 13 },
   cardPlayerRarityStrip: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 },
   cardPlayerRarity: { width: 38, height: 34, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", fontSize: 12, fontWeight: 950, background: "rgba(255,255,255,.07)" },
-  cardPackOnlySection: { minHeight: "min(720px, calc(100vh - 170px))", display: "grid", placeItems: "center", padding: "24px 0" },
+  cardPackOnlySection: { minHeight: "min(720px, calc(100vh - 170px))", display: "grid", placeItems: "center", alignContent: "center", gap: 18, padding: "24px 0" },
+  cardPackStockPanel: { display: "inline-grid", justifyItems: "center", gap: 4, padding: "10px 16px", borderRadius: 999, background: "rgba(15,23,42,.72)", border: "1px solid rgba(204,0,255,.32)", color: "#f8fafc", fontWeight: 950, boxShadow: "0 16px 42px rgba(0,0,0,.22)" },
   cardPlayerPackScene: { minHeight: 430, position: "relative", display: "grid", placeItems: "center" },
   cardPlayerPackButton: { width: "min(390px, 82vw)", aspectRatio: "1024 / 1536", border: 0, background: "transparent", padding: 0, display: "grid", placeItems: "center", cursor: "pointer", filter: "drop-shadow(0 34px 72px rgba(204,0,255,.32))", transform: "rotate(2deg)", transition: "transform .22s ease, filter .22s ease" },
   cardPlayerPackUnavailable: { cursor: "default", opacity: .55, filter: "drop-shadow(0 20px 42px rgba(148,163,184,.18)) grayscale(.45)" },
