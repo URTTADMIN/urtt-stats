@@ -4,7 +4,7 @@ import { useRef } from "react";
 
 const POINTS_SYSTEM = [30, 25, 22, 20, 18, 16, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const F2_SEASONS_3_AND_4_POINTS_SYSTEM = [20, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
-const DEFAULT_SEASON_OPTIONS = Array.from({ length: 16 }, (_, index) => ({ id: `S${index + 1}`, name: `Saison ${index + 1}`, sortOrder: index + 1 }));
+const DEFAULT_SEASON_OPTIONS = Array.from({ length: 18 }, (_, index) => ({ id: `S${index + 1}`, name: `Saison ${index + 1}`, sortOrder: index + 1 }));
 let runtimeSeasonOptions = DEFAULT_SEASON_OPTIONS;
 const CATEGORY_OPTIONS = [
   { id: "F1", name: "F1", color: "#7c3aed" },
@@ -20,6 +20,8 @@ const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_TEST_SEASON_ID = "S1";
+const CARD_COLLECTION_CATEGORY_ID = "F1";
+const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
@@ -2461,6 +2463,7 @@ export default function URTTAdminPanel() {
   const currentSeasonRaces = racesBySelectedCategory[effectiveSelectedSeasonId] || [];
   const currentAdminSeasonRaces = adminRacesBySelectedCategory[selectedSeasonId] || adminRacesBySelectedCategory[effectiveSelectedSeasonId] || [];
   const computed = useMemo(() => computeStats({ drivers, teams, raceResults, selectedCategoryId, seasonTitles }), [drivers, teams, raceResults, selectedCategoryId, seasonTitles]);
+  const f1Computed = useMemo(() => computeStats({ drivers, teams, raceResults, selectedCategoryId: CARD_COLLECTION_CATEGORY_ID, seasonTitles }), [drivers, teams, raceResults, seasonTitles]);
   const seasonOnlyDrivers = computed.driverStatsBySeason[effectiveSelectedSeasonId] || [];
   const seasonOnlyTeams = computed.teamStatsBySeason[effectiveSelectedSeasonId] || [];
   const cumulativeDrivers = computed.cumulativeDriverStatsBySeason[effectiveSelectedSeasonId] || [];
@@ -3980,7 +3983,7 @@ export default function URTTAdminPanel() {
   const cardLabSeasonId = cardLabSettings.seasonId;
   const cardLabRequested = isCardLabRequested();
   const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile, cardLabSettings) || isLocalHost();
-  const cardLabSeasonDrivers = computed.driverStatsBySeason[cardLabSeasonId]?.length ? computed.driverStatsBySeason[cardLabSeasonId] : computed.globalDriverStats;
+  const cardLabSeasonDrivers = f1Computed.driverStatsBySeason[cardLabSeasonId]?.length ? f1Computed.driverStatsBySeason[cardLabSeasonId] : f1Computed.globalDriverStats;
 
   return (
     <>
@@ -4032,6 +4035,7 @@ export default function URTTAdminPanel() {
           cardLabRequested={cardLabRequested}
           hasCardLabAccess={hasCardLabAccess}
           cardLabDrivers={cardLabSeasonDrivers}
+          cardLabStandingsBySeason={f1Computed.driverStatsBySeason}
           cardLabSettings={cardLabSettings}
         />
       )}
@@ -4468,7 +4472,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -4677,7 +4681,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "cards-lab" && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={selectedCategoryId} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -4848,6 +4852,10 @@ function buildSeasonCardEdition(standings = [], seasonId, categoryId, teams = []
     .filter(Boolean);
 }
 
+function buildSeasonCardCollection(standingsBySeason = {}, seasonIds = CARD_COLLECTION_SEASON_IDS, categoryId = CARD_COLLECTION_CATEGORY_ID, teams = [], rarities = CARD_RARITY_PRESETS) {
+  return seasonIds.flatMap((seasonId) => buildSeasonCardEdition(standingsBySeason[seasonId] || [], seasonId, categoryId, teams, rarities));
+}
+
 function drawLabPack(pool, rarities, count = 5) {
   const stableCards = pool.map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)));
   const selected = [];
@@ -4873,15 +4881,28 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId = "F1", embedded = false }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, embedded = false }) {
   const rarities = CARD_RARITY_PRESETS;
-  const cardLibrary = useMemo(() => buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities)
-    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity.id] || 0) - (CARD_RARITY_ORDER[a.rarity.id] || 0) || a.position - b.position || a.name.localeCompare(b.name)),
-  [drivers, teams, seasonId, categoryId, rarities]);
+  const [cardsView, setCardsView] = useState("opening");
+  const [collectionSeasonFilter, setCollectionSeasonFilter] = useState("ALL");
+  const cardLibrary = useMemo(() => {
+    const collection = buildSeasonCardCollection(standingsBySeason, CARD_COLLECTION_SEASON_IDS, CARD_COLLECTION_CATEGORY_ID, teams, rarities);
+    if (collection.length) return collection;
+    return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
+  }, [drivers, standingsBySeason, teams, seasonId, categoryId, rarities]);
+  const sortedCollectionCards = useMemo(() => [...cardLibrary]
+    .sort((a, b) => getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || a.name.localeCompare(b.name)),
+  [cardLibrary]);
+  const displayedCollectionCards = collectionSeasonFilter === "ALL"
+    ? sortedCollectionCards
+    : sortedCollectionCards.filter((card) => normalizeSeasonId(card.seasonId) === normalizeSeasonId(collectionSeasonFilter));
   const rarityCounts = useMemo(() => cardLibrary.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
   }), {}), [cardLibrary]);
+  const collectionSeasonOptions = CARD_COLLECTION_SEASON_IDS
+    .map((id) => ({ id, count: cardLibrary.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
+    .filter((season) => season.count > 0);
   const [pack, setPack] = useState([]);
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
@@ -4900,6 +4921,7 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
     return () => window.clearTimeout(timer);
   }, [isOpeningPack, revealedCount, pack.length]);
   const openPack = () => {
+    if (!cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
     setRevealedCount(0);
     setShowPackModal(true);
@@ -4914,10 +4936,11 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
       <section style={styles.cardPlayerHero}>
         <div style={styles.cardPlayerCopy}>
           <span style={styles.cardPlayerEyebrow}>URTT Cards</span>
-          <h1 style={styles.cardPlayerTitle}>Ouvre ton pack Saison 1</h1>
-          <p style={styles.cardPlayerText}>Découvre 5 cartes de l'édition {seasonName(seasonId)}. Pour ce test, seules les cartes de la Saison 1 sont disponibles.</p>
+          <h1 style={styles.cardPlayerTitle}>Ouvre ton pack F1</h1>
+          <p style={styles.cardPlayerText}>Découvre 5 cartes issues des saisons F1 1 à 17. Chaque carte est faite pour la collection, avec sa rareté basée sur le classement de sa saison.</p>
           <div style={styles.cardPlayerActions}>
-            <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.cardPlayerPrimary}>{isOpeningPack ? "Ouverture en cours..." : "Ouvrir un pack"}</button>
+            <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.cardPlayerPrimary}>{isOpeningPack ? "Ouverture en cours..." : "Ouvrir un pack"}</button>
+            <button type="button" onClick={() => setCardsView("collection")} style={styles.secondaryButton}>Voir la collection</button>
             <span style={styles.cardPlayerHint}>La meilleure carte arrive toujours à la fin.</span>
           </div>
           <div style={styles.cardPlayerRarityStrip}>
@@ -4936,23 +4959,25 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
       </section>
       <header style={styles.cardLabHeader}>
         <div>
-          <p style={styles.kicker}>ÉDITION TEST · {seasonName(seasonId).toUpperCase()}</p>
-          <h1 style={styles.cardLabTitle}>Collection Saison 1</h1>
-          <p style={styles.muted}>Ouvre des packs, découvre les cartes pilotes et donne ton retour sur les raretés, les stats et le ressenti général.</p>
+          <p style={styles.kicker}>ÉDITION TEST · F1 S1 → S17</p>
+          <h1 style={styles.cardLabTitle}>Cartes F1</h1>
+          <p style={styles.muted}>Ouvre des packs, découvre les cartes pilotes et donne ton retour sur les raretés et le ressenti collection.</p>
         </div>
         <div style={styles.actions}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          <button type="button" onClick={() => setCardsView("opening")} style={cardsView === "opening" ? styles.primaryButton : styles.secondaryButton}>Ouverture</button>
+          <button type="button" onClick={() => setCardsView("collection")} style={cardsView === "collection" ? styles.primaryButton : styles.secondaryButton}>Collection</button>
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
       </header>
-      <section style={styles.cardLabOpeningStage}>
+      {cardsView === "opening" && <section style={styles.cardLabOpeningStage}>
         <div>
           <p style={styles.kicker}>Comment ça marche</p>
           <h2 style={styles.cardLabStageTitle}>Une série basée sur le classement</h2>
-          <p style={styles.muted}>Chaque carte Saison 1 garde sa rareté officielle selon la position finale du pilote au championnat.</p>
+          <p style={styles.muted}>Chaque carte F1 garde sa rareté officielle selon la position finale du pilote sur sa saison.</p>
         </div>
-      </section>
-      <section style={styles.cardPlayerInfoGrid}>
-        <Card title="Raretés Saison 1" icon="🏆">
+      </section>}
+      {cardsView === "opening" && <section style={styles.cardPlayerInfoGrid}>
+        <Card title="Raretés F1 par saison" icon="🏆">
           <div style={styles.cardPlayerRules}>
             {[
               ["#1", "Légendaire", "L"],
@@ -4972,20 +4997,20 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
             <p style={styles.muted}>Ouvre plusieurs packs et regarde si les cartes donnent envie d'être collectionnées.</p>
             <div style={styles.cardPlayerObjectiveList}>
               <span style={styles.cardPlayerObjectiveItem}>Raretés compréhensibles</span>
-              <span style={styles.cardPlayerObjectiveItem}>Stats crédibles</span>
+              <span style={styles.cardPlayerObjectiveItem}>Collection lisible</span>
               <span style={styles.cardPlayerObjectiveItem}>Ouverture agréable</span>
               <span style={styles.cardPlayerObjectiveItem}>Cartes lisibles mobile/PC</span>
             </div>
-            <button type="button" onClick={openPack} disabled={isOpeningPack} style={styles.fullButton}>{isOpeningPack ? "Ouverture..." : "Tester un pack"}</button>
+            <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.fullButton}>{isOpeningPack ? "Ouverture..." : "Tester un pack"}</button>
           </div>
         </Card>
-      </section>
-      <section style={styles.cardCollectionPanel}>
+      </section>}
+      {cardsView === "collection" && <section style={styles.cardCollectionPanel}>
         <div style={styles.cardCollectionHeader}>
           <div>
-            <p style={styles.kicker}>COLLECTION SAISON 1</p>
+            <p style={styles.kicker}>COLLECTION F1 · S1 → S17</p>
             <h2 style={styles.cardLabStageTitle}>Toutes les cartes disponibles</h2>
-            <p style={styles.muted}>La collection complète de l'édition test, triée des cartes les plus rares aux plus communes.</p>
+            <p style={styles.muted}>La collection complète de l'édition test, avec toutes les cartes F1 générées depuis les classements de chaque saison.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {rarities.map((rarity) => (
@@ -4995,10 +5020,21 @@ function CardRarityLab({ drivers = [], teams = [], seasonId = "S1", categoryId =
             ))}
           </div>
         </div>
-        <div style={styles.cardCollectionGrid}>
-          {cardLibrary.map((card) => <CollectionCard key={card.cardId} card={card} />)}
+        <div style={styles.cardCollectionToolbar}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Filtrer par saison</span>
+            <select value={collectionSeasonFilter} onChange={(event) => setCollectionSeasonFilter(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Toutes les saisons ({cardLibrary.length})</option>
+              {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !cardLibrary.length} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
-      </section>
+        <div style={styles.cardCollectionGrid}>
+          {displayedCollectionCards.map((card) => <CollectionCard key={card.cardId} card={card} />)}
+        </div>
+        {displayedCollectionCards.length === 0 && <Empty text="Aucune carte F1 disponible pour cette sélection." />}
+      </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} onClose={closePackModal} onReplay={openPack} />}
     </div>
   );
@@ -8415,7 +8451,7 @@ function SeasonCardsAdminPanel({
             {validatedEdition && <button type="button" onClick={removeGeneration} style={styles.dangerButton}>Retirer validation</button>}
           </div>
           <p style={styles.muted}>
-            Test verrouillé sur Saison 1. Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
+            Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
           </p>
           <div style={validatedEdition ? styles.badgeGreen : styles.badgeDark}>
             {validatedEdition ? `Génération validée le ${formatRaceDate(validatedEdition.generatedAt)}` : "Aucune génération validée pour cette saison."}
@@ -8627,6 +8663,7 @@ const styles = {
   cardCollectionHeader: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "center", flexWrap: "wrap" },
   cardCollectionSummary: { display: "flex", gap: 8, flexWrap: "wrap" },
   cardCollectionSummaryBadge: { border: "1px solid currentColor", borderRadius: 999, padding: "8px 10px", fontWeight: 950, background: "rgba(255,255,255,.06)" },
+  cardCollectionToolbar: { display: "flex", justifyContent: "space-between", alignItems: "end", gap: 12, flexWrap: "wrap", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 16, padding: 14 },
   cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 },
   collectionCard: { background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 16, padding: 14, display: "grid", gap: 12, alignContent: "start" },
   collectionCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
