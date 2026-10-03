@@ -19,6 +19,7 @@ const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
+const PUBLIC_PAGE_STORAGE_KEY = "urtt-public-page";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_COLLECTION_STORAGE_KEY = "urtt-card-collection-v4";
 const CARD_PACK_STOCK_STORAGE_KEY = "urtt-card-pack-stock-v4";
@@ -229,6 +230,17 @@ function readStoredCardCollection() {
 function writeStoredCardCollection(cards = []) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(CARD_COLLECTION_STORAGE_KEY, JSON.stringify(Array.isArray(cards) ? cards : []));
+}
+
+function readStoredPublicPage() {
+  if (typeof window === "undefined") return "home";
+  const storedPage = window.localStorage.getItem(PUBLIC_PAGE_STORAGE_KEY);
+  return PUBLIC_PAGE_OPTIONS.some((page) => page.id === storedPage) ? storedPage : "home";
+}
+
+function writeStoredPublicPage(pageId = "home") {
+  if (typeof window === "undefined") return;
+  if (PUBLIC_PAGE_OPTIONS.some((page) => page.id === pageId)) window.localStorage.setItem(PUBLIC_PAGE_STORAGE_KEY, pageId);
 }
 
 function normalizeCardCollection(value) {
@@ -2274,7 +2286,7 @@ export default function URTTAdminPanel() {
     return () => document.head.removeChild(style);
   }, []);
   const [view, setView] = useState("front");
-  const [publicPage, setPublicPage] = useState("home");
+  const [publicPage, setPublicPage] = useState(() => readStoredPublicPage());
   const [adminPage, setAdminPage] = useState("dashboard");
   const [isAdminPreview, setIsAdminPreview] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState("F1");
@@ -2285,6 +2297,9 @@ export default function URTTAdminPanel() {
   const [loginError, setLoginError] = useState("");
   const [adminUser, setAdminUser] = useState(null);
   const [adminPermissions, setAdminPermissions] = useState(defaultAdminPermissions);
+  useEffect(() => {
+    writeStoredPublicPage(publicPage);
+  }, [publicPage]);
   const [drivers, setDrivers] = useState([]);
   const [teams, setTeams] = useState([]);
   const [isSaving, setIsSaving] = useState(false);
