@@ -21,6 +21,7 @@ const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_TEST_SEASON_ID = "S1";
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
+const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_LOGO = "/retired-driver.png";
@@ -319,7 +320,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "" };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -907,6 +908,17 @@ function normalizeThanksNames(value) {
 function normalizeThanksText(value) {
   return String(value || "").trim();
 }
+function normalizeCardLabSettings(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const rawPseudos = Array.isArray(source.allowedPseudos) ? source.allowedPseudos : String(source.allowedPseudos || "").split(/[\n,]/);
+  const allowedPseudos = Array.from(new Set(rawPseudos
+    .map((pseudo) => normalizeResultText(pseudo || ""))
+    .filter(Boolean)));
+  return {
+    seasonId: normalizeSeasonId(source.seasonId || DEFAULT_CARD_LAB_SETTINGS.seasonId),
+    allowedPseudos: allowedPseudos.length ? allowedPseudos : DEFAULT_CARD_LAB_SETTINGS.allowedPseudos,
+  };
+}
 function mapSiteSettingsFromDb(rows = []) {
   const rawSettings = rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
   const hasPublicPagesSetting = rows.some((row) => row.key === "publicPages");
@@ -916,6 +928,7 @@ function mapSiteSettingsFromDb(rows = []) {
     publicPages: normalizePublicPageSettings(hasPublicPagesSetting ? rawSettings.publicPages : null, rawSettings.publicDevelopmentEnabled),
     thanksNames: normalizeThanksNames(rawSettings.thanksNames),
     thanksText: normalizeThanksText(rawSettings.thanksText),
+    cardLabSettings: normalizeCardLabSettings(rawSettings.cardLabSettings),
   };
 }
 function mapRaceResultFromDb(result, entries = []) {
@@ -3276,6 +3289,7 @@ export default function URTTAdminPanel() {
       return;
     }
 
+    const previousValue = siteSettings[key];
     setSiteSettings((current) => ({ ...current, [key]: value }));
     const { error } = await supabase
       .from("site_settings")
@@ -3283,12 +3297,12 @@ export default function URTTAdminPanel() {
 
     if (error) {
       console.error("Erreur reglage site:", error);
-      setSiteSettings((current) => ({ ...current, [key]: !value }));
+      setSiteSettings((current) => ({ ...current, [key]: previousValue }));
       setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table site_settings n'existe pas encore. Lance la commande SQL fournie par Codex." : `Impossible de sauvegarder le reglage: ${error.message}` });
       return;
     }
 
-    setPopup({ type: "success", title: "Reglage sauvegarde", message: "La visibilite publique a ete mise a jour." });
+    setPopup({ type: "success", title: "Reglage sauvegarde", message: "Les reglages du site ont ete mis a jour." });
   }
 
   async function saveAdminPermission() {
@@ -3962,9 +3976,11 @@ export default function URTTAdminPanel() {
   }
 
   const allRaces = allCalendarRaces.filter((race) => normalizeCategoryId(race.categoryId) === normalizeCategoryId(selectedCategoryId));
+  const cardLabSettings = normalizeCardLabSettings(siteSettings.cardLabSettings);
+  const cardLabSeasonId = cardLabSettings.seasonId;
   const cardLabRequested = isCardLabRequested();
-  const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile) || isLocalHost();
-  const seasonOneCardDrivers = computed.driverStatsBySeason[CARD_TEST_SEASON_ID]?.length ? computed.driverStatsBySeason[CARD_TEST_SEASON_ID] : computed.globalDriverStats;
+  const hasCardLabAccess = canOpenAdmin || canPlayerAccessCardLab(playerProfile, cardLabSettings) || isLocalHost();
+  const cardLabSeasonDrivers = computed.driverStatsBySeason[cardLabSeasonId]?.length ? computed.driverStatsBySeason[cardLabSeasonId] : computed.globalDriverStats;
 
   return (
     <>
@@ -4015,7 +4031,8 @@ export default function URTTAdminPanel() {
           onOpenAdmin={openAdminAccess}
           cardLabRequested={cardLabRequested}
           hasCardLabAccess={hasCardLabAccess}
-          cardLabDrivers={seasonOneCardDrivers}
+          cardLabDrivers={cardLabSeasonDrivers}
+          cardLabSettings={cardLabSettings}
         />
       )}
       {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
@@ -4064,7 +4081,7 @@ export default function URTTAdminPanel() {
 )}
           {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {visibleAdminPage === "championship-stats" && <ChampionshipStatsAdminPanel drivers={drivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allCalendarRaces={allCalendarRaces} categoryOptions={adminCategoryOptions} seasonOptions={seasonOptions} />}
-          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} />}
+          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} isSaving={isSaving} />}
           {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
@@ -4451,7 +4468,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [] }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -4660,7 +4677,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {activePublicPage === "cards-lab" && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} teams={teams} seasonId={CARD_TEST_SEASON_ID} categoryId={selectedCategoryId} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={selectedCategoryId} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -4726,9 +4743,10 @@ function isCardLabRequested() {
   return new URLSearchParams(window.location.search).get("lab") === "cards";
 }
 
-function canPlayerAccessCardLab(profile) {
+function canPlayerAccessCardLab(profile, settings = DEFAULT_CARD_LAB_SETTINGS) {
   const pseudo = normalizeResultText(profile?.pseudo || "");
-  return Boolean(profile?.id && CARD_LAB_ALLOWED_PLAYER_PSEUDOS.includes(pseudo));
+  const safeSettings = normalizeCardLabSettings(settings);
+  return Boolean(profile?.id && safeSettings.allowedPseudos.includes(pseudo));
 }
 
 function randomBetween(min, max) {
@@ -8337,8 +8355,16 @@ function SeasonCardsAdminPanel({
   selectedSeasonId,
   setSelectedSeasonId,
   seasonOptions = [],
+  siteSettings = defaultSiteSettings,
+  onUpdateSetting,
+  isSaving = false,
 }) {
-  const cardSeasonId = CARD_TEST_SEASON_ID;
+  const cardSettings = normalizeCardLabSettings(siteSettings.cardLabSettings);
+  const cardSeasonId = cardSettings.seasonId;
+  const [allowedDraft, setAllowedDraft] = useState(() => cardSettings.allowedPseudos.join("\n"));
+  useEffect(() => {
+    setAllowedDraft(cardSettings.allowedPseudos.join("\n"));
+  }, [cardSettings.allowedPseudos.join("|")]);
   const storageKey = `${normalizeCategoryId(selectedCategoryId)}-${cardSeasonId}`;
   const [validatedGenerations, setValidatedGenerations] = useState(() => {
     try {
@@ -8371,9 +8397,34 @@ function SeasonCardsAdminPanel({
     window.localStorage.setItem(CARD_GENERATION_STORAGE_KEY, JSON.stringify(next));
     setValidatedGenerations(next);
   };
+  const saveCardSettings = (patch) => {
+    const nextSettings = normalizeCardLabSettings({ ...cardSettings, ...patch });
+    onUpdateSetting?.("cardLabSettings", nextSettings);
+  };
+  const saveAllowedPseudos = () => {
+    saveCardSettings({ allowedPseudos: allowedDraft });
+  };
 
   return (
     <div style={styles.section}>
+      <Card title="Paramètres du test cartes" icon="⚙️">
+        <div style={styles.stack}>
+          <div style={styles.resultsInfo}>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Saison utilisée sur la page joueur</span>
+              <select value={cardSeasonId} onChange={(event) => saveCardSettings({ seasonId: event.target.value })} disabled={isSaving} style={styles.resultsSelect}>
+                {(seasonOptions.length ? seasonOptions : getSeasonOptions()).map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}
+              </select>
+            </label>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Pseudos joueurs autorisés</span>
+              <textarea value={allowedDraft} onChange={(event) => setAllowedDraft(event.target.value)} rows={5} placeholder={"Kolti\nAutrePseudo"} style={styles.textarea} />
+            </label>
+            <button type="button" onClick={saveAllowedPseudos} disabled={isSaving || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Sauvegarder les testeurs"}</button>
+          </div>
+          <p style={styles.mutedSmall}>La page cachée <strong>?lab=cards</strong> reste réservée aux admins, au local et aux pseudos listés ici.</p>
+        </div>
+      </Card>
       <Card title="Génération des cartes saison" icon="🃏">
         <div style={styles.stack}>
           <div style={styles.resultsInfo}>
