@@ -94,7 +94,7 @@ const PUBLIC_PAGE_OPTIONS = [
 const PUBLIC_NAV_GROUPS = [
   { id: "championship", label: "Championnat", pages: ["standings", "seasons", "drivers", "teams", "development"] },
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
-  { id: "tgc", label: "URTT TGC", pages: ["tgc-packs", "tgc-collection"] },
+  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
@@ -8932,7 +8932,7 @@ function SeasonCardsAdminPanel({
 
   return (
     <div style={styles.section}>
-      <Card title="Paramètres du test cartes" icon="⚙️">
+      <Card title="Création de carte spéciale" icon="⚙️">
         <div style={styles.stack}>
           <div style={styles.resultsInfo}>
             <label style={styles.label}>
