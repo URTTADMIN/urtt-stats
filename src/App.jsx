@@ -5189,20 +5189,27 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
 }
 
 function CollectionCard({ card }) {
+  const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   return (
-    <article style={{ ...styles.collectionCard, borderColor: card.rarity.color, boxShadow: `0 14px 34px rgba(0,0,0,.25), 0 0 24px ${card.rarity.color}22` }}>
+    <article style={{ ...styles.collectionCard, borderColor: card.rarity.color, boxShadow: `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${card.rarity.color}33`, background: `radial-gradient(circle at 50% 0%, ${card.rarity.color}38, transparent 38%), linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
+      <div style={{ ...styles.collectionCardAccent, background: `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       <div style={styles.collectionCardTop}>
-        <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
+        <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}26`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
         <strong style={{ color: card.rarity.color }}>{card.rarity.name}</strong>
       </div>
-      <div style={styles.collectionCardIdentity}>
+      <div style={styles.collectionCardHero}>
         <div style={styles.collectionCardAvatar}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
-        <div style={styles.collectionCardText}>
-          <h3 style={styles.collectionCardName}>{card.name}</h3>
-          <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
-        </div>
+        {card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}
       </div>
-      <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryName || getCardCategoryLabel(card.categoryId)}</div>
+      <div style={styles.collectionCardText}>
+        <h3 style={styles.collectionCardName}>{card.name}</h3>
+        <p style={styles.mutedSmall}>{card.teamName}</p>
+      </div>
+      <div style={styles.collectionCardInfoGrid}>
+        <span style={styles.collectionCardInfoPill}>{seasonName(card.seasonId)}</span>
+        <span style={styles.collectionCardInfoPill}>{cardLabel}</span>
+      </div>
+      <div style={{ ...styles.cardCollectOnlyMeta, borderColor: `${card.rarity.color}55`, background: `${card.rarity.color}18` }}>Carte collection</div>
     </article>
   );
 }
@@ -5267,19 +5274,25 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, canOpenPack = tr
 }
 
 function LabCard({ card, revealed = true, finalCard = false, active = false }) {
+  const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   return (
     <article style={{ ...styles.cardLabFlipShell, ...(active ? styles.cardLabFlipShellActive : {}) }}>
       <div style={{ ...styles.cardLabFlipInner, transform: revealed ? "rotateY(180deg)" : "rotateY(0deg)" }}>
         <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
-        <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: card.rarity.color, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${card.rarity.color}55` }}>
+        <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: card.rarity.color, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${card.rarity.color}55`, background: `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
+          <div style={{ ...styles.collectionCardAccent, background: `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
           <div style={styles.cardLabCardTop}>
             <span style={{ ...styles.cardLabRarityBadge, background: `${card.rarity.color}22`, borderColor: card.rarity.color, color: card.rarity.color }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
           </div>
-          <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}</div>
+          <div style={styles.cardLabPortrait}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={styles.cardLabLogo} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: card.rarity.color, color: card.rarity.color }}>#{card.position}</span> : null}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
-          <p style={styles.mutedSmall}>{card.teamName}{card.position ? ` · #${card.position} ${seasonName(card.seasonId)}` : ""}</p>
-          <div style={styles.cardCollectOnlyMeta}>Carte collection · {card.categoryName || getCardCategoryLabel(card.categoryId)}</div>
+          <p style={styles.mutedSmall}>{card.teamName}</p>
+          <div style={styles.collectionCardInfoGrid}>
+            <span style={styles.collectionCardInfoPill}>{seasonName(card.seasonId)}</span>
+            <span style={styles.collectionCardInfoPill}>{cardLabel}</span>
+          </div>
+          <div style={{ ...styles.cardCollectOnlyMeta, borderColor: `${card.rarity.color}55`, background: `${card.rarity.color}18` }}>Carte collection</div>
         </div>
       </div>
     </article>
@@ -8814,24 +8827,28 @@ const styles = {
   cardRarityFilterRow: { display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" },
   cardRarityFilterButton: { minHeight: 36, border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "0 11px", background: "rgba(255,255,255,.04)", color: "#f8fafc", fontWeight: 950, cursor: "pointer" },
   cardRarityFilterButtonActive: { borderColor: "#f8fafc", background: "rgba(255,255,255,.13)", boxShadow: "0 0 22px rgba(255,255,255,.12)" },
-  cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(210px, 1fr))", gap: 14 },
-  collectionCard: { background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 16, padding: 14, display: "grid", gap: 12, alignContent: "start" },
-  collectionCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
-  collectionCardIdentity: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr)", gap: 11, alignItems: "center" },
-  collectionCardAvatar: { width: 48, height: 48, borderRadius: 12, display: "grid", placeItems: "center", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.12)", fontWeight: 950, overflow: "hidden" },
+  cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 },
+  collectionCard: { minHeight: 320, position: "relative", isolation: "isolate", background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 20, padding: 16, display: "grid", gap: 12, alignContent: "start", overflow: "hidden" },
+  collectionCardAccent: { position: "absolute", top: 0, left: 0, width: 5, height: "100%", opacity: .88, zIndex: 0 },
+  collectionCardTop: { position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, textTransform: "uppercase" },
+  collectionCardHero: { position: "relative", zIndex: 1, minHeight: 138, borderRadius: 18, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.14)", overflow: "hidden" },
+  collectionCardAvatar: { width: 94, height: 94, borderRadius: 18, display: "grid", placeItems: "center", background: "rgba(2,6,23,.34)", border: "1px solid rgba(255,255,255,.16)", fontWeight: 950, overflow: "hidden", boxShadow: "inset 0 0 28px rgba(255,255,255,.06), 0 16px 30px rgba(0,0,0,.22)" },
+  collectionCardRank: { position: "absolute", right: 10, bottom: 10, minWidth: 38, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", background: "rgba(2,6,23,.72)", fontSize: 12, fontWeight: 950 },
   collectionCardText: { minWidth: 0 },
-  collectionCardName: { margin: 0, fontSize: 18, letterSpacing: "-.03em", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
-  cardCollectOnlyMeta: { marginTop: 4, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0", textAlign: "center" },
+  collectionCardName: { margin: 0, fontSize: 24, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" },
+  collectionCardInfoGrid: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, position: "relative", zIndex: 1 },
+  collectionCardInfoPill: { minHeight: 34, display: "grid", placeItems: "center", background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 10, color: "#cbd5e1", fontSize: 12, fontWeight: 900, textAlign: "center", padding: "0 8px" },
+  cardCollectOnlyMeta: { marginTop: 0, background: "rgba(255,255,255,.07)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12, padding: "10px 12px", fontWeight: 900, color: "#e2e8f0", textAlign: "center" },
   cardLabPack: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 18 },
   cardLabFlipShell: { minHeight: 330, perspective: 1200, transform: "translateY(0) scale(1)", transition: "transform .32s ease" },
   cardLabFlipShellActive: { transform: "translateY(-8px) scale(1.025)" },
   cardLabFlipInner: { position: "relative", width: "100%", minHeight: 330, transformStyle: "preserve-3d", transition: "transform .72s cubic-bezier(.2,.85,.2,1)" },
   cardLabCardBack: { position: "absolute", inset: 0, backfaceVisibility: "hidden", minHeight: 310, backgroundImage: "url('/card-back-urtt.png')", backgroundSize: "cover", backgroundPosition: "center", border: "2px solid #455574", borderRadius: 18, padding: 16, display: "grid", placeItems: "center", alignContent: "center", gap: 10, overflow: "hidden", boxShadow: "0 20px 55px rgba(0,0,0,.34)" },
-  cardLabCard: { position: "absolute", inset: 0, backfaceVisibility: "hidden", transform: "rotateY(180deg)", minHeight: 310, background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "2px solid #475569", borderRadius: 18, padding: 16, display: "grid", gap: 10, alignContent: "start", overflow: "hidden" },
+  cardLabCard: { position: "absolute", inset: 0, backfaceVisibility: "hidden", transform: "rotateY(180deg)", minHeight: 310, background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "2px solid #475569", borderRadius: 18, padding: 16, display: "grid", gap: 10, alignContent: "start", overflow: "hidden", isolation: "isolate" },
   cardLabFinalCard: { background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 34%), linear-gradient(160deg, rgba(21,26,43,.99), rgba(49,31,58,.98))" },
   cardLabCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
-  cardLabPortrait: { height: 104, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950 },
-  cardLabLogo: { width: 76, height: 76, objectFit: "contain" },
+  cardLabPortrait: { position: "relative", zIndex: 1, height: 112, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950, overflow: "hidden" },
+  cardLabLogo: { width: 82, height: 82, objectFit: "contain" },
   cardLabCardName: { margin: 0, fontSize: 25, letterSpacing: "-.04em" },
   cardTitle: { margin: 0, fontSize: 22 },
   stack: { display: "grid", gap: 12 },
