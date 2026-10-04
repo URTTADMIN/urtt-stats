@@ -7912,6 +7912,20 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
       if (!search) return true;
       return `${card.name || ""} ${card.teamName || ""} ${getCardSeasonLabel(card)} ${card.categoryName || getCardCategoryLabel(card.categoryId)} ${card.rarity?.id || ""} ${card.rarity?.name || ""}`.toLowerCase().includes(search);
     });
+  const groupedFilteredPlayerCards = useMemo(() => {
+    const grouped = new Map();
+    filteredPlayerCards.forEach((card) => {
+      const key = getCollectionGroupKey(card);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.duplicateCount += 1;
+        existing.ownedCopies.push(card);
+      } else {
+        grouped.set(key, { ...card, collectionGroupKey: key, duplicateCount: 1, ownedCopies: [card] });
+      }
+    });
+    return Array.from(grouped.values());
+  }, [filteredPlayerCards]);
   const selectedCardAccountRarityCounts = CARD_RARITY_PRESETS.map((rarity) => ({
     ...rarity,
     count: selectedCardAccountCards.filter((card) => card.rarity?.id === rarity.id).length,
@@ -8027,7 +8041,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
               ))}
             </div>
             <div style={styles.cardCollectionGrid}>
-              {filteredPlayerCards.map((card, index) => <CollectionCard key={`${card.ownedId || card.id || card.cardId}-${index}`} card={card} />)}
+              {groupedFilteredPlayerCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} />)}
             </div>
             {filteredPlayerCards.length === 0 && <Empty text="Aucune carte pour cette sélection." />}
           </>
