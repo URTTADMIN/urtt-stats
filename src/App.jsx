@@ -217,7 +217,7 @@ function getEmptyCardPackStock(now = Date.now()) {
   const dayStart = getCardPackDayStartMs(now);
   const generatedToday = getDailyGeneratedCardPacks(now);
   return {
-    packs: 0,
+    packs: generatedToday,
     updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS,
     generatedToday,
     dayKey: getCardPackDayKey(now),
@@ -255,6 +255,15 @@ function normalizeCardPackStock(source, now = Date.now()) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
   return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION };
+}
+
+function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
+  const normalized = normalizeCardPackStock(stock, now);
+  const safeAmount = Math.max(0, Math.floor(Number(amount) || 0));
+  return {
+    ...normalized,
+    packs: Math.min(CARD_PACK_MAX_STOCK, normalized.packs + safeAmount),
+  };
 }
 
 function readStoredCardPackStock() {
@@ -4026,6 +4035,48 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function grantPlayerCardPacks({ playerId = "", amount = 1, global = false } = {}) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut donner des packs.` });
+      return false;
+    }
+    const safeAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(amount) || 1)));
+    const targets = global ? playerAccounts : playerAccounts.filter((account) => idsEqual(account.id, playerId));
+    if (!targets.length) {
+      setPopup({ type: "error", title: "Aucun compte", message: "Aucun compte joueur trouvé pour recevoir des packs." });
+      return false;
+    }
+
+    const updates = targets.map((account) => {
+      const cardPackStock = addCardPacksToStock(account.cardPackStock, safeAmount);
+      return { account, cardPackStock };
+    });
+
+    const results = await Promise.all(updates.map(({ account, cardPackStock }) => supabase
+      .from("player_accounts")
+      .update({ card_pack_stock: cardPackStock, last_seen_at: new Date().toISOString() })
+      .eq("id", account.id)));
+
+    const firstError = results.find((result) => result.error)?.error;
+    if (firstError) {
+      console.error("Erreur don packs:", firstError);
+      setPopup({ type: "error", title: "Erreur Supabase", message: firstError.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de donner les packs." });
+      return false;
+    }
+
+    setPlayerAccounts((current) => current.map((account) => {
+      const update = updates.find((item) => idsEqual(item.account.id, account.id));
+      return update ? { ...account, cardPackStock: update.cardPackStock } : account;
+    }));
+    setPlayerProfile((current) => {
+      if (!current) return current;
+      const update = updates.find((item) => idsEqual(item.account.id, current.id));
+      return update ? { ...current, cardPackStock: update.cardPackStock } : current;
+    });
+    setPopup({ type: "success", title: "Packs ajoutés", message: global ? `${safeAmount} pack(s) ajouté(s) à ${updates.length} compte(s).` : `${safeAmount} pack(s) ajouté(s) au compte ${updates[0].account.pseudo}.` });
+    return true;
+  }
+
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
@@ -4345,7 +4396,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -5460,7 +5511,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     setOwnedCards(nextCards);
     setPackStock(nextStock);
     if (playerCardAccountId && (!playerProfile?.cardPackStock || (!accountCards.length && localCards.length))) savePlayerCards(nextCards, nextStock);
-  }, [playerCardAccountId]);
+  }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
     if (pack.length || !cardLibrary.length) return;
     setPack(drawCardPack(cardLibrary, rarities));
@@ -7762,7 +7813,10 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [] }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks }) {
+  const [packGiftAmount, setPackGiftAmount] = useState(1);
+  const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
+  const [isGrantingPacks, setIsGrantingPacks] = useState(false);
   if (!isPermissionsOwner(adminUser)) {
     return <div style={styles.section}><Card title="Comptes utilisateurs" icon="👤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
   }
@@ -7777,14 +7831,23 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
   const rows = accounts.map((account) => {
     const accountPredictions = predictions.filter((prediction) => idsEqual(prediction.playerId, account.id));
     const accountGuessResults = guessResults.filter((result) => idsEqual(result.playerId, account.id));
+    const cardPackStock = normalizeCardPackStock(account.cardPackStock);
     return {
       ...account,
+      cardPackStock,
       predictionsCount: accountPredictions.length,
       guessCount: accountGuessResults.length,
       guessWins: accountGuessResults.filter((result) => result.won).length,
       guessScore: accountGuessResults.reduce((total, result) => total + Number(result.score || 0), 0),
     };
   });
+  const safePackGiftAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(packGiftAmount) || 1)));
+  const grantPacks = async (targetId = packGiftTargetId) => {
+    if (!onGrantPacks) return;
+    setIsGrantingPacks(true);
+    await onGrantPacks({ amount: safePackGiftAmount, global: targetId === "ALL", playerId: targetId });
+    setIsGrantingPacks(false);
+  };
 
   return (
     <div style={styles.section}>
@@ -7797,18 +7860,39 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
         </div>
         <p style={styles.mutedSmall}>Cette page est réservée à {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rôles admin ne peuvent pas y accéder.</p>
       </Card>
+      <Card title="Donner des packs TCG" icon="🎁">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Nombre de packs</span>
+            <input type="number" min="1" max={CARD_PACK_MAX_STOCK} value={packGiftAmount} onChange={(event) => setPackGiftAmount(event.target.value)} style={styles.input} />
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Cible</span>
+            <select value={packGiftTargetId} onChange={(event) => setPackGiftTargetId(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Tous les comptes ({rows.length})</option>
+              {rows.map((account) => <option key={account.id} value={account.id}>{account.pseudo || `Compte ${account.id}`} ({account.cardPackStock.packs}/{CARD_PACK_MAX_STOCK})</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={() => grantPacks()} disabled={isGrantingPacks || !rows.length || !onGrantPacks} style={styles.primaryButton}>
+            {isGrantingPacks ? "Ajout..." : packGiftTargetId === "ALL" ? "Donner à tout le monde" : "Donner au joueur"}
+          </button>
+        </div>
+        <p style={styles.mutedSmall}>Les packs sont ajoutés au stock actuel, avec une limite de {CARD_PACK_MAX_STOCK} packs disponibles par compte.</p>
+      </Card>
       <Card title="Liste des comptes" icon="👥">
         <div style={styles.tableWrap}>
-          <table style={{ ...styles.table, minWidth: 860 }}>
+          <table style={{ ...styles.table, minWidth: 1040 }}>
             <thead>
               <tr style={styles.tableHead}>
                 <th style={styles.th}>Pseudo</th>
                 <th style={styles.th}>Discord</th>
+                <th style={styles.th}>Packs</th>
                 <th style={styles.th}>Créé le</th>
                 <th style={styles.th}>Dernière activité</th>
                 <th style={styles.th}>Pronos</th>
                 <th style={styles.th}>Devine</th>
                 <th style={styles.th}>Points</th>
+                <th style={styles.th}>Action</th>
               </tr>
             </thead>
             <tbody>
@@ -7816,11 +7900,13 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                 <tr key={account.id} style={styles.tr}>
                   <td style={styles.td}><strong>{account.pseudo || "—"}</strong><p style={styles.mutedSmall}>ID {account.id}</p></td>
                   <td style={styles.td}>{account.discordName || "—"}</td>
+                  <td style={styles.td}>{account.cardPackStock.packs}/{CARD_PACK_MAX_STOCK}</td>
                   <td style={styles.td}>{formatAccountDate(account.createdAt)}</td>
                   <td style={styles.td}>{formatAccountDate(account.lastSeenAt)}</td>
                   <td style={styles.td}>{account.predictionsCount}</td>
                   <td style={styles.td}>{account.guessCount} essais · {account.guessWins} win</td>
                   <td style={{ ...styles.td, ...styles.points }}>{account.guessScore}</td>
+                  <td style={styles.td}><button type="button" onClick={() => grantPacks(account.id)} disabled={isGrantingPacks || !onGrantPacks} style={styles.secondaryButton}>+{safePackGiftAmount}</button></td>
                 </tr>
               ))}
             </tbody>
