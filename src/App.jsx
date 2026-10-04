@@ -4120,6 +4120,34 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function resetPlayerCards({ playerId = "" } = {}) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut reset les cartes joueurs.` });
+      return false;
+    }
+    const target = playerAccounts.find((account) => idsEqual(account.id, playerId));
+    if (!target) {
+      setPopup({ type: "error", title: "Compte introuvable", message: "Aucun compte joueur trouvé pour ce reset." });
+      return false;
+    }
+
+    const { error } = await supabase
+      .from("player_accounts")
+      .update({ card_collection: [], last_seen_at: new Date().toISOString() })
+      .eq("id", target.id);
+
+    if (error) {
+      console.error("Erreur reset cartes joueur:", error);
+      setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de reset les cartes de ce joueur." });
+      return false;
+    }
+
+    setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, target.id) ? { ...account, cardCollection: [] } : account));
+    setPlayerProfile((current) => current && idsEqual(current.id, target.id) ? { ...current, cardCollection: [] } : current);
+    setPopup({ type: "success", title: "Cartes reset", message: `La collection de ${target.pseudo || "ce joueur"} a été vidée.` });
+    return true;
+  }
+
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
@@ -4439,7 +4467,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -7876,11 +7904,12 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards, onResetPlayerCards }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
   const [isCleaningDemoCards, setIsCleaningDemoCards] = useState(false);
+  const [isResettingCards, setIsResettingCards] = useState(false);
   const [selectedCardAccountId, setSelectedCardAccountId] = useState("");
   const [playerCardSearch, setPlayerCardSearch] = useState("");
   const [playerCardRarityFilter, setPlayerCardRarityFilter] = useState("ALL");
@@ -7954,6 +7983,12 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     setIsCleaningDemoCards(true);
     await onCleanupDemoCards({ global: targetId === "ALL", playerId: targetId });
     setIsCleaningDemoCards(false);
+  };
+  const resetCards = async (targetId) => {
+    if (!onResetPlayerCards || !targetId) return;
+    setIsResettingCards(true);
+    await onResetPlayerCards({ playerId: targetId });
+    setIsResettingCards(false);
   };
 
   return (
@@ -8047,6 +8082,9 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                   {rarity.id} · {rarity.count}
                 </span>
               ))}
+              <button type="button" onClick={() => resetCards(selectedCardAccount.id)} disabled={isResettingCards || !selectedCardAccountCards.length || !onResetPlayerCards} style={styles.dangerButton}>
+                {isResettingCards ? "Reset..." : "Reset cartes du joueur"}
+              </button>
             </div>
             <div style={styles.cardCollectionGrid}>
               {groupedFilteredPlayerCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} />)}
@@ -8082,7 +8120,12 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                   <td style={styles.td}>{account.predictionsCount}</td>
                   <td style={styles.td}>{account.guessCount} essais · {account.guessWins} win</td>
                   <td style={{ ...styles.td, ...styles.points }}>{account.guessScore}</td>
-                  <td style={styles.td}><button type="button" onClick={() => grantPacks(account.id)} disabled={isGrantingPacks || !onGrantPacks} style={styles.secondaryButton}>+{safePackGiftAmount}</button></td>
+                  <td style={styles.td}>
+                    <div style={styles.actions}>
+                      <button type="button" onClick={() => grantPacks(account.id)} disabled={isGrantingPacks || !onGrantPacks} style={styles.secondaryButton}>+{safePackGiftAmount}</button>
+                      <button type="button" onClick={() => resetCards(account.id)} disabled={isResettingCards || !account.cardCollection.length || !onResetPlayerCards} style={styles.dangerButton}>Reset cartes</button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
