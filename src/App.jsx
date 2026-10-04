@@ -5540,6 +5540,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
+  const cardRevealSoundRef = useRef(null);
   const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
   const savePlayerCards = async (cards, stock) => {
     const normalizedCards = normalizeCardCollection(cards);
@@ -5623,6 +5624,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   };
   const revealNextCard = () => {
     if (!isOpeningPack) return;
+    try {
+      if (!cardRevealSoundRef.current) cardRevealSoundRef.current = new Audio("/card-reveal.mp3");
+      cardRevealSoundRef.current.currentTime = 0;
+      cardRevealSoundRef.current.play().catch(() => {});
+    } catch {
+      // Le son ne doit jamais bloquer la révélation de la carte.
+    }
     const next = Math.min(revealedCount + 1, pack.length);
     setRevealedCount(next);
     if (next >= pack.length) setIsOpeningPack(false);
