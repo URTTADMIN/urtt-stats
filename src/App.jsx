@@ -33,6 +33,8 @@ const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
+const CARD_AUCTION_DURATION_MS = 24 * 60 * 60 * 1000;
+const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const EMPTY_SPECIAL_CARD_FORM = { name: "", rarityId: "C", image: "", color: "#cc00ff" };
@@ -91,12 +93,13 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "tgc-packs", label: "Packs" },
   { id: "tgc-collection", label: "Collection" },
   { id: "tgc-pokedex", label: "Catalogue" },
+  { id: "tgc-auctions", label: "Enchères" },
   { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
   { id: "championship", label: "Championnat", pages: ["standings", "seasons", "drivers", "teams", "development"] },
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
-  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex"] },
+  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex", "tgc-auctions"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
@@ -150,6 +153,7 @@ function getPublicPageIcon(pageId) {
     "tgc-packs": "◈",
     "tgc-collection": "▣",
     "tgc-pokedex": "◇",
+    "tgc-auctions": "◇",
     "other-championships": "+",
   }[pageId] || "•";
 }
@@ -214,6 +218,41 @@ function getEmptyCardPackStock(now = Date.now()) {
     dayKey: getCardPackDayKey(now),
     resetVersion: CARD_PACK_RESET_VERSION,
     stockSyncedAt: 0,
+    arekcoins: 0,
+    marketListings: [],
+  };
+}
+
+function normalizeCardMarketListings(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .map((listing) => {
+      if (!listing || typeof listing !== "object" || !listing.card) return null;
+      const minBid = Math.max(1, Math.floor(Number(listing.minBid) || 1));
+      const currentBid = Math.max(0, Math.floor(Number(listing.currentBid) || 0));
+      const createdAt = Math.max(0, Number(listing.createdAt) || Date.now());
+      const endsAt = Math.max(createdAt, Number(listing.endsAt) || createdAt + CARD_AUCTION_DURATION_MS);
+      return {
+        id: String(listing.id || `auction-${createdAt}-${Math.random().toString(16).slice(2)}`),
+        sellerId: String(listing.sellerId || ""),
+        sellerPseudo: String(listing.sellerPseudo || "Vendeur"),
+        card: listing.card,
+        minBid,
+        currentBid,
+        currentBidderId: listing.currentBidderId ? String(listing.currentBidderId) : "",
+        currentBidderPseudo: String(listing.currentBidderPseudo || ""),
+        createdAt,
+        endsAt,
+        status: listing.status === "CLOSED" ? "CLOSED" : "OPEN",
+      };
+    })
+    .filter(Boolean);
+}
+
+function getCardWalletFields(source = {}) {
+  return {
+    arekcoins: Math.max(0, Math.floor(Number(source?.arekcoins) || 0)),
+    marketListings: normalizeCardMarketListings(source?.marketListings),
   };
 }
 
@@ -223,6 +262,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   const generatedToday = getDailyGeneratedCardPacks(now);
   if (!source || typeof source !== "object") return getEmptyCardPackStock(now);
   if (source?.resetVersion !== CARD_PACK_RESET_VERSION) return getEmptyCardPackStock(now);
+  const walletFields = getCardWalletFields(source);
   const cardCollectionResetAt = Math.max(0, Number(source?.cardCollectionResetAt) || 0);
   const stockSyncedAt = Math.max(0, Number(source?.stockSyncedAt) || 0);
   if (source?.dayKey !== dayKey) {
@@ -234,6 +274,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
       resetVersion: CARD_PACK_RESET_VERSION,
       cardCollectionResetAt,
       stockSyncedAt,
+      ...walletFields,
     };
   }
   const sourcePacks = Number(source?.packs);
@@ -250,7 +291,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
-  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt, stockSyncedAt };
+  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt, stockSyncedAt, ...walletFields };
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -367,6 +408,28 @@ function formatCardPackWait(ms) {
 
 function getLatestCardObtainedAt(cards = []) {
   return normalizeCardCollection(cards).reduce((latest, card) => Math.max(latest, Number(card?.obtainedAtMs) || 0), 0);
+}
+
+function getOwnedCardInstanceKey(card = {}) {
+  return String(card?.ownedId || card?.id || `${card?.cardId || ""}-${card?.obtainedAtMs || ""}-${card?.name || ""}`);
+}
+
+function removeOwnedCardInstance(cards = [], key = "") {
+  let removed = false;
+  const kept = [];
+  normalizeCardCollection(cards).forEach((card) => {
+    if (!removed && getOwnedCardInstanceKey(card) === key) {
+      removed = true;
+      return;
+    }
+    kept.push(card);
+  });
+  return { kept, removed };
+}
+
+function getCardBurnValue(card = {}) {
+  const rarityId = card?.rarity?.id || "C";
+  return CARD_BURN_VALUES[rarityId] || CARD_BURN_VALUES.C;
 }
 
 function getEasterEggStorageKey(playerId = "") {
@@ -4056,6 +4119,30 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function savePlayerTcgState(playerId, cards = [], stock = null) {
+    const targetId = String(playerId || "");
+    if (!targetId) return { ok: false, message: "Compte joueur introuvable." };
+    const normalizedCards = normalizeCardCollection(cards);
+    const normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
+    const { error } = await supabase
+      .from("player_accounts")
+      .update({ card_collection: normalizedCards, card_pack_stock: normalizedStock, last_seen_at: new Date().toISOString() })
+      .eq("id", targetId);
+
+    if (error) {
+      console.error("Erreur sauvegarde TCG joueur:", error);
+      return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de sauvegarder les données TCG." };
+    }
+
+    setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, targetId) ? { ...account, cardCollection: normalizedCards, cardPackStock: normalizedStock } : account));
+    setPlayerProfile((current) => current && idsEqual(current.id, targetId) ? { ...current, cardCollection: normalizedCards, cardPackStock: normalizedStock } : current);
+    if (playerProfile?.id && idsEqual(playerProfile.id, targetId)) {
+      writeStoredCardCollection(normalizedCards);
+      writeStoredCardPackStock(normalizedStock);
+    }
+    return { ok: true };
+  }
+
   async function grantPlayerCardPacks({ playerId = "", amount = 1, global = false } = {}) {
     if (!isPermissionsOwner(adminUser)) {
       setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut donner des packs.` });
@@ -4413,12 +4500,14 @@ export default function URTTAdminPanel() {
           isSavingPrediction={isSavingPrediction}
           adminUser={adminUser}
           playerProfile={playerProfile}
+          playerAccounts={playerAccounts}
           guessDriverResults={guessDriverResults}
           guessDriverAttempts={guessDriverAttempts}
           onPlayerLogin={loginPlayerAccount}
           onPlayerSignup={signUpPlayerAccount}
           onPlayerLogout={logoutPlayerAccount}
           onSyncEasterEggs={syncPlayerEasterEggs}
+          onSavePlayerTcgState={savePlayerTcgState}
           onSaveGuessDriverWin={saveGuessDriverWin}
           onSaveGuessDriverAttempt={saveGuessDriverAttempt}
           isSavingPlayerAccount={isSavingPlayerAccount}
@@ -4886,7 +4975,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabTeamStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, playerAccounts = [], guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSavePlayerTcgState, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabTeamStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -4947,7 +5036,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const profileEasterEggs = normalizeEasterEggIds(playerProfile?.unlockedEasterEggs);
   const displayedEasterEggs = normalizeEasterEggIds([...unlockedEasterEggs, ...profileEasterEggs]);
   const activePublicPageOption = activePublicPage === "cards-lab" ? { id: "cards-lab", label: "Cartes" } : PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
-  const isTgcPage = ["cards-lab", "tgc-packs", "tgc-collection", "tgc-pokedex"].includes(activePublicPage);
+  const isTgcCardsPage = ["cards-lab", "tgc-packs", "tgc-collection", "tgc-pokedex"].includes(activePublicPage);
   const isLightTheme = publicTheme === "light";
   
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
@@ -5095,9 +5184,10 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
             </div>
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
-        {isTgcPage && (hasCardLabAccess
+        {isTgcCardsPage && (hasCardLabAccess
           ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
+        {activePublicPage === "tgc-auctions" && <TcgAuctionsPage playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} />}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
@@ -5922,6 +6012,295 @@ function CollectionCard({ card, locked = false }) {
         <span style={styles.collectionCardInfoPill}>{locked ? "???" : cardLabel}</span>
       </div>
     </article>
+  );
+}
+
+function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlayerTcgState, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount = false }) {
+  const [selectedCardKey, setSelectedCardKey] = useState("");
+  const [minBid, setMinBid] = useState(25);
+  const [bidInputs, setBidInputs] = useState({});
+  const [status, setStatus] = useState("");
+  const playerId = playerProfile?.id ? String(playerProfile.id) : "";
+  const normalizedAccounts = useMemo(() => playerAccounts.map((account) => ({
+    ...account,
+    cardCollection: normalizeCardCollection(account.cardCollection),
+    cardPackStock: normalizeCardPackStock(account.cardPackStock),
+  })), [playerAccounts]);
+  const accountFromList = normalizedAccounts.find((account) => idsEqual(account.id, playerId));
+  const currentAccount = playerId ? accountFromList || playerProfile : null;
+  const localStock = readStoredCardPackStock();
+  const accountStock = normalizeCardPackStock(currentAccount?.cardPackStock);
+  const currentStock = playerId ? getFreshestCardPackStock(accountStock, localStock) : getEmptyCardPackStock();
+  const localCards = readStoredCardCollection();
+  const accountCards = normalizeCardCollection(currentAccount?.cardCollection);
+  const useLocalCards = playerId && (Number(localStock.stockSyncedAt) || 0) > (Number(accountStock.stockSyncedAt) || 0);
+  const currentCards = playerId
+    ? (currentStock.cardCollectionResetAt > getLatestCardObtainedAt(useLocalCards ? localCards : accountCards)
+      ? []
+      : useLocalCards ? localCards : accountCards)
+    : [];
+  const tradableCards = currentCards.filter((card) => card?.rarity?.id !== "SL");
+  const activeListings = normalizedAccounts
+    .flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings.map((listing) => ({
+      ...listing,
+      sellerId: String(listing.sellerId || account.id),
+      sellerPseudo: listing.sellerPseudo || account.pseudo || "Vendeur",
+      sellerAccount: account,
+    })))
+    .filter((listing) => listing.status === "OPEN" && listing.card?.rarity?.id !== "SL")
+    .sort((a, b) => Number(a.endsAt) - Number(b.endsAt) || Number(b.currentBid) - Number(a.currentBid));
+  const selectedCard = tradableCards.find((card) => getOwnedCardInstanceKey(card) === selectedCardKey) || tradableCards[0];
+  const balance = Number(currentStock.arekcoins) || 0;
+
+  const saveAccounts = async (updates = []) => {
+    const uniqueUpdates = Array.from(new Map(updates.filter(Boolean).map((update) => [String(update.account.id), update])).values());
+    const results = await Promise.all(uniqueUpdates.map((update) => onSavePlayerTcgState?.(update.account.id, update.cards, update.stock)));
+    const failed = results.find((result) => !result?.ok);
+    if (failed) {
+      setStatus(failed.message || "Impossible de sauvegarder l'opération.");
+      return false;
+    }
+    return true;
+  };
+
+  const getMutableAccount = (accountsById, accountId) => {
+    const key = String(accountId || "");
+    if (!accountsById.has(key)) {
+      const source = normalizedAccounts.find((account) => idsEqual(account.id, key)) || (idsEqual(playerId, key) ? currentAccount : null);
+      if (!source) return null;
+      accountsById.set(key, {
+        account: source,
+        cards: idsEqual(key, playerId) ? [...currentCards] : normalizeCardCollection(source.cardCollection),
+        stock: idsEqual(key, playerId) ? { ...currentStock } : normalizeCardPackStock(source.cardPackStock),
+      });
+    }
+    return accountsById.get(key);
+  };
+
+  const destroyCard = async (card) => {
+    if (!playerId || !card) return;
+    const key = getOwnedCardInstanceKey(card);
+    const removed = removeOwnedCardInstance(currentCards, key);
+    if (!removed.removed) {
+      setStatus("Carte introuvable dans ta collection.");
+      return;
+    }
+    const value = getCardBurnValue(card);
+    const nextStock = { ...currentStock, arekcoins: balance + value, stockSyncedAt: Date.now() };
+    const ok = await saveAccounts([{ account: currentAccount, cards: removed.kept, stock: nextStock }]);
+    if (ok) {
+      setSelectedCardKey("");
+      setStatus(`${card.name} détruite : +${value} AREKCOINS.`);
+    }
+  };
+
+  const createListing = async () => {
+    if (!playerId || !selectedCard) return;
+    const safeMinBid = Math.max(1, Math.floor(Number(minBid) || 1));
+    const removed = removeOwnedCardInstance(currentCards, getOwnedCardInstanceKey(selectedCard));
+    if (!removed.removed) {
+      setStatus("Carte introuvable dans ta collection.");
+      return;
+    }
+    const now = Date.now();
+    const listing = {
+      id: `auction-${playerId}-${now}-${Math.random().toString(16).slice(2)}`,
+      sellerId: playerId,
+      sellerPseudo: playerProfile?.pseudo || currentAccount?.pseudo || "Vendeur",
+      card: { ...selectedCard, marketListedAt: now },
+      minBid: safeMinBid,
+      currentBid: 0,
+      currentBidderId: "",
+      currentBidderPseudo: "",
+      createdAt: now,
+      endsAt: now + CARD_AUCTION_DURATION_MS,
+      status: "OPEN",
+    };
+    const nextStock = { ...currentStock, marketListings: [...normalizeCardMarketListings(currentStock.marketListings), listing], stockSyncedAt: now };
+    const ok = await saveAccounts([{ account: currentAccount, cards: removed.kept, stock: nextStock }]);
+    if (ok) {
+      setSelectedCardKey("");
+      setStatus(`${selectedCard.name} est en enchère pendant 24h.`);
+    }
+  };
+
+  const bidOnListing = async (listing) => {
+    if (!playerId) return;
+    if (idsEqual(listing.sellerId, playerId)) {
+      setStatus("Tu ne peux pas enchérir sur ta propre carte.");
+      return;
+    }
+    const bidAmount = Math.floor(Number(bidInputs[listing.id]) || 0);
+    const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
+    if (bidAmount < minimum) {
+      setStatus(`Enchère minimum : ${minimum} AREKCOINS.`);
+      return;
+    }
+    const accountsById = new Map();
+    const seller = getMutableAccount(accountsById, listing.sellerId);
+    const bidder = getMutableAccount(accountsById, playerId);
+    const previousBidder = listing.currentBidderId && !idsEqual(listing.currentBidderId, playerId) ? getMutableAccount(accountsById, listing.currentBidderId) : null;
+    if (!seller || !bidder) {
+      setStatus("Compte joueur introuvable pour cette enchère.");
+      return;
+    }
+    const delta = idsEqual(listing.currentBidderId, playerId) ? bidAmount - listing.currentBid : bidAmount;
+    if ((Number(bidder.stock.arekcoins) || 0) < delta) {
+      setStatus("Tu n'as pas assez d'AREKCOINS pour cette enchère.");
+      return;
+    }
+    bidder.stock = { ...bidder.stock, arekcoins: (Number(bidder.stock.arekcoins) || 0) - delta, stockSyncedAt: Date.now() };
+    if (previousBidder) previousBidder.stock = { ...previousBidder.stock, arekcoins: (Number(previousBidder.stock.arekcoins) || 0) + listing.currentBid, stockSyncedAt: Date.now() };
+    seller.stock = {
+      ...seller.stock,
+      marketListings: normalizeCardMarketListings(seller.stock.marketListings).map((item) => item.id === listing.id ? { ...item, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur" } : item),
+      stockSyncedAt: Date.now(),
+    };
+    const ok = await saveAccounts(Array.from(accountsById.values()));
+    if (ok) {
+      setBidInputs((current) => ({ ...current, [listing.id]: "" }));
+      setStatus(`Enchère posée à ${bidAmount} AREKCOINS.`);
+    }
+  };
+
+  const closeListing = async (listing) => {
+    if (Date.now() < Number(listing.endsAt)) {
+      setStatus("Cette enchère n'est pas encore terminée.");
+      return;
+    }
+    const accountsById = new Map();
+    const seller = getMutableAccount(accountsById, listing.sellerId);
+    const winner = listing.currentBidderId ? getMutableAccount(accountsById, listing.currentBidderId) : null;
+    if (!seller) {
+      setStatus("Vendeur introuvable.");
+      return;
+    }
+    seller.stock = {
+      ...seller.stock,
+      marketListings: normalizeCardMarketListings(seller.stock.marketListings).filter((item) => item.id !== listing.id),
+      stockSyncedAt: Date.now(),
+    };
+    if (winner) {
+      seller.stock = { ...seller.stock, arekcoins: (Number(seller.stock.arekcoins) || 0) + listing.currentBid };
+      winner.cards = [{ ...listing.card, ownedId: `auction-win-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...winner.cards];
+    } else {
+      seller.cards = [{ ...listing.card, ownedId: `auction-return-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...seller.cards];
+    }
+    const ok = await saveAccounts(Array.from(accountsById.values()));
+    if (ok) setStatus(winner ? "Enchère clôturée : carte envoyée au gagnant." : "Enchère clôturée : carte rendue au vendeur.");
+  };
+
+  if (!playerId) {
+    return (
+      <div style={styles.cardLabEmbeddedPage}>
+        <section style={styles.cardCollectionPanel}>
+          <div>
+            <p style={styles.kicker}>URTT TCG · ENCHÈRES</p>
+            <h1 style={styles.cardLabTitle}>Marché AREKCOINS</h1>
+            <p style={styles.muted}>Connecte-toi à ton compte joueur pour détruire des cartes, gagner des AREKCOINS et enchérir.</p>
+          </div>
+          <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} triggerLabel="Se connecter" triggerStyle={styles.cardPlayerPrimary} />
+        </section>
+      </div>
+    );
+  }
+
+  return (
+    <div style={styles.cardLabEmbeddedPage}>
+      <header style={styles.cardLabHeader}>
+        <div>
+          <p style={styles.kicker}>URTT TCG · MARCHÉ</p>
+          <h1 style={styles.cardLabTitle}>Enchères AREKCOINS</h1>
+          <p style={styles.muted}>Détruis des cartes pour obtenir des AREKCOINS, puis utilise-les pour enchérir sur les cartes mises en vente.</p>
+        </div>
+        <div style={styles.cardCollectionSummary}>
+          <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: "#f8c72f", color: "#f8c72f" }}>{balance} AREKCOINS</span>
+          <span style={styles.cardCollectionSummaryBadge}>{activeListings.length} enchère{activeListings.length > 1 ? "s" : ""}</span>
+        </div>
+      </header>
+
+      <section style={styles.cardCollectionPanel}>
+        <div style={styles.cardCollectionHeader}>
+          <div>
+            <p style={styles.kicker}>CRÉDITS</p>
+            <h2 style={styles.cardLabStageTitle}>Détruire une carte</h2>
+            <p style={styles.muted}>La carte est retirée de ta collection et transformée en AREKCOINS.</p>
+          </div>
+          <div style={styles.cardCollectionSummary}>
+            {Object.entries(CARD_BURN_VALUES).filter(([rarity]) => rarity !== "SL").map(([rarity, value]) => <span key={rarity} style={styles.cardCollectionSummaryBadge}>{rarity} · {value}</span>)}
+          </div>
+        </div>
+        <div style={styles.cardCollectionGrid}>
+          {tradableCards.slice(0, 8).map((card) => (
+            <div key={getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
+              <CollectionCard card={card} />
+              <button type="button" onClick={() => destroyCard(card)} style={styles.dangerButton}>Détruire · +{getCardBurnValue(card)}</button>
+            </div>
+          ))}
+        </div>
+        {!tradableCards.length && <Empty text="Aucune carte échangeable pour le moment." />}
+      </section>
+
+      <section style={styles.cardCollectionPanel}>
+        <div style={styles.cardCollectionHeader}>
+          <div>
+            <p style={styles.kicker}>VENTE</p>
+            <h2 style={styles.cardLabStageTitle}>Mettre une carte aux enchères</h2>
+            <p style={styles.muted}>L'annonce dure 24h. La carte est retirée de ta collection pendant l'enchère.</p>
+          </div>
+        </div>
+        <div style={styles.cardCollectionToolbar}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Carte à vendre</span>
+            <select value={selectedCardKey || getOwnedCardInstanceKey(selectedCard || {})} onChange={(event) => setSelectedCardKey(event.target.value)} style={styles.resultsSelect}>
+              {tradableCards.map((card) => <option key={getOwnedCardInstanceKey(card)} value={getOwnedCardInstanceKey(card)}>{card.name} · {card.rarity?.id} · {getCardSeasonLabel(card)}</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Prix de départ</span>
+            <input type="number" min="1" value={minBid} onChange={(event) => setMinBid(event.target.value)} style={styles.resultsSelect} />
+          </label>
+          <button type="button" onClick={createListing} disabled={!selectedCard} style={styles.primaryButton}>Créer l'enchère</button>
+        </div>
+      </section>
+
+      <section style={styles.cardCollectionPanel}>
+        <div style={styles.cardCollectionHeader}>
+          <div>
+            <p style={styles.kicker}>ENCHÈRES EN COURS</p>
+            <h2 style={styles.cardLabStageTitle}>Cartes en vente</h2>
+            <p style={styles.muted}>Les enchères terminées doivent être clôturées pour transférer la carte et les AREKCOINS.</p>
+          </div>
+        </div>
+        <div style={styles.cardCollectionGrid}>
+          {activeListings.map((listing) => {
+            const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
+            const ended = Date.now() >= Number(listing.endsAt);
+            return (
+              <div key={listing.id} style={styles.marketCardAction}>
+                <CollectionCard card={listing.card} />
+                <div style={styles.marketListingMeta}>
+                  <strong>{listing.currentBid || listing.minBid} AREKCOINS</strong>
+                  <span>Vendeur : {listing.sellerPseudo}</span>
+                  <span>{listing.currentBidderPseudo ? `Meilleure offre : ${listing.currentBidderPseudo}` : "Aucune enchère"}</span>
+                  <span>{ended ? "Terminée" : `Fin : ${new Date(listing.endsAt).toLocaleString("fr-FR")}`}</span>
+                </div>
+                {ended ? (
+                  <button type="button" onClick={() => closeListing(listing)} style={styles.primaryButton}>Clôturer</button>
+                ) : (
+                  <div style={styles.marketBidRow}>
+                    <input type="number" min={minimum} value={bidInputs[listing.id] || ""} onChange={(event) => setBidInputs((current) => ({ ...current, [listing.id]: event.target.value }))} placeholder={`${minimum}+`} style={styles.resultsSelect} />
+                    <button type="button" onClick={() => bidOnListing(listing)} disabled={idsEqual(listing.sellerId, playerId)} style={styles.secondaryButton}>Enchérir</button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {!activeListings.length && <Empty text="Aucune enchère active pour le moment." />}
+      </section>
+      {status && <p style={{ ...styles.muted, margin: 0 }}>{status}</p>}
+    </div>
   );
 }
 
@@ -9755,6 +10134,9 @@ const styles = {
   cardRarityFilterButton: { minHeight: 36, border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "0 11px", background: "rgba(255,255,255,.04)", color: "#f8fafc", fontWeight: 950, cursor: "pointer" },
   cardRarityFilterButtonActive: { borderColor: "#f8fafc", background: "rgba(255,255,255,.13)", boxShadow: "0 0 22px rgba(255,255,255,.12)" },
   cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 },
+  marketCardAction: { display: "grid", gap: 10, minWidth: 0 },
+  marketListingMeta: { display: "grid", gap: 5, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12, color: "#cbd5e1", fontSize: 13 },
+  marketBidRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" },
   collectionCard: { minHeight: 320, position: "relative", isolation: "isolate", background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 20, padding: 16, display: "grid", gap: 12, alignContent: "start", overflow: "hidden" },
   collectionCardAccent: { position: "absolute", top: 0, left: 0, width: 5, height: "100%", opacity: .88, zIndex: 0 },
   collectionCardTop: { position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, textTransform: "uppercase" },
