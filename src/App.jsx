@@ -6046,6 +6046,20 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
     return counts;
   }, {});
   const destructibleCards = tradableCards.filter((card) => (tradableCardCounts[getCollectionGroupKey(card)] || 0) > 1);
+  const destructibleCardGroups = useMemo(() => {
+    const grouped = new Map();
+    destructibleCards.forEach((card) => {
+      const key = getCollectionGroupKey(card);
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.duplicateCount += 1;
+        existing.ownedCopies.push(card);
+      } else {
+        grouped.set(key, { ...card, collectionGroupKey: key, duplicateCount: 1, ownedCopies: [card] });
+      }
+    });
+    return Array.from(grouped.values());
+  }, [destructibleCards, tradableCardCounts]);
   const activeListings = normalizedAccounts
     .flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings.map((listing) => ({
       ...listing,
@@ -6241,14 +6255,14 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
           </div>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {destructibleCards.map((card) => (
-            <div key={getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
+          {destructibleCardGroups.map((card) => (
+            <div key={card.collectionGroupKey || getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
               <CollectionCard card={card} />
               <button type="button" onClick={() => destroyCard(card)} style={styles.dangerButton}>Détruire · +{getCardBurnValue(card)}</button>
             </div>
           ))}
         </div>
-        {!destructibleCards.length && <Empty text="Aucun doublon destructible pour le moment." />}
+        {!destructibleCardGroups.length && <Empty text="Aucun doublon destructible pour le moment." />}
       </section>
 
       <section style={styles.cardCollectionPanel}>
