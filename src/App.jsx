@@ -7826,6 +7826,9 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
+  const [selectedCardAccountId, setSelectedCardAccountId] = useState("");
+  const [playerCardSearch, setPlayerCardSearch] = useState("");
+  const [playerCardRarityFilter, setPlayerCardRarityFilter] = useState("ALL");
   if (!isPermissionsOwner(adminUser)) {
     return <div style={styles.section}><Card title="Comptes utilisateurs" icon="👤"><Empty text={`Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut consulter les comptes utilisateurs.`} /></Card></div>;
   }
@@ -7844,12 +7847,28 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     return {
       ...account,
       cardPackStock,
+      cardCollection: normalizeCardCollection(account.cardCollection),
       predictionsCount: accountPredictions.length,
       guessCount: accountGuessResults.length,
       guessWins: accountGuessResults.filter((result) => result.won).length,
       guessScore: accountGuessResults.reduce((total, result) => total + Number(result.score || 0), 0),
     };
   });
+  const selectedCardAccount = rows.find((account) => idsEqual(account.id, selectedCardAccountId)) || rows[0] || null;
+  const selectedCardAccountCards = normalizeCardCollection(selectedCardAccount?.cardCollection)
+    .map((card, index) => ({ ...card, id: card.id || card.ownedId || `${card.cardId || "card"}-${index}` }))
+    .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || String(a.name || "").localeCompare(String(b.name || "")));
+  const filteredPlayerCards = selectedCardAccountCards
+    .filter((card) => playerCardRarityFilter === "ALL" || card.rarity?.id === playerCardRarityFilter)
+    .filter((card) => {
+      const search = playerCardSearch.trim().toLowerCase();
+      if (!search) return true;
+      return `${card.name || ""} ${card.teamName || ""} ${getCardSeasonLabel(card)} ${card.categoryName || getCardCategoryLabel(card.categoryId)} ${card.rarity?.id || ""} ${card.rarity?.name || ""}`.toLowerCase().includes(search);
+    });
+  const selectedCardAccountRarityCounts = CARD_RARITY_PRESETS.map((rarity) => ({
+    ...rarity,
+    count: selectedCardAccountCards.filter((card) => card.rarity?.id === rarity.id).length,
+  }));
   const safePackGiftAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(packGiftAmount) || 1)));
   const grantPacks = async (targetId = packGiftTargetId) => {
     if (!onGrantPacks) return;
@@ -7887,6 +7906,43 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
           </button>
         </div>
         <p style={styles.mutedSmall}>Les packs sont ajoutés au stock actuel, avec une limite de {CARD_PACK_MAX_STOCK} packs disponibles par compte.</p>
+      </Card>
+      <Card title="Cartes des joueurs" icon="🃏">
+        <div style={styles.cardCollectionToolbar}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Joueur</span>
+            <select value={selectedCardAccount?.id || ""} onChange={(event) => setSelectedCardAccountId(event.target.value)} style={styles.resultsSelect}>
+              {rows.map((account) => <option key={account.id} value={account.id}>{account.pseudo || `Compte ${account.id}`} · {normalizeCardCollection(account.cardCollection).length} carte(s)</option>)}
+            </select>
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Recherche</span>
+            <input value={playerCardSearch} onChange={(event) => setPlayerCardSearch(event.target.value)} placeholder="Nom, écurie, saison..." style={styles.input} />
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Rareté</span>
+            <select value={playerCardRarityFilter} onChange={(event) => setPlayerCardRarityFilter(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Toutes</option>
+              {CARD_RARITY_PRESETS.map((rarity) => <option key={rarity.id} value={rarity.id}>{rarity.id} · {rarity.name}</option>)}
+            </select>
+          </label>
+        </div>
+        {selectedCardAccount ? (
+          <>
+            <div style={styles.cardCollectionSummary}>
+              <span style={styles.cardCollectionSummaryBadge}>{selectedCardAccount.pseudo || "Compte"} · {selectedCardAccountCards.length} carte(s)</span>
+              {selectedCardAccountRarityCounts.map((rarity) => (
+                <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, ...(rarity.id === "SL" ? { borderColor: CARD_SL_COLOR, background: CARD_SL_GRADIENT, color: "#0f172a" } : { borderColor: rarity.color, color: rarity.color }) }}>
+                  {rarity.id} · {rarity.count}
+                </span>
+              ))}
+            </div>
+            <div style={styles.cardCollectionGrid}>
+              {filteredPlayerCards.map((card, index) => <CollectionCard key={`${card.ownedId || card.id || card.cardId}-${index}`} card={card} />)}
+            </div>
+            {filteredPlayerCards.length === 0 && <Empty text="Aucune carte pour cette sélection." />}
+          </>
+        ) : <Empty text="Aucun compte joueur disponible." />}
       </Card>
       <Card title="Liste des comptes" icon="👥">
         <div style={styles.tableWrap}>
