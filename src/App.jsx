@@ -6231,7 +6231,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
           </div>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {tradableCards.slice(0, 8).map((card) => (
+          {tradableCards.map((card) => (
             <div key={getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
               <CollectionCard card={card} />
               <button type="button" onClick={() => destroyCard(card)} style={styles.dangerButton}>Détruire · +{getCardBurnValue(card)}</button>
