@@ -4144,6 +4144,7 @@ export default function URTTAdminPanel() {
 
     setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, target.id) ? { ...account, cardCollection: [] } : account));
     setPlayerProfile((current) => current && idsEqual(current.id, target.id) ? { ...current, cardCollection: [] } : current);
+    if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) writeStoredCardCollection([]);
     setPopup({ type: "success", title: "Cartes reset", message: `La collection de ${target.pseudo || "ce joueur"} a été vidée.` });
     return true;
   }
@@ -5588,13 +5589,17 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   useEffect(() => {
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
     const localCards = readStoredCardCollection();
-    const nextCards = playerCardAccountId ? mergeCardCollections(accountCards, accountCards.length ? [] : localCards) : localCards;
+    const nextCards = playerCardAccountId ? accountCards : localCards;
     const nextStock = playerCardAccountId
       ? (playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : getEmptyCardPackStock())
       : readStoredCardPackStock();
     setOwnedCards(nextCards);
     setPackStock(nextStock);
-    if (playerCardAccountId && (!playerProfile?.cardPackStock || (!accountCards.length && localCards.length))) savePlayerCards(nextCards, nextStock);
+    if (playerCardAccountId) {
+      writeStoredCardCollection(nextCards);
+      writeStoredCardPackStock(nextStock);
+      if (!playerProfile?.cardPackStock) savePlayerCards(nextCards, nextStock);
+    }
   }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
     if (pack.length || !packCardLibrary.length) return;
