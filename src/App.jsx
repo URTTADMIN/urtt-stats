@@ -125,11 +125,7 @@ const CARD_RARITY_PRESETS = [
 const CARD_SL_GRADIENT = "linear-gradient(135deg, #cc00ff 0%, #7c3aed 38%, #f8c72f 100%)";
 const CARD_SL_COLOR = "#f8c72f";
 const CARD_COLLECTION_VISIBLE_RARITIES = CARD_RARITY_PRESETS.filter((rarity) => rarity.id !== "SL");
-const CARD_SPECIAL_PRESETS = [
-  { id: "fiareku", name: "FIAREKU", rarityId: "C", image: "/fiareku.png", color: "#cc00ff" },
-  { id: "arekcoins", name: "AREKCOINS", rarityId: "SR", image: "/arekcoins.png", color: "#f8c72f" },
-  { id: "areku", name: "AREKU", rarityId: "SL", image: "/areku-special.png", color: "#cc00ff" },
-];
+const CARD_SPECIAL_PRESETS = [];
 const CARD_LAB_FALLBACK_POOL = [
   { id: "lab-alain", name: "Alain", teamName: "McLaren", points: 312, wins: 6, podiums: 11, poles: 3 },
   { id: "lab-augustin", name: "Augustin", teamName: "Nissan", points: 286, wins: 5, podiums: 9, poles: 5 },
