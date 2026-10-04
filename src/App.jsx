@@ -213,6 +213,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     generatedToday,
     dayKey: getCardPackDayKey(now),
     resetVersion: CARD_PACK_RESET_VERSION,
+    stockSyncedAt: 0,
   };
 }
 
@@ -223,6 +224,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   if (!source || typeof source !== "object") return getEmptyCardPackStock(now);
   if (source?.resetVersion !== CARD_PACK_RESET_VERSION) return getEmptyCardPackStock(now);
   const cardCollectionResetAt = Math.max(0, Number(source?.cardCollectionResetAt) || 0);
+  const stockSyncedAt = Math.max(0, Number(source?.stockSyncedAt) || 0);
   if (source?.dayKey !== dayKey) {
     return {
       packs: generatedToday,
@@ -231,6 +233,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
       dayKey,
       resetVersion: CARD_PACK_RESET_VERSION,
       cardCollectionResetAt,
+      stockSyncedAt,
     };
   }
   const sourcePacks = Number(source?.packs);
@@ -247,7 +250,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
-  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt };
+  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt, stockSyncedAt };
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -256,7 +259,16 @@ function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
   return {
     ...normalized,
     packs: Math.min(CARD_PACK_MAX_STOCK, normalized.packs + safeAmount),
+    stockSyncedAt: now,
   };
+}
+
+function getFreshestCardPackStock(primary, fallback) {
+  const primaryStock = primary ? normalizeCardPackStock(primary) : null;
+  const fallbackStock = fallback ? normalizeCardPackStock(fallback) : null;
+  if (!primaryStock) return fallbackStock || getEmptyCardPackStock();
+  if (!fallbackStock) return primaryStock;
+  return (Number(fallbackStock.stockSyncedAt) || 0) > (Number(primaryStock.stockSyncedAt) || 0) ? fallbackStock : primaryStock;
 }
 
 function readStoredCardPackStock() {
@@ -4138,7 +4150,7 @@ export default function URTTAdminPanel() {
     }
 
     const resetAt = Date.now();
-    const nextCardPackStock = { ...normalizeCardPackStock(target.cardPackStock), cardCollectionResetAt: resetAt };
+    const nextCardPackStock = { ...normalizeCardPackStock(target.cardPackStock), cardCollectionResetAt: resetAt, stockSyncedAt: resetAt };
     const { error } = await supabase
       .from("player_accounts")
       .update({ card_collection: [], card_pack_stock: nextCardPackStock, last_seen_at: new Date().toISOString() })
@@ -5584,7 +5596,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
   const savePlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
-    let normalizedStock = normalizeCardPackStock(stock);
+    let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
     writeStoredCardCollection(normalizedCards);
     writeStoredCardPackStock(normalizedStock);
     if (!playerCardAccountId) return;
@@ -5614,9 +5626,10 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   useEffect(() => {
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
     const localCards = readStoredCardCollection();
+    const localStock = readStoredCardPackStock();
     const nextStock = playerCardAccountId
-      ? (playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : getEmptyCardPackStock())
-      : readStoredCardPackStock();
+      ? getFreshestCardPackStock(playerProfile?.cardPackStock, localStock)
+      : localStock;
     const nextCards = playerCardAccountId
       ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(accountCards) ? [] : accountCards
       : localCards;
@@ -5660,11 +5673,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       return;
     }
     const nextStock = {
+      ...refreshedStock,
       packs: Math.max(0, refreshedStock.packs - 1),
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
       resetVersion: CARD_PACK_RESET_VERSION,
+      stockSyncedAt: Date.now(),
     };
     setPackStock(nextStock);
     const nextPack = drawCardPack(packCardLibrary, rarities);
