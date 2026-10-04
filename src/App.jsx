@@ -5346,8 +5346,7 @@ function drawLabPack(pool, rarities, count = 5) {
   const selected = [];
   let available = [...stableCards];
   if (!available.length) return selected;
-  while (selected.length < count) {
-    if (!available.length) available = [...stableCards];
+  while (selected.length < count && available.length) {
     const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
     if (!card) break;
     selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
@@ -5360,12 +5359,14 @@ function drawLabPack(pool, rarities, count = 5) {
 
 function drawCardPack(cards, rarities, count = 5) {
   const selected = [];
-  const cardPool = cards.filter(Boolean);
+  const cardPool = Array.from(new Map(cards.filter(Boolean).map((card) => [card.cardId || card.id, card])).values());
   let available = [...cardPool];
   if (!available.length) return selected;
-  while (selected.length < count) {
-    if (!available.length) available = [...cardPool];
-    const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
+  while (selected.length < count && available.length) {
+    const selectedSpecialCount = selected.filter((item) => item.cardType === "special").length;
+    const eligibleCards = selectedSpecialCount > 0 ? available.filter((item) => item.cardType !== "special") : available;
+    if (!eligibleCards.length) break;
+    const card = pickWeightedItem(eligibleCards, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
     if (!card) break;
     selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
     const cardIndex = available.findIndex((item) => item.cardId === card.cardId);
@@ -5383,17 +5384,19 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [collectionRarityFilter, setCollectionRarityFilter] = useState("ALL");
   const [collectionTypeFilter, setCollectionTypeFilter] = useState("ALL");
   const [collectionSearch, setCollectionSearch] = useState("");
-  const cardLibrary = useMemo(() => {
+  const normalCardLibrary = useMemo(() => {
     const categoryStandings = Object.keys(standingsByCategory || {}).length ? standingsByCategory : { [categoryId]: standingsBySeason };
     const collection = [
       ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonCardCollection(categoryStandings[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, teams, rarities)),
       ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonTeamCardCollection(teamStandingsByCategory[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, rarities)),
       ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
-      ...buildSpecialCardCollection(rarities, specialCards),
     ];
     if (collection.length) return collection;
     return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
-  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities, specialCards]);
+  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
+  const specialCardLibrary = useMemo(() => buildSpecialCardCollection(rarities, specialCards), [rarities, specialCards]);
+  const cardLibrary = useMemo(() => [...normalCardLibrary, ...specialCardLibrary], [normalCardLibrary, specialCardLibrary]);
+  const packCardLibrary = useMemo(() => normalCardLibrary.length >= 5 ? [...normalCardLibrary, ...specialCardLibrary] : [], [normalCardLibrary, specialCardLibrary]);
   const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
   const ownedCardKeys = useMemo(() => new Set(ownedCards.map((card) => getCollectionGroupKey(card))), [ownedCards]);
   const sortedOwnedCards = useMemo(() => [...ownedCards]
@@ -5522,9 +5525,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (playerCardAccountId && (!playerProfile?.cardPackStock || (!accountCards.length && localCards.length))) savePlayerCards(nextCards, nextStock);
   }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
-    if (pack.length || !cardLibrary.length) return;
-    setPack(drawCardPack(cardLibrary, rarities));
-  }, [cardLibrary, rarities, pack.length]);
+    if (pack.length || !packCardLibrary.length) return;
+    setPack(drawCardPack(packCardLibrary, rarities));
+  }, [packCardLibrary, rarities, pack.length]);
   useEffect(() => {
     const refreshPackStock = () => {
       setPackStock((current) => {
@@ -5537,7 +5540,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const interval = window.setInterval(refreshPackStock, 1000);
     return () => window.clearInterval(interval);
   }, [ownedCards, playerCardAccountId]);
-  const canOpenPack = cardLibrary.length > 0 && packStock.packs > 0;
+  const canOpenPack = packCardLibrary.length >= 5 && packStock.packs > 0;
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
@@ -5547,7 +5550,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
   const openPack = () => {
     const refreshedStock = normalizeCardPackStock(packStock);
-    if (!cardLibrary.length || refreshedStock.packs <= 0) {
+    if (packCardLibrary.length < 5 || refreshedStock.packs <= 0) {
       setPackStock(refreshedStock);
       savePlayerCards(ownedCards, refreshedStock);
       return;
@@ -5560,7 +5563,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       resetVersion: CARD_PACK_RESET_VERSION,
     };
     setPackStock(nextStock);
-    const nextPack = drawCardPack(cardLibrary, rarities);
+    const nextPack = drawCardPack(packCardLibrary, rarities);
     const openedAt = Date.now();
     setPack(nextPack);
     setOwnedCards((current) => {
