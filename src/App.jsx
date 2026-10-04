@@ -130,16 +130,6 @@ const CARD_SPECIAL_PRESETS = [
   { id: "arekcoins", name: "AREKCOINS", rarityId: "SR", image: "/arekcoins.png", color: "#f8c72f" },
   { id: "areku", name: "AREKU", rarityId: "SL", image: "/areku-special.png", color: "#cc00ff" },
 ];
-const CARD_LAB_FALLBACK_POOL = [
-  { id: "lab-alain", name: "Alain", teamName: "McLaren", points: 312, wins: 6, podiums: 11, poles: 3 },
-  { id: "lab-augustin", name: "Augustin", teamName: "Nissan", points: 286, wins: 5, podiums: 9, poles: 5 },
-  { id: "lab-kolti", name: "Kolti", teamName: "Renault", points: 252, wins: 4, podiums: 8, poles: 2 },
-  { id: "lab-lorden", name: "Lorden", teamName: "Kolost Racing", points: 226, wins: 3, podiums: 7, poles: 1 },
-  { id: "lab-noah", name: "Noah", teamName: "Audi", points: 204, wins: 2, podiums: 6, poles: 2 },
-  { id: "lab-etienne", name: "Etienne", teamName: "BMW", points: 178, wins: 1, podiums: 4, poles: 1 },
-  { id: "lab-cahouet", name: "Cahouet", teamName: "McLaren", points: 151, wins: 1, podiums: 3, poles: 0 },
-  { id: "lab-maxelier", name: "Maxelier", teamName: "Audi", points: 126, wins: 0, podiums: 2, poles: 0 },
-];
 const CARD_RARITY_ORDER = Object.fromEntries(CARD_RARITY_PRESETS.map((rarity, index) => [rarity.id, index]));
 
 function getPublicPageIcon(pageId) {
@@ -5098,15 +5088,15 @@ function pickWeightedItem(items, getWeight) {
 }
 
 function normalizeCardPool(drivers = [], teams = []) {
-  const source = drivers.length ? drivers : CARD_LAB_FALLBACK_POOL;
+  const source = drivers.length ? drivers : [];
   return source.slice(0, 36).map((driver, index) => {
     const team = teams.find((item) => idsEqual(item.id, driver.teamId)) || null;
     return {
       id: driver.id || `lab-${index}`,
       name: driver.name || `Pilote ${index + 1}`,
-      teamName: driver.teamName || team?.name || CARD_LAB_FALLBACK_POOL[index % CARD_LAB_FALLBACK_POOL.length]?.teamName || "URTT",
+      teamName: driver.teamName || team?.name || "URTT",
       teamLogo: team?.logo || driver.teamLogo || "",
-      points: Number(driver.points) || Number(driver.totalPoints) || Number(driver.careerPoints) || CARD_LAB_FALLBACK_POOL[index % CARD_LAB_FALLBACK_POOL.length]?.points || 80,
+      points: Number(driver.points) || Number(driver.totalPoints) || Number(driver.careerPoints) || 0,
       wins: Number(driver.wins) || 0,
       podiums: Number(driver.podiums) || 0,
       poles: Number(driver.poles) || 0,
@@ -5392,7 +5382,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
     ];
     if (collection.length) return collection;
-    return buildSeasonCardEdition(drivers.length ? drivers : normalizeCardPool([], teams), seasonId, categoryId, teams, rarities);
+    return drivers.length ? buildSeasonCardEdition(drivers, seasonId, categoryId, teams, rarities) : [];
   }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
   const specialCardLibrary = useMemo(() => buildSpecialCardCollection(rarities, specialCards), [rarities, specialCards]);
   const cardLibrary = useMemo(() => [...normalCardLibrary, ...specialCardLibrary], [normalCardLibrary, specialCardLibrary]);
