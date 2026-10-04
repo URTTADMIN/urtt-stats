@@ -5344,11 +5344,15 @@ function buildSpecialCardCollection(rarities = CARD_RARITY_PRESETS, customSpecia
 function drawLabPack(pool, rarities, count = 5) {
   const stableCards = pool.map((driver) => buildStableLabCard(driver, getLabCardRarity(driver, pool, rarities)));
   const selected = [];
-  const available = [...stableCards];
-  while (selected.length < Math.min(count, available.length + selected.length) && available.length) {
+  let available = [...stableCards];
+  if (!available.length) return selected;
+  while (selected.length < count) {
+    if (!available.length) available = [...stableCards];
     const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
+    if (!card) break;
     selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
-    available.splice(available.findIndex((item) => item.cardId === card.cardId), 1);
+    const cardIndex = available.findIndex((item) => item.cardId === card.cardId);
+    if (cardIndex >= 0) available.splice(cardIndex, 1);
   }
   return selected
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
@@ -5356,11 +5360,16 @@ function drawLabPack(pool, rarities, count = 5) {
 
 function drawCardPack(cards, rarities, count = 5) {
   const selected = [];
-  const available = [...cards];
-  while (selected.length < Math.min(count, available.length + selected.length) && available.length) {
+  const cardPool = cards.filter(Boolean);
+  let available = [...cardPool];
+  if (!available.length) return selected;
+  while (selected.length < count) {
+    if (!available.length) available = [...cardPool];
     const card = pickWeightedItem(available, (item) => rarities.find((rarity) => rarity.id === item.rarity.id)?.weight || item.rarity.weight);
+    if (!card) break;
     selected.push({ ...card, id: `${card.cardId}-${Date.now()}-${selected.length}-${Math.random()}` });
-    available.splice(available.findIndex((item) => item.cardId === card.cardId), 1);
+    const cardIndex = available.findIndex((item) => item.cardId === card.cardId);
+    if (cardIndex >= 0) available.splice(cardIndex, 1);
   }
   return selected
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
