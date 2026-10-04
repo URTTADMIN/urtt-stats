@@ -6040,6 +6040,12 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       : useLocalCards ? localCards : accountCards)
     : [];
   const tradableCards = currentCards.filter((card) => card?.rarity?.id !== "SL");
+  const tradableCardCounts = tradableCards.reduce((counts, card) => {
+    const key = getCollectionGroupKey(card);
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+  const destructibleCards = tradableCards.filter((card) => (tradableCardCounts[getCollectionGroupKey(card)] || 0) > 1);
   const activeListings = normalizedAccounts
     .flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings.map((listing) => ({
       ...listing,
@@ -6079,6 +6085,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
 
   const destroyCard = async (card) => {
     if (!playerId || !card) return;
+    if ((tradableCardCounts[getCollectionGroupKey(card)] || 0) <= 1) {
+      setStatus("Cette carte est unique dans ta collection : il faut un doublon pour la détruire.");
+      return;
+    }
     const key = getOwnedCardInstanceKey(card);
     const removed = removeOwnedCardInstance(currentCards, key);
     if (!removed.removed) {
@@ -6224,21 +6234,21 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
           <div>
             <p style={styles.kicker}>CRÉDITS</p>
             <h2 style={styles.cardLabStageTitle}>Détruire une carte</h2>
-            <p style={styles.muted}>La carte est retirée de ta collection et transformée en AREKCOINS.</p>
+            <p style={styles.muted}>Tu peux détruire uniquement une carte que tu possèdes en double. Une seule copie est retirée et transformée en AREKCOINS.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {Object.entries(CARD_BURN_VALUES).filter(([rarity]) => rarity !== "SL").map(([rarity, value]) => <span key={rarity} style={styles.cardCollectionSummaryBadge}>{rarity} · {value}</span>)}
           </div>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {tradableCards.map((card) => (
+          {destructibleCards.map((card) => (
             <div key={getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
               <CollectionCard card={card} />
               <button type="button" onClick={() => destroyCard(card)} style={styles.dangerButton}>Détruire · +{getCardBurnValue(card)}</button>
             </div>
           ))}
         </div>
-        {!tradableCards.length && <Empty text="Aucune carte échangeable pour le moment." />}
+        {!destructibleCards.length && <Empty text="Aucun doublon destructible pour le moment." />}
       </section>
 
       <section style={styles.cardCollectionPanel}>
