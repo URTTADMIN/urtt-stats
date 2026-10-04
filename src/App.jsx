@@ -130,6 +130,7 @@ const CARD_SPECIAL_PRESETS = [
   { id: "arekcoins", name: "AREKCOINS", rarityId: "SR", image: "/arekcoins.png", color: "#f8c72f" },
   { id: "areku", name: "AREKU", rarityId: "SL", image: "/areku-special.png", color: "#cc00ff" },
 ];
+const OBSOLETE_TCG_DEMO_CARD_IDS = ["lab-alain", "lab-augustin", "lab-kolti", "lab-lorden", "lab-noah", "lab-etienne", "lab-cahouet", "lab-maxelier"];
 const CARD_RARITY_ORDER = Object.fromEntries(CARD_RARITY_PRESETS.map((rarity, index) => [rarity.id, index]));
 
 function getPublicPageIcon(pageId) {
@@ -306,6 +307,18 @@ function normalizeCardCollection(value) {
     }
   }
   return Array.isArray(value) ? value : [];
+}
+
+function isObsoleteTcgDemoCard(card = {}) {
+  const haystack = `${card.id || ""} ${card.cardId || ""} ${card.driverId || ""} ${card.ownedId || ""}`.toLowerCase();
+  return OBSOLETE_TCG_DEMO_CARD_IDS.some((id) => haystack.includes(id));
+}
+
+function splitObsoleteTcgDemoCards(cards = []) {
+  return normalizeCardCollection(cards).reduce((result, card) => {
+    result[isObsoleteTcgDemoCard(card) ? "removed" : "kept"].push(card);
+    return result;
+  }, { kept: [], removed: [] });
 }
 
 function mergeCardCollections(primary = [], fallback = []) {
@@ -4067,6 +4080,46 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function cleanupPlayerDemoCards({ playerId = "", global = false } = {}) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut nettoyer les cartes joueurs.` });
+      return false;
+    }
+    const candidates = global ? playerAccounts : playerAccounts.filter((account) => idsEqual(account.id, playerId));
+    const updates = candidates
+      .map((account) => ({ account, cleanup: splitObsoleteTcgDemoCards(account.cardCollection) }))
+      .filter(({ cleanup }) => cleanup.removed.length > 0);
+    if (!updates.length) {
+      setPopup({ type: "success", title: "Aucune carte test", message: "Aucune ancienne carte de demo TCG trouvee sur cette selection." });
+      return true;
+    }
+
+    const results = await Promise.all(updates.map(({ account, cleanup }) => supabase
+      .from("player_accounts")
+      .update({ card_collection: cleanup.kept, last_seen_at: new Date().toISOString() })
+      .eq("id", account.id)));
+
+    const firstError = results.find((result) => result.error)?.error;
+    if (firstError) {
+      console.error("Erreur nettoyage cartes demo:", firstError);
+      setPopup({ type: "error", title: "Erreur Supabase", message: firstError.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de retirer les cartes test." });
+      return false;
+    }
+
+    setPlayerAccounts((current) => current.map((account) => {
+      const update = updates.find((item) => idsEqual(item.account.id, account.id));
+      return update ? { ...account, cardCollection: update.cleanup.kept } : account;
+    }));
+    setPlayerProfile((current) => {
+      if (!current) return current;
+      const update = updates.find((item) => idsEqual(item.account.id, current.id));
+      return update ? { ...current, cardCollection: update.cleanup.kept } : current;
+    });
+    const removedTotal = updates.reduce((total, update) => total + update.cleanup.removed.length, 0);
+    setPopup({ type: "success", title: "Cartes test retirées", message: `${removedTotal} carte(s) retirée(s) sur ${updates.length} compte(s).` });
+    return true;
+  }
+
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
@@ -4386,7 +4439,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -7815,10 +7868,11 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
+  const [isCleaningDemoCards, setIsCleaningDemoCards] = useState(false);
   const [selectedCardAccountId, setSelectedCardAccountId] = useState("");
   const [playerCardSearch, setPlayerCardSearch] = useState("");
   const [playerCardRarityFilter, setPlayerCardRarityFilter] = useState("ALL");
@@ -7862,12 +7916,22 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     ...rarity,
     count: selectedCardAccountCards.filter((card) => card.rarity?.id === rarity.id).length,
   }));
+  const demoCardRows = rows
+    .map((account) => ({ account, cleanup: splitObsoleteTcgDemoCards(account.cardCollection) }))
+    .filter(({ cleanup }) => cleanup.removed.length > 0);
+  const demoCardTotal = demoCardRows.reduce((total, row) => total + row.cleanup.removed.length, 0);
   const safePackGiftAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(packGiftAmount) || 1)));
   const grantPacks = async (targetId = packGiftTargetId) => {
     if (!onGrantPacks) return;
     setIsGrantingPacks(true);
     await onGrantPacks({ amount: safePackGiftAmount, global: targetId === "ALL", playerId: targetId });
     setIsGrantingPacks(false);
+  };
+  const cleanupDemoCards = async (targetId = "ALL") => {
+    if (!onCleanupDemoCards) return;
+    setIsCleaningDemoCards(true);
+    await onCleanupDemoCards({ global: targetId === "ALL", playerId: targetId });
+    setIsCleaningDemoCards(false);
   };
 
   return (
@@ -7899,6 +7963,38 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
           </button>
         </div>
         <p style={styles.mutedSmall}>Les packs sont ajoutés au stock actuel, avec une limite de {CARD_PACK_MAX_STOCK} packs disponibles par compte.</p>
+      </Card>
+      <Card title="Cartes test détectées" icon="🧹">
+        <div style={styles.resultsInfo}>
+          <Stat label="Joueurs concernés" value={demoCardRows.length} />
+          <Stat label="Cartes test" value={demoCardTotal} />
+          <button type="button" onClick={() => cleanupDemoCards("ALL")} disabled={isCleaningDemoCards || !demoCardRows.length || !onCleanupDemoCards} style={styles.dangerButton}>
+            {isCleaningDemoCards ? "Nettoyage..." : "Retirer à tout le monde"}
+          </button>
+        </div>
+        <p style={styles.mutedSmall}>Anciennes cartes locales de test : Alain, Augustin, Kolti, Lorden, Noah, Etienne, Cahouet, Maxelier.</p>
+        {demoCardRows.length > 0 ? (
+          <div style={styles.tableWrap}>
+            <table style={{ ...styles.table, minWidth: 820 }}>
+              <thead>
+                <tr style={styles.tableHead}>
+                  <th style={styles.th}>Joueur</th>
+                  <th style={styles.th}>Cartes test drop</th>
+                  <th style={styles.th}>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {demoCardRows.map(({ account, cleanup }) => (
+                  <tr key={account.id} style={styles.tr}>
+                    <td style={styles.td}><strong>{account.pseudo || "—"}</strong><p style={styles.mutedSmall}>{account.discordName || `ID ${account.id}`}</p></td>
+                    <td style={styles.td}>{cleanup.removed.map((card) => card.name || card.cardId || "Carte test").join(" · ")}</td>
+                    <td style={styles.td}><button type="button" onClick={() => cleanupDemoCards(account.id)} disabled={isCleaningDemoCards || !onCleanupDemoCards} style={styles.secondaryButton}>Retirer</button></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : <Empty text="Aucun joueur n'a d'ancienne carte test TCG." />}
       </Card>
       <Card title="Cartes des joueurs" icon="🃏">
         <div style={styles.cardCollectionToolbar}>
