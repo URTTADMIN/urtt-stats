@@ -34,6 +34,15 @@ const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
 const CARD_AUCTION_DURATION_MS = 24 * 60 * 60 * 1000;
+const CARD_AUCTION_DURATION_OPTIONS = [
+  { label: "10 min", value: 10 * 60 * 1000 },
+  { label: "30 min", value: 30 * 60 * 1000 },
+  { label: "1 h", value: 60 * 60 * 1000 },
+  { label: "3 h", value: 3 * 60 * 60 * 1000 },
+  { label: "6 h", value: 6 * 60 * 60 * 1000 },
+  { label: "12 h", value: 12 * 60 * 60 * 1000 },
+  { label: "24 h", value: 24 * 60 * 60 * 1000 },
+];
 const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
@@ -220,6 +229,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     stockSyncedAt: 0,
     arekcoins: 0,
     marketListings: [],
+    marketSales: [],
   };
 }
 
@@ -249,10 +259,32 @@ function normalizeCardMarketListings(value) {
     .filter(Boolean);
 }
 
+function normalizeCardMarketSales(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .map((sale) => {
+      if (!sale || typeof sale !== "object" || !sale.card) return null;
+      return {
+        id: String(sale.id || `sale-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+        cardKey: String(sale.cardKey || getCollectionGroupKey(sale.card)),
+        card: sale.card,
+        sellerId: sale.sellerId ? String(sale.sellerId) : "",
+        sellerPseudo: String(sale.sellerPseudo || "Vendeur"),
+        buyerId: sale.buyerId ? String(sale.buyerId) : "",
+        buyerPseudo: String(sale.buyerPseudo || ""),
+        price: Math.max(0, Math.floor(Number(sale.price) || 0)),
+        soldAt: Math.max(0, Number(sale.soldAt) || Date.now()),
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => Number(b.soldAt) - Number(a.soldAt));
+}
+
 function getCardWalletFields(source = {}) {
   return {
     arekcoins: Math.max(0, Math.floor(Number(source?.arekcoins) || 0)),
     marketListings: normalizeCardMarketListings(source?.marketListings),
+    marketSales: normalizeCardMarketSales(source?.marketSales),
   };
 }
 
@@ -5185,7 +5217,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcCardsPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} specialCards={siteSettings.specialCards} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "tgc-auctions" && <TcgAuctionsPage playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} />}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
@@ -5561,7 +5593,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, embedded = false, specialCards = [] }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, embedded = false, specialCards = [] }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5682,8 +5714,16 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
+  const [selectedCollectionCard, setSelectedCollectionCard] = useState(null);
   const cardRevealSoundRef = useRef(null);
   const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
+  const ownedCardCounts = useMemo(() => ownedCards.reduce((counts, card) => {
+    const key = getCollectionGroupKey(card);
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {}), [ownedCards]);
+  const marketSales = useMemo(() => playerAccounts.flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketSales), [playerAccounts]);
+  const marketListings = useMemo(() => playerAccounts.flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings), [playerAccounts]);
   const savePlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
@@ -5703,6 +5743,11 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         writeStoredCardCollection([]);
         writeStoredCardPackStock(normalizedStock);
       }
+    }
+    if (onSavePlayerTcgState) {
+      const response = await onSavePlayerTcgState(playerCardAccountId, normalizedCards, normalizedStock);
+      if (!response?.ok) console.error("Erreur sauvegarde cartes joueur:", response?.message || response);
+      return;
     }
     const { error } = await supabase
       .from("player_accounts")
@@ -5804,6 +5849,44 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (isOpeningPack) return;
     setShowPackModal(false);
   };
+  const destroyCollectionCard = async (card) => {
+    if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être détruite." };
+    const groupKey = getCollectionGroupKey(card);
+    if ((ownedCardCounts[groupKey] || 0) <= 1) return { ok: false, message: "Il faut posséder cette carte en double pour la détruire." };
+    const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
+    if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
+    const nextStock = { ...normalizeCardPackStock(packStock), arekcoins: (Number(packStock.arekcoins) || 0) + getCardBurnValue(card), stockSyncedAt: Date.now() };
+    setOwnedCards(removed.kept);
+    setPackStock(nextStock);
+    await savePlayerCards(removed.kept, nextStock);
+    setSelectedCollectionCard(null);
+    return { ok: true, message: `${card.name} détruite : +${getCardBurnValue(card)} AREKCOINS.` };
+  };
+  const createCollectionAuction = async (card, minBid = 1, durationMs = CARD_AUCTION_DURATION_MS) => {
+    if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être mise aux enchères." };
+    const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
+    if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
+    const now = Date.now();
+    const listing = {
+      id: `auction-${playerCardAccountId || "local"}-${now}-${Math.random().toString(16).slice(2)}`,
+      sellerId: playerCardAccountId,
+      sellerPseudo: playerProfile?.pseudo || "Vendeur",
+      card: { ...(card.ownedCopies?.[0] || card), marketListedAt: now },
+      minBid: Math.max(1, Math.floor(Number(minBid) || 1)),
+      currentBid: 0,
+      currentBidderId: "",
+      currentBidderPseudo: "",
+      createdAt: now,
+      endsAt: now + Math.max(10 * 60 * 1000, Number(durationMs) || CARD_AUCTION_DURATION_MS),
+      status: "OPEN",
+    };
+    const nextStock = { ...normalizeCardPackStock(packStock), marketListings: [listing, ...normalizeCardMarketListings(packStock.marketListings)], stockSyncedAt: now };
+    setOwnedCards(removed.kept);
+    setPackStock(nextStock);
+    await savePlayerCards(removed.kept, nextStock);
+    setSelectedCollectionCard(null);
+    return { ok: true, message: `${card.name} est aux enchères.` };
+  };
   return (
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       {cardsView === "opening" && (
@@ -5893,7 +5976,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
-          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} />)}
+          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} onClick={() => setSelectedCollectionCard(card)} />)}
         </div>
         {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
       </section>}
@@ -5978,11 +6061,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
+      {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketSales={marketSales.filter((sale) => sale.cardKey === getCollectionGroupKey(selectedCollectionCard)).slice(0, 4)} activeListings={marketListings.filter((listing) => getCollectionGroupKey(listing.card) === getCollectionGroupKey(selectedCollectionCard) && listing.status === "OPEN")} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} onCreateAuction={createCollectionAuction} />}
     </div>
   );
 }
 
-function CollectionCard({ card, locked = false }) {
+function CollectionCard({ card, locked = false, onClick = null }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
   const rarityColor = getCardRarityColor(card.rarity);
@@ -5991,7 +6075,7 @@ function CollectionCard({ card, locked = false }) {
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   const duplicateCount = Number(card.duplicateCount) || 1;
   return (
-    <article style={{ ...styles.collectionCard, borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
+    <article onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
@@ -6012,6 +6096,115 @@ function CollectionCard({ card, locked = false }) {
         <span style={styles.collectionCardInfoPill}>{locked ? "???" : cardLabel}</span>
       </div>
     </article>
+  );
+}
+
+function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSales = [], activeListings = [], onClose, onDestroy, onCreateAuction }) {
+  const [view, setView] = useState("details");
+  const [minBid, setMinBid] = useState(10);
+  const [durationMs, setDurationMs] = useState(60 * 60 * 1000);
+  const [status, setStatus] = useState("");
+  const canBurn = card?.rarity?.id !== "SL" && ownedCount > 1;
+  const canAuction = card?.rarity?.id !== "SL";
+  const latestSale = marketSales[0];
+  const submitDestroy = async () => {
+    const result = await onDestroy?.(card);
+    setStatus(result?.message || "");
+  };
+  const submitAuction = async () => {
+    const result = await onCreateAuction?.(card, minBid, durationMs);
+    setStatus(result?.message || "");
+  };
+
+  return createPortal(
+    <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
+      <div style={styles.cardDetailModal} onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
+        {view === "details" ? (
+          <>
+            <div style={styles.cardDetailPreview}>
+              <CollectionCard card={card} />
+            </div>
+            <div style={styles.cardDetailContent}>
+              <div>
+                <h2 style={styles.cardDetailTitle}>{card.name}</h2>
+                <div style={styles.cardDetailPills}>
+                  <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: getCardRarityColor(card.rarity), color: getCardRarityColor(card.rarity) }}>{card.rarity?.name}</span>
+                  <span style={styles.cardCollectionSummaryBadge}>{getCardSeasonLabel(card)}</span>
+                  <span style={styles.cardCollectionSummaryBadge}>{card.categoryName || getCardCategoryLabel(card.categoryId)}</span>
+                </div>
+              </div>
+              <p style={styles.muted}>{card.teamName}</p>
+              <div style={styles.marketStatsGrid}>
+                <div style={styles.marketStatBox}><strong>{ownedCount}</strong><span>Exemplaire{ownedCount > 1 ? "s" : ""}</span></div>
+                <div style={styles.marketStatBox}><strong>{balance}</strong><span>AREKCOINS</span></div>
+                <div style={styles.marketStatBox}><strong>{activeListings.length}</strong><span>Enchère{activeListings.length > 1 ? "s" : ""} active{activeListings.length > 1 ? "s" : ""}</span></div>
+              </div>
+              <section style={styles.marketHistoryPanel}>
+                <p style={styles.kicker}>Dernières ventes</p>
+                {latestSale ? (
+                  <div style={styles.marketHistoryRow}>
+                    <strong>{latestSale.price} AREKCOINS</strong>
+                    <span>{latestSale.buyerPseudo ? `Achetée par ${latestSale.buyerPseudo}` : "Vente terminée"} · {new Date(latestSale.soldAt).toLocaleString("fr-FR")}</span>
+                  </div>
+                ) : <p style={styles.mutedSmall}>Aucune vente terminée pour cette carte.</p>}
+                {marketSales.slice(1, 4).map((sale) => (
+                  <div key={sale.id} style={styles.marketHistoryRow}>
+                    <strong>{sale.price} AREKCOINS</strong>
+                    <span>{new Date(sale.soldAt).toLocaleString("fr-FR")}</span>
+                  </div>
+                ))}
+              </section>
+              <div style={styles.cardDetailActions}>
+                <button type="button" onClick={() => setView("auction")} disabled={!canAuction} style={styles.cardDetailAuctionButton}>Mettre aux enchères</button>
+                <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>Détruire {canBurn ? `+${getCardBurnValue(card)}` : "· doublon requis"}</button>
+              </div>
+              {status && <p style={styles.mutedSmall}>{status}</p>}
+            </div>
+          </>
+        ) : (
+          <div style={styles.auctionCreatePanel}>
+            <div style={styles.cardDetailHeaderLine}>
+              <div>
+                <p style={styles.kicker}>Mettre aux enchères</p>
+                <h2 style={styles.cardDetailTitle}>Créer l'enchère</h2>
+                <p style={styles.muted}>Un exemplaire sera mis en réserve pour la durée de l'enchère.</p>
+              </div>
+            </div>
+            <div style={styles.auctionCreateCardRow}>
+              <div style={styles.auctionCreateMiniCard}><CollectionCard card={card} /></div>
+              <div>
+                <h3 style={styles.subTitle}>{card.name}</h3>
+                <p style={styles.mutedSmall}>{getCardCategoryLabel(card.categoryId)} · {card.rarity?.name}</p>
+                <p style={{ ...styles.mutedSmall, color: "#34d399", fontWeight: 900 }}>Dernière vente : {latestSale ? `${latestSale.price} AREKCOINS` : "aucune"}</p>
+              </div>
+            </div>
+            <label style={styles.label}>
+              <span style={styles.labelText}>Mise de départ</span>
+              <div style={styles.auctionBidStepper}>
+                <button type="button" onClick={() => setMinBid((value) => Math.max(1, Number(value) - 1))} style={styles.auctionBidStepperButton}>−</button>
+                <input type="number" min="1" value={minBid} onChange={(event) => setMinBid(Math.max(1, Math.floor(Number(event.target.value) || 1)))} style={styles.auctionBidStepperInput} />
+                <button type="button" onClick={() => setMinBid((value) => Math.max(1, Number(value) + 1))} style={styles.auctionBidStepperButton}>+</button>
+              </div>
+            </label>
+            <div style={styles.cardRarityFilterGroup}>
+              <span style={styles.labelText}>Durée</span>
+              <div style={styles.cardRarityFilterRow}>
+                {CARD_AUCTION_DURATION_OPTIONS.map((option) => (
+                  <button key={option.value} type="button" onClick={() => setDurationMs(option.value)} style={{ ...styles.cardRarityFilterButton, ...(durationMs === option.value ? { ...styles.cardRarityFilterButtonActive, borderColor: "#34d399", color: "#34d399" } : {}) }}>{option.label}</button>
+                ))}
+              </div>
+            </div>
+            <div style={styles.cardDetailActions}>
+              <button type="button" onClick={() => setView("details")} style={styles.secondaryButton}>Annuler</button>
+              <button type="button" onClick={submitAuction} disabled={!canAuction} style={styles.cardDetailAuctionButton}>Lancer l'enchère</button>
+            </div>
+            {status && <p style={styles.mutedSmall}>{status}</p>}
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -6205,7 +6398,19 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       stockSyncedAt: Date.now(),
     };
     if (winner) {
-      seller.stock = { ...seller.stock, arekcoins: (Number(seller.stock.arekcoins) || 0) + listing.currentBid };
+      const soldAt = Date.now();
+      const saleRecord = {
+        id: `sale-${listing.id}-${soldAt}`,
+        cardKey: getCollectionGroupKey(listing.card),
+        card: listing.card,
+        sellerId: listing.sellerId,
+        sellerPseudo: listing.sellerPseudo,
+        buyerId: listing.currentBidderId,
+        buyerPseudo: listing.currentBidderPseudo,
+        price: listing.currentBid,
+        soldAt,
+      };
+      seller.stock = { ...seller.stock, arekcoins: (Number(seller.stock.arekcoins) || 0) + listing.currentBid, marketSales: [saleRecord, ...normalizeCardMarketSales(seller.stock.marketSales)].slice(0, 80) };
       winner.cards = [{ ...listing.card, ownedId: `auction-win-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...winner.cards];
     } else {
       seller.cards = [{ ...listing.card, ownedId: `auction-return-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...seller.cards];
@@ -10161,6 +10366,29 @@ const styles = {
   marketCardAction: { display: "grid", gap: 10, minWidth: 0 },
   marketListingMeta: { display: "grid", gap: 5, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12, color: "#cbd5e1", fontSize: 13 },
   marketBidRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" },
+  cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
+  cardDetailModal: { width: "min(980px, 100%)", maxHeight: "92vh", overflow: "auto", position: "relative", display: "grid", gridTemplateColumns: "minmax(230px, 360px) minmax(0, 1fr)", gap: 30, background: "linear-gradient(145deg, rgba(14,20,28,.98), rgba(10,16,23,.98))", border: "1px solid rgba(148,163,184,.22)", borderRadius: 22, padding: 28, boxShadow: "0 35px 110px rgba(0,0,0,.62)" },
+  cardDetailCloseButton: { position: "absolute", right: 20, top: 18, width: 34, height: 34, border: 0, borderRadius: 999, background: "rgba(255,255,255,.05)", color: "#cbd5e1", fontSize: 28, lineHeight: 1, cursor: "pointer" },
+  cardDetailPreview: { minWidth: 0 },
+  cardDetailContent: { display: "grid", gap: 16, alignContent: "start", paddingRight: 14 },
+  cardDetailTitle: { margin: 0, fontSize: "clamp(26px, 4vw, 42px)", lineHeight: 1.05, letterSpacing: "-.045em" },
+  cardDetailPills: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 },
+  marketStatsGrid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 },
+  marketStatBox: { minHeight: 82, display: "grid", placeItems: "center", gap: 3, background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, textAlign: "center", color: "#94a3b8" },
+  marketHistoryPanel: { display: "grid", gap: 8, borderTop: "1px solid rgba(255,255,255,.1)", borderBottom: "1px solid rgba(255,255,255,.1)", padding: "14px 0" },
+  marketHistoryRow: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#cbd5e1", background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "9px 11px" },
+  cardDetailActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center" },
+  cardDetailAuctionButton: { minHeight: 54, border: 0, borderRadius: 12, background: "#34d399", color: "#03130d", fontWeight: 950, cursor: "pointer", boxShadow: "0 18px 38px rgba(52,211,153,.2)" },
+  cardDetailDestroyButton: { minHeight: 54, border: "1px solid rgba(255,255,255,.14)", borderRadius: 12, background: "rgba(239,68,68,.12)", color: "#fecaca", fontWeight: 950, cursor: "pointer" },
+  cardDetailDisabledButton: { opacity: .52, cursor: "not-allowed", background: "rgba(255,255,255,.04)", color: "#94a3b8" },
+  auctionCreatePanel: { gridColumn: "1 / -1", display: "grid", gap: 22 },
+  cardDetailHeaderLine: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", paddingRight: 42 },
+  auctionCreateCardRow: { display: "grid", gridTemplateColumns: "160px minmax(0, 1fr)", gap: 20, alignItems: "center", background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 16 },
+  auctionCreateMiniCard: { transform: "scale(.72)", transformOrigin: "left center", width: 220, marginRight: -60, pointerEvents: "none" },
+  auctionBidStepper: { display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 48px", minHeight: 54, border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, overflow: "hidden", background: "rgba(255,255,255,.035)" },
+  auctionBidStepperButton: { border: 0, background: "rgba(255,255,255,.04)", color: "#cbd5e1", fontSize: 24, fontWeight: 800, cursor: "pointer" },
+  auctionBidStepperInput: { border: 0, background: "transparent", color: "#f8fafc", textAlign: "center", fontSize: 20, fontWeight: 900, outline: "none" },
+  collectionCardClickable: { cursor: "pointer", transition: "transform .18s ease, border-color .18s ease" },
   collectionCard: { minHeight: 320, position: "relative", isolation: "isolate", background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 20, padding: 16, display: "grid", gap: 12, alignContent: "start", overflow: "hidden" },
   collectionCardAccent: { position: "absolute", top: 0, left: 0, width: 5, height: "100%", opacity: .88, zIndex: 0 },
   collectionCardTop: { position: "relative", zIndex: 1, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12, textTransform: "uppercase" },
