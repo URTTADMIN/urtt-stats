@@ -44,6 +44,7 @@ const CARD_AUCTION_DURATION_OPTIONS = [
   { label: "24 h", value: 24 * 60 * 60 * 1000 },
 ];
 const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
+const TCG_MARKET_ALLOWED_PSEUDOS = ["Compte Test", "Test2", "Kolti"];
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
 const EMPTY_SPECIAL_CARD_FORM = { name: "", rarityId: "C", image: "", color: "#cc00ff" };
@@ -5217,9 +5218,9 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcCardsPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} specialCards={siteSettings.specialCards} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
-        {activePublicPage === "tgc-auctions" && <TcgAuctionsPage playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} />}
+        {activePublicPage === "tgc-auctions" && <TcgAuctionsPage playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} />}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
@@ -5288,6 +5289,12 @@ function canPlayerAccessCardLab(profile, settings = DEFAULT_CARD_LAB_SETTINGS) {
   const pseudo = normalizeResultText(profile?.pseudo || "");
   const safeSettings = normalizeCardLabSettings(settings);
   return Boolean(profile?.id && safeSettings.allowedPseudos.includes(pseudo));
+}
+
+function canUseTcgMarket(profile, adminUser = null) {
+  if (adminUser?.email) return true;
+  const pseudo = normalizeResultText(profile?.pseudo || "");
+  return Boolean(profile?.id && TCG_MARKET_ALLOWED_PSEUDOS.map((item) => normalizeResultText(item)).includes(pseudo));
 }
 
 function randomBetween(min, max) {
@@ -5593,7 +5600,7 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, embedded = false, specialCards = [] }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, marketAccessAllowed = false, embedded = false, specialCards = [] }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5850,6 +5857,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     setShowPackModal(false);
   };
   const destroyCollectionCard = async (card) => {
+    if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être détruite." };
     const groupKey = getCollectionGroupKey(card);
     if ((ownedCardCounts[groupKey] || 0) <= 1) return { ok: false, message: "Il faut posséder cette carte en double pour la détruire." };
@@ -5863,6 +5871,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     return { ok: true, message: `${card.name} détruite : +${getCardBurnValue(card)} AREKCOINS.` };
   };
   const createCollectionAuction = async (card, minBid = 1, durationMs = CARD_AUCTION_DURATION_MS) => {
+    if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être mise aux enchères." };
     const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
     if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
@@ -6061,7 +6070,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
-      {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketSales={marketSales.filter((sale) => sale.cardKey === getCollectionGroupKey(selectedCollectionCard)).slice(0, 4)} activeListings={marketListings.filter((listing) => getCollectionGroupKey(listing.card) === getCollectionGroupKey(selectedCollectionCard) && listing.status === "OPEN")} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} onCreateAuction={createCollectionAuction} />}
+      {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketSales={marketSales.filter((sale) => sale.cardKey === getCollectionGroupKey(selectedCollectionCard)).slice(0, 4)} activeListings={marketListings.filter((listing) => getCollectionGroupKey(listing.card) === getCollectionGroupKey(selectedCollectionCard) && listing.status === "OPEN")} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} onCreateAuction={createCollectionAuction} />}
     </div>
   );
 }
@@ -6099,13 +6108,13 @@ function CollectionCard({ card, locked = false, onClick = null }) {
   );
 }
 
-function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSales = [], activeListings = [], onClose, onDestroy, onCreateAuction }) {
+function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSales = [], activeListings = [], marketAccessAllowed = false, onClose, onDestroy, onCreateAuction }) {
   const [view, setView] = useState("details");
   const [minBid, setMinBid] = useState(10);
   const [durationMs, setDurationMs] = useState(60 * 60 * 1000);
   const [status, setStatus] = useState("");
-  const canBurn = card?.rarity?.id !== "SL" && ownedCount > 1;
-  const canAuction = card?.rarity?.id !== "SL";
+  const canBurn = marketAccessAllowed && card?.rarity?.id !== "SL" && ownedCount > 1;
+  const canAuction = marketAccessAllowed && card?.rarity?.id !== "SL";
   const latestSale = marketSales[0];
   const submitDestroy = async () => {
     const result = await onDestroy?.(card);
@@ -6156,9 +6165,10 @@ function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSa
                 ))}
               </section>
               <div style={styles.cardDetailActions}>
-                <button type="button" onClick={() => setView("auction")} disabled={!canAuction} style={styles.cardDetailAuctionButton}>Mettre aux enchères</button>
-                <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>Détruire {canBurn ? `+${getCardBurnValue(card)}` : "· doublon requis"}</button>
+                <button type="button" onClick={() => setView("auction")} disabled={!canAuction} style={{ ...styles.cardDetailAuctionButton, ...(!canAuction ? styles.cardDetailDisabledButton : {}) }}>Mettre aux enchères</button>
+                <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>Détruire {canBurn ? `+${getCardBurnValue(card)}` : marketAccessAllowed ? "· doublon requis" : "· accès restreint"}</button>
               </div>
+              {!marketAccessAllowed && <p style={styles.mutedSmall}>Fonctionnalité réservée aux admins et aux comptes test autorisés.</p>}
               {status && <p style={styles.mutedSmall}>{status}</p>}
             </div>
           </>
@@ -6197,7 +6207,7 @@ function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSa
             </div>
             <div style={styles.cardDetailActions}>
               <button type="button" onClick={() => setView("details")} style={styles.secondaryButton}>Annuler</button>
-              <button type="button" onClick={submitAuction} disabled={!canAuction} style={styles.cardDetailAuctionButton}>Lancer l'enchère</button>
+              <button type="button" onClick={submitAuction} disabled={!canAuction} style={{ ...styles.cardDetailAuctionButton, ...(!canAuction ? styles.cardDetailDisabledButton : {}) }}>Lancer l'enchère</button>
             </div>
             {status && <p style={styles.mutedSmall}>{status}</p>}
           </div>
@@ -6208,7 +6218,7 @@ function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSa
   );
 }
 
-function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlayerTcgState, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount = false }) {
+function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlayerTcgState, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount = false, marketAccessAllowed = false }) {
   const [selectedCardKey, setSelectedCardKey] = useState("");
   const [minBid, setMinBid] = useState(25);
   const [bidInputs, setBidInputs] = useState({});
@@ -6292,6 +6302,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
 
   const destroyCard = async (card) => {
     if (!playerId || !card) return;
+    if (!marketAccessAllowed) {
+      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
+      return;
+    }
     if ((tradableCardCounts[getCollectionGroupKey(card)] || 0) <= 1) {
       setStatus("Cette carte est unique dans ta collection : il faut un doublon pour la détruire.");
       return;
@@ -6313,6 +6327,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
 
   const createListing = async () => {
     if (!playerId || !selectedCard) return;
+    if (!marketAccessAllowed) {
+      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
+      return;
+    }
     const safeMinBid = Math.max(1, Math.floor(Number(minBid) || 1));
     const removed = removeOwnedCardInstance(currentCards, getOwnedCardInstanceKey(selectedCard));
     if (!removed.removed) {
@@ -6343,6 +6361,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
 
   const bidOnListing = async (listing) => {
     if (!playerId) return;
+    if (!marketAccessAllowed) {
+      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
+      return;
+    }
     if (idsEqual(listing.sellerId, playerId)) {
       setStatus("Tu ne peux pas enchérir sur ta propre carte.");
       return;
@@ -6381,6 +6403,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
   };
 
   const closeListing = async (listing) => {
+    if (!marketAccessAllowed) {
+      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
+      return;
+    }
     if (Date.now() < Number(listing.endsAt)) {
       setStatus("Cette enchère n'est pas encore terminée.");
       return;
@@ -6429,6 +6455,20 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
             <p style={styles.muted}>Connecte-toi à ton compte joueur pour détruire des cartes, gagner des AREKCOINS et enchérir.</p>
           </div>
           <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} triggerLabel="Se connecter" triggerStyle={styles.cardPlayerPrimary} />
+        </section>
+      </div>
+    );
+  }
+
+  if (!marketAccessAllowed) {
+    return (
+      <div style={styles.cardLabEmbeddedPage}>
+        <section style={styles.cardCollectionPanel}>
+          <div>
+            <p style={styles.kicker}>URTT TCG · ACCÈS RESTREINT</p>
+            <h1 style={styles.cardLabTitle}>Enchères</h1>
+            <p style={styles.muted}>La fonctionnalité est réservée temporairement aux admins et aux comptes joueurs autorisés : Compte Test, Test2 et Kolti.</p>
+          </div>
         </section>
       </div>
     );
