@@ -222,6 +222,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   const generatedToday = getDailyGeneratedCardPacks(now);
   if (!source || typeof source !== "object") return getEmptyCardPackStock(now);
   if (source?.resetVersion !== CARD_PACK_RESET_VERSION) return getEmptyCardPackStock(now);
+  const cardCollectionResetAt = Math.max(0, Number(source?.cardCollectionResetAt) || 0);
   if (source?.dayKey !== dayKey) {
     return {
       packs: generatedToday,
@@ -229,6 +230,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
       generatedToday,
       dayKey,
       resetVersion: CARD_PACK_RESET_VERSION,
+      cardCollectionResetAt,
     };
   }
   const sourcePacks = Number(source?.packs);
@@ -245,7 +247,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
   if (gained > 0) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
-  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION };
+  return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt };
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -349,6 +351,10 @@ function formatCardPackWait(ms) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function getLatestCardObtainedAt(cards = []) {
+  return normalizeCardCollection(cards).reduce((latest, card) => Math.max(latest, Number(card?.obtainedAtMs) || 0), 0);
 }
 
 function getEasterEggStorageKey(playerId = "") {
@@ -4131,9 +4137,11 @@ export default function URTTAdminPanel() {
       return false;
     }
 
+    const resetAt = Date.now();
+    const nextCardPackStock = { ...normalizeCardPackStock(target.cardPackStock), cardCollectionResetAt: resetAt };
     const { error } = await supabase
       .from("player_accounts")
-      .update({ card_collection: [], last_seen_at: new Date().toISOString() })
+      .update({ card_collection: [], card_pack_stock: nextCardPackStock, last_seen_at: new Date().toISOString() })
       .eq("id", target.id);
 
     if (error) {
@@ -4142,9 +4150,12 @@ export default function URTTAdminPanel() {
       return false;
     }
 
-    setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, target.id) ? { ...account, cardCollection: [] } : account));
-    setPlayerProfile((current) => current && idsEqual(current.id, target.id) ? { ...current, cardCollection: [] } : current);
-    if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) writeStoredCardCollection([]);
+    setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, target.id) ? { ...account, cardCollection: [], cardPackStock: nextCardPackStock } : account));
+    setPlayerProfile((current) => current && idsEqual(current.id, target.id) ? { ...current, cardCollection: [], cardPackStock: nextCardPackStock } : current);
+    if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) {
+      writeStoredCardCollection([]);
+      writeStoredCardPackStock(nextCardPackStock);
+    }
     setPopup({ type: "success", title: "Cartes reset", message: `La collection de ${target.pseudo || "ce joueur"} a été vidée.` });
     return true;
   }
@@ -5572,11 +5583,25 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const cardRevealSoundRef = useRef(null);
   const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
   const savePlayerCards = async (cards, stock) => {
-    const normalizedCards = normalizeCardCollection(cards);
-    const normalizedStock = normalizeCardPackStock(stock);
+    let normalizedCards = normalizeCardCollection(cards);
+    let normalizedStock = normalizeCardPackStock(stock);
     writeStoredCardCollection(normalizedCards);
     writeStoredCardPackStock(normalizedStock);
     if (!playerCardAccountId) return;
+    const { data: currentAccount, error: currentAccountError } = await supabase
+      .from("player_accounts")
+      .select("card_pack_stock")
+      .eq("id", playerCardAccountId)
+      .maybeSingle();
+    if (!currentAccountError && currentAccount?.card_pack_stock) {
+      const serverStock = normalizeCardPackStock(currentAccount.card_pack_stock);
+      if (serverStock.cardCollectionResetAt > normalizedStock.cardCollectionResetAt && serverStock.cardCollectionResetAt > getLatestCardObtainedAt(normalizedCards)) {
+        normalizedCards = [];
+        normalizedStock = { ...normalizedStock, cardCollectionResetAt: serverStock.cardCollectionResetAt };
+        writeStoredCardCollection([]);
+        writeStoredCardPackStock(normalizedStock);
+      }
+    }
     const { error } = await supabase
       .from("player_accounts")
       .update({ card_collection: normalizedCards, card_pack_stock: normalizedStock, last_seen_at: new Date().toISOString() })
@@ -5589,10 +5614,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   useEffect(() => {
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
     const localCards = readStoredCardCollection();
-    const nextCards = playerCardAccountId ? accountCards : localCards;
     const nextStock = playerCardAccountId
       ? (playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : getEmptyCardPackStock())
       : readStoredCardPackStock();
+    const nextCards = playerCardAccountId
+      ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(accountCards) ? [] : accountCards
+      : localCards;
     setOwnedCards(nextCards);
     setPackStock(nextStock);
     if (playerCardAccountId) {
