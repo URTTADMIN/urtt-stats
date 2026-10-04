@@ -9505,7 +9505,7 @@ function Setting({ title, description, active }) { return <div style={styles.tea
 const styles = {
   publicPage: { minHeight: "100vh", background: "radial-gradient(circle at 18% 0%, rgba(185,0,228,.24), transparent 32%), linear-gradient(135deg, #141b31 0%, #1b2440 46%, #241a3c 100%)", color: "#f4f4f5", fontFamily: "Inter, system-ui, Arial" },
   publicAppShell: { maxWidth: 1600, margin: "0 auto", minHeight: "100vh", display: "grid", gridTemplateColumns: "238px minmax(0, 1fr)", background: "linear-gradient(135deg, rgba(18,25,45,.92), rgba(28,26,53,.9))" },
-  publicSidebar: { borderRight: "1px solid #33405a", background: "rgba(17,24,43,.88)", padding: "27px 15px", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh", backdropFilter: "blur(16px)" },
+  publicSidebar: { borderRight: "1px solid #33405a", background: "rgba(17,24,43,.88)", padding: "27px 15px max(34px, env(safe-area-inset-bottom))", display: "flex", flexDirection: "column", gap: 38, position: "sticky", top: 0, height: "100vh", overflowY: "auto", overscrollBehavior: "contain", scrollbarWidth: "thin", backdropFilter: "blur(16px)" },
   publicBrand: { display: "flex", alignItems: "center", padding: "0 9px" },
   publicBrandLogoButton: { border: 0, background: "transparent", padding: 0, cursor: "pointer", width: "100%", textAlign: "left" },
   publicBrandLogo: { display: "block", width: 172, maxWidth: "100%", height: "auto", objectFit: "contain" },
