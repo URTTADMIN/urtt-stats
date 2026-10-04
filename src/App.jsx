@@ -6220,7 +6220,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
         <section style={styles.cardCollectionPanel}>
           <div>
             <p style={styles.kicker}>URTT TCG · ENCHÈRES</p>
-            <h1 style={styles.cardLabTitle}>Marché AREKCOINS</h1>
+            <h1 style={styles.cardLabTitle}>Enchères</h1>
             <p style={styles.muted}>Connecte-toi à ton compte joueur pour détruire des cartes, gagner des AREKCOINS et enchérir.</p>
           </div>
           <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} triggerLabel="Se connecter" triggerStyle={styles.cardPlayerPrimary} />
@@ -6234,7 +6234,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       <header style={styles.cardLabHeader}>
         <div>
           <p style={styles.kicker}>URTT TCG · MARCHÉ</p>
-          <h1 style={styles.cardLabTitle}>Enchères AREKCOINS</h1>
+          <h1 style={styles.cardLabTitle}>Enchères</h1>
           <p style={styles.muted}>Détruis des cartes pour obtenir des AREKCOINS, puis utilise-les pour enchérir sur les cartes mises en vente.</p>
         </div>
         <div style={styles.cardCollectionSummary}>
