@@ -43,6 +43,7 @@ const CARD_AUCTION_DURATION_OPTIONS = [
   { label: "12 h", value: 12 * 60 * 60 * 1000 },
   { label: "24 h", value: 24 * 60 * 60 * 1000 },
 ];
+const CARD_AUCTION_MAX_ACTIVE_SALES = 10;
 const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
 const TCG_MARKET_ALLOWED_PSEUDOS = ["Compte Test", "Test2", "Kolti"];
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
@@ -252,12 +253,26 @@ function normalizeCardMarketListings(value) {
         currentBid,
         currentBidderId: listing.currentBidderId ? String(listing.currentBidderId) : "",
         currentBidderPseudo: String(listing.currentBidderPseudo || ""),
+        bidHistory: normalizeCardBidHistory(listing.bidHistory),
         createdAt,
         endsAt,
         status: listing.status === "CLOSED" ? "CLOSED" : "OPEN",
       };
     })
     .filter(Boolean);
+}
+
+function normalizeCardBidHistory(value) {
+  const rows = Array.isArray(value) ? value : [];
+  return rows
+    .map((bid) => ({
+      playerId: bid?.playerId ? String(bid.playerId) : "",
+      pseudo: String(bid?.pseudo || "Acheteur"),
+      amount: Math.max(0, Math.floor(Number(bid?.amount) || 0)),
+      createdAt: Math.max(0, Number(bid?.createdAt) || Date.now()),
+    }))
+    .filter((bid) => bid.amount > 0)
+    .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
 }
 
 function normalizeCardMarketSales(value) {
@@ -437,6 +452,17 @@ function formatCardPackWait(ms) {
   const minutes = Math.floor((totalSeconds % 3600) / 60);
   const seconds = totalSeconds % 60;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatAuctionTimeLeft(ms) {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (days > 0) return `${days}j ${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h ${minutes}m ${seconds}s`;
+  return `${minutes}m ${seconds}s`;
 }
 
 function getLatestCardObtainedAt(cards = []) {
@@ -5873,6 +5899,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const createCollectionAuction = async (card, minBid = 1, durationMs = CARD_AUCTION_DURATION_MS) => {
     if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être mise aux enchères." };
+    const ownActiveListings = normalizeCardMarketListings(packStock.marketListings).filter((listing) => listing.status === "OPEN");
+    if (ownActiveListings.length >= CARD_AUCTION_MAX_ACTIVE_SALES) return { ok: false, message: `Tu as déjà ${CARD_AUCTION_MAX_ACTIVE_SALES} enchères actives.` };
     const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
     if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
     const now = Date.now();
@@ -5885,6 +5913,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       currentBid: 0,
       currentBidderId: "",
       currentBidderPseudo: "",
+      bidHistory: [],
       createdAt: now,
       endsAt: now + Math.max(10 * 60 * 1000, Number(durationMs) || CARD_AUCTION_DURATION_MS),
       status: "OPEN",
@@ -6222,6 +6251,11 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
   const [selectedCardKey, setSelectedCardKey] = useState("");
   const [minBid, setMinBid] = useState(25);
   const [bidInputs, setBidInputs] = useState({});
+  const [marketTab, setMarketTab] = useState("browse");
+  const [marketSearch, setMarketSearch] = useState("");
+  const [marketSort, setMarketSort] = useState("recent");
+  const [selectedListing, setSelectedListing] = useState(null);
+  const [nowTick, setNowTick] = useState(Date.now());
   const [status, setStatus] = useState("");
   const playerId = playerProfile?.id ? String(playerProfile.id) : "";
   const normalizedAccounts = useMemo(() => playerAccounts.map((account) => ({
@@ -6271,7 +6305,24 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       sellerAccount: account,
     })))
     .filter((listing) => listing.status === "OPEN" && listing.card?.rarity?.id !== "SL")
-    .sort((a, b) => Number(a.endsAt) - Number(b.endsAt) || Number(b.currentBid) - Number(a.currentBid));
+    .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+  const mySales = activeListings.filter((listing) => idsEqual(listing.sellerId, playerId));
+  const myBids = activeListings.filter((listing) => idsEqual(listing.currentBidderId, playerId) || normalizeCardBidHistory(listing.bidHistory).some((bid) => idsEqual(bid.playerId, playerId)));
+  const searchedListings = activeListings.filter((listing) => {
+    const query = normalizeResultText(marketSearch);
+    if (!query) return true;
+    return normalizeResultText(`${listing.card?.name || ""} ${listing.card?.teamName || ""} ${listing.sellerPseudo || ""} ${listing.card?.categoryName || ""}`).includes(query);
+  });
+  const browseListings = [...searchedListings].sort((a, b) => {
+    if (marketSort === "ending") return Number(a.endsAt) - Number(b.endsAt);
+    if (marketSort === "price") return (Number(b.currentBid || b.minBid) || 0) - (Number(a.currentBid || a.minBid) || 0);
+    return Number(b.createdAt) - Number(a.createdAt);
+  });
+  const tabListings = marketTab === "my-sales" ? mySales : marketTab === "my-bids" ? myBids : browseListings;
   const selectedCard = tradableCards.find((card) => getOwnedCardInstanceKey(card) === selectedCardKey) || tradableCards[0];
   const balance = Number(currentStock.arekcoins) || 0;
 
@@ -6331,6 +6382,10 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
       return;
     }
+    if (mySales.length >= CARD_AUCTION_MAX_ACTIVE_SALES) {
+      setStatus(`Tu as déjà ${CARD_AUCTION_MAX_ACTIVE_SALES} enchères actives.`);
+      return;
+    }
     const safeMinBid = Math.max(1, Math.floor(Number(minBid) || 1));
     const removed = removeOwnedCardInstance(currentCards, getOwnedCardInstanceKey(selectedCard));
     if (!removed.removed) {
@@ -6347,6 +6402,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       currentBid: 0,
       currentBidderId: "",
       currentBidderPseudo: "",
+      bidHistory: [],
       createdAt: now,
       endsAt: now + CARD_AUCTION_DURATION_MS,
       status: "OPEN",
@@ -6359,7 +6415,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
     }
   };
 
-  const bidOnListing = async (listing) => {
+  const bidOnListing = async (listing, forcedAmount = null) => {
     if (!playerId) return;
     if (!marketAccessAllowed) {
       setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
@@ -6369,7 +6425,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
       setStatus("Tu ne peux pas enchérir sur ta propre carte.");
       return;
     }
-    const bidAmount = Math.floor(Number(bidInputs[listing.id]) || 0);
+    const bidAmount = Math.floor(Number(forcedAmount ?? bidInputs[listing.id]) || 0);
     const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
     if (bidAmount < minimum) {
       setStatus(`Enchère minimum : ${minimum} AREKCOINS.`);
@@ -6392,12 +6448,13 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
     if (previousBidder) previousBidder.stock = { ...previousBidder.stock, arekcoins: (Number(previousBidder.stock.arekcoins) || 0) + listing.currentBid, stockSyncedAt: Date.now() };
     seller.stock = {
       ...seller.stock,
-      marketListings: normalizeCardMarketListings(seller.stock.marketListings).map((item) => item.id === listing.id ? { ...item, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur" } : item),
+      marketListings: normalizeCardMarketListings(seller.stock.marketListings).map((item) => item.id === listing.id ? { ...item, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur", bidHistory: [{ playerId, pseudo: playerProfile?.pseudo || "Acheteur", amount: bidAmount, createdAt: Date.now() }, ...normalizeCardBidHistory(item.bidHistory)] } : item),
       stockSyncedAt: Date.now(),
     };
     const ok = await saveAccounts(Array.from(accountsById.values()));
     if (ok) {
       setBidInputs((current) => ({ ...current, [listing.id]: "" }));
+      setSelectedListing((current) => current?.id === listing.id ? { ...listing, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur", bidHistory: [{ playerId, pseudo: playerProfile?.pseudo || "Acheteur", amount: bidAmount, createdAt: Date.now() }, ...normalizeCardBidHistory(listing.bidHistory)] } : current);
       setStatus(`Enchère posée à ${bidAmount} AREKCOINS.`);
     }
   };
@@ -6476,100 +6533,126 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
 
   return (
     <div style={styles.cardLabEmbeddedPage}>
-      <header style={styles.cardLabHeader}>
+      <header style={styles.marketHero}>
         <div>
           <p style={styles.kicker}>URTT TCG · MARCHÉ</p>
-          <h1 style={styles.cardLabTitle}>Enchères</h1>
-          <p style={styles.muted}>Détruis des cartes pour obtenir des AREKCOINS, puis utilise-les pour enchérir sur les cartes mises en vente.</p>
+          <h1 style={styles.marketTitle}>Enchères</h1>
+          <p style={styles.muted}>Enchérissez sur des cartes ou vendez les vôtres contre des AREKCOINS.</p>
         </div>
         <div style={styles.cardCollectionSummary}>
           <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: "#f8c72f", color: "#f8c72f" }}>{balance} AREKCOINS</span>
-          <span style={styles.cardCollectionSummaryBadge}>{activeListings.length} enchère{activeListings.length > 1 ? "s" : ""}</span>
         </div>
       </header>
-
-      <section style={styles.cardCollectionPanel}>
-        <div style={styles.cardCollectionHeader}>
-          <div>
-            <p style={styles.kicker}>CRÉDITS</p>
-            <h2 style={styles.cardLabStageTitle}>Détruire une carte</h2>
-            <p style={styles.muted}>Tu peux détruire uniquement une carte que tu possèdes en double. Une seule copie est retirée et transformée en AREKCOINS.</p>
-          </div>
-          <div style={styles.cardCollectionSummary}>
-            {Object.entries(CARD_BURN_VALUES).filter(([rarity]) => rarity !== "SL").map(([rarity, value]) => <span key={rarity} style={styles.cardCollectionSummaryBadge}>{rarity} · {value}</span>)}
-          </div>
+      <nav style={styles.marketTabs}>
+        <button type="button" onClick={() => setMarketTab("browse")} style={{ ...styles.marketTabButton, ...(marketTab === "browse" ? styles.marketTabButtonActive : {}) }}>Parcourir</button>
+        <button type="button" onClick={() => setMarketTab("my-sales")} style={{ ...styles.marketTabButton, ...(marketTab === "my-sales" ? styles.marketTabButtonActive : {}) }}>Mes ventes ({mySales.length}/{CARD_AUCTION_MAX_ACTIVE_SALES})</button>
+        <button type="button" onClick={() => setMarketTab("my-bids")} style={{ ...styles.marketTabButton, ...(marketTab === "my-bids" ? styles.marketTabButtonActive : {}) }}>Mes enchères ({myBids.length})</button>
+      </nav>
+      {marketTab === "browse" && (
+        <div style={styles.marketSearchRow}>
+          <input value={marketSearch} onChange={(event) => setMarketSearch(event.target.value)} placeholder="Rechercher une carte..." style={styles.marketSearchInput} />
+          <button type="button" style={styles.marketSearchButton}>Rechercher</button>
+          <select value={marketSort} onChange={(event) => setMarketSort(event.target.value)} style={styles.publicDesignSelect}>
+            <option value="recent">Récemment listées</option>
+            <option value="ending">Fin bientôt</option>
+            <option value="price">Prix actuel</option>
+          </select>
         </div>
-        <div style={styles.cardCollectionGrid}>
-          {destructibleCardGroups.map((card) => (
-            <div key={card.collectionGroupKey || getOwnedCardInstanceKey(card)} style={styles.marketCardAction}>
-              <CollectionCard card={card} />
-              <button type="button" onClick={() => destroyCard(card)} style={styles.dangerButton}>Détruire · +{getCardBurnValue(card)}</button>
-            </div>
-          ))}
-        </div>
-        {!destructibleCardGroups.length && <Empty text="Aucun doublon destructible pour le moment." />}
-      </section>
-
-      <section style={styles.cardCollectionPanel}>
-        <div style={styles.cardCollectionHeader}>
-          <div>
-            <p style={styles.kicker}>VENTE</p>
-            <h2 style={styles.cardLabStageTitle}>Mettre une carte aux enchères</h2>
-            <p style={styles.muted}>L'annonce dure 24h. La carte est retirée de ta collection pendant l'enchère.</p>
-          </div>
-        </div>
-        <div style={styles.cardCollectionToolbar}>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Carte à vendre</span>
-            <select value={selectedCardKey || getOwnedCardInstanceKey(selectedCard || {})} onChange={(event) => setSelectedCardKey(event.target.value)} style={styles.resultsSelect}>
-              {tradableCards.map((card) => <option key={getOwnedCardInstanceKey(card)} value={getOwnedCardInstanceKey(card)}>{card.name} · {card.rarity?.id} · {getCardSeasonLabel(card)}</option>)}
-            </select>
-          </label>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Prix de départ</span>
-            <input type="number" min="1" value={minBid} onChange={(event) => setMinBid(event.target.value)} style={styles.resultsSelect} />
-          </label>
-          <button type="button" onClick={createListing} disabled={!selectedCard} style={styles.primaryButton}>Créer l'enchère</button>
-        </div>
-      </section>
-
-      <section style={styles.cardCollectionPanel}>
-        <div style={styles.cardCollectionHeader}>
-          <div>
-            <p style={styles.kicker}>ENCHÈRES EN COURS</p>
-            <h2 style={styles.cardLabStageTitle}>Cartes en vente</h2>
-            <p style={styles.muted}>Les enchères terminées doivent être clôturées pour transférer la carte et les AREKCOINS.</p>
-          </div>
-        </div>
-        <div style={styles.cardCollectionGrid}>
-          {activeListings.map((listing) => {
-            const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
-            const ended = Date.now() >= Number(listing.endsAt);
-            return (
-              <div key={listing.id} style={styles.marketCardAction}>
-                <CollectionCard card={listing.card} />
-                <div style={styles.marketListingMeta}>
-                  <strong>{listing.currentBid || listing.minBid} AREKCOINS</strong>
-                  <span>Vendeur : {listing.sellerPseudo}</span>
-                  <span>{listing.currentBidderPseudo ? `Meilleure offre : ${listing.currentBidderPseudo}` : "Aucune enchère"}</span>
-                  <span>{ended ? "Terminée" : `Fin : ${new Date(listing.endsAt).toLocaleString("fr-FR")}`}</span>
-                </div>
-                {ended ? (
-                  <button type="button" onClick={() => closeListing(listing)} style={styles.primaryButton}>Clôturer</button>
-                ) : (
-                  <div style={styles.marketBidRow}>
-                    <input type="number" min={minimum} value={bidInputs[listing.id] || ""} onChange={(event) => setBidInputs((current) => ({ ...current, [listing.id]: event.target.value }))} placeholder={`${minimum}+`} style={styles.resultsSelect} />
-                    <button type="button" onClick={() => bidOnListing(listing)} disabled={idsEqual(listing.sellerId, playerId)} style={styles.secondaryButton}>Enchérir</button>
-                  </div>
-                )}
+      )}
+      <section style={styles.marketGrid}>
+        {tabListings.map((listing) => {
+          const price = listing.currentBid || listing.minBid;
+          const ended = nowTick >= Number(listing.endsAt);
+          return (
+            <button type="button" key={listing.id} onClick={() => setSelectedListing(listing)} style={styles.marketListingCard}>
+              <CollectionCard card={listing.card} />
+              <div style={styles.marketListingFooter}>
+                <div><span style={styles.mutedSmall}>Mise actuelle</span><strong>{price} AREKCOINS</strong></div>
+                <div><span style={styles.mutedSmall}>Temps restant</span><strong>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - nowTick)}</strong></div>
+                <span style={styles.mutedSmall}>Vendu par {listing.sellerPseudo}</span>
               </div>
-            );
-          })}
-        </div>
-        {!activeListings.length && <Empty text="Aucune enchère active pour le moment." />}
+            </button>
+          );
+        })}
+        {!tabListings.length && <Empty text={marketTab === "browse" ? "Aucune carte aux enchères pour cette recherche." : marketTab === "my-sales" ? "Tu n'as aucune vente active." : "Tu n'as misé sur aucune carte active."} />}
       </section>
+      {selectedListing && (
+        <AuctionListingDetailModal
+          listing={activeListings.find((listing) => listing.id === selectedListing.id) || selectedListing}
+          balance={balance}
+          playerId={playerId}
+          now={nowTick}
+          bidValue={bidInputs[selectedListing.id] || ""}
+          onBidValueChange={(value) => setBidInputs((current) => ({ ...current, [selectedListing.id]: value }))}
+          onClose={() => setSelectedListing(null)}
+          onBid={(listing, amount) => bidOnListing(listing, amount)}
+          onCloseListing={closeListing}
+        />
+      )}
       {status && <p style={{ ...styles.muted, margin: 0 }}>{status}</p>}
     </div>
+  );
+}
+
+function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = Date.now(), bidValue = "", onBidValueChange, onClose, onBid, onCloseListing }) {
+  const history = normalizeCardBidHistory(listing.bidHistory);
+  const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
+  const ended = now >= Number(listing.endsAt);
+  const currentValue = bidValue === "" ? minimum : bidValue;
+  return createPortal(
+    <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
+      <div style={{ ...styles.cardDetailModal, gridTemplateColumns: "minmax(260px, 380px) minmax(0, 1fr)" }} onMouseDown={(event) => event.stopPropagation()}>
+        <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
+        <div style={styles.cardDetailPreview}><CollectionCard card={listing.card} /></div>
+        <div style={styles.cardDetailContent}>
+          <button type="button" onClick={onClose} style={styles.linkButton}>← Retour aux enchères</button>
+          <div>
+            <h2 style={styles.cardDetailTitle}>{listing.card?.name}</h2>
+            <p style={styles.muted}>Mis en vente par <strong style={{ color: "#34d399" }}>{listing.sellerPseudo}</strong></p>
+          </div>
+          <section style={styles.marketDetailBidPanel}>
+            <div style={styles.marketDetailPriceLine}>
+              <span style={styles.labelText}>Mise actuelle</span>
+              <strong>{listing.currentBid || listing.minBid} AREKCOINS</strong>
+            </div>
+            <p style={styles.mutedSmall}>Meneur : {listing.currentBidderPseudo || "Aucun"}</p>
+            <div style={styles.marketDetailPriceLine}>
+              <span>Temps restant</span>
+              <strong>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - now)}</strong>
+            </div>
+          </section>
+          {!idsEqual(listing.sellerId, playerId) && !ended && (
+            <section style={styles.marketDetailBidPanel}>
+              <div style={styles.marketDetailPriceLine}>
+                <span>Votre solde : <strong>{balance}</strong> AREKCOINS</span>
+                <span>Mise minimum : {minimum}</span>
+              </div>
+              <div style={styles.marketBidRow}>
+                <div style={styles.auctionBidStepper}>
+                  <button type="button" onClick={() => onBidValueChange(Math.max(minimum, Number(currentValue) - 1))} style={styles.auctionBidStepperButton}>−</button>
+                  <input type="number" min={minimum} value={currentValue} onChange={(event) => onBidValueChange(event.target.value)} style={styles.auctionBidStepperInput} />
+                  <button type="button" onClick={() => onBidValueChange(Math.max(minimum, Number(currentValue) + 1))} style={styles.auctionBidStepperButton}>+</button>
+                </div>
+                <button type="button" onClick={() => onBid(listing, currentValue)} style={styles.cardDetailAuctionButton}>Miser</button>
+              </div>
+              <p style={styles.mutedSmall}>La mise est débitée immédiatement. Si vous êtes surenchéri, elle vous est remboursée.</p>
+            </section>
+          )}
+          {idsEqual(listing.sellerId, playerId) && ended && <button type="button" onClick={() => onCloseListing(listing)} style={styles.cardDetailAuctionButton}>Clôturer l'enchère</button>}
+          <section style={styles.marketHistoryPanel}>
+            <p style={styles.kicker}>Historique des mises ({history.length})</p>
+            {history.map((bid, index) => (
+              <div key={`${bid.playerId}-${bid.createdAt}-${index}`} style={styles.marketHistoryRow}>
+                <strong>{bid.pseudo}</strong>
+                <span>{new Date(bid.createdAt).toLocaleString("fr-FR")} · {bid.amount} AREKCOINS</span>
+              </div>
+            ))}
+            {!history.length && <p style={styles.mutedSmall}>Aucune mise pour le moment.</p>}
+          </section>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
@@ -10406,6 +10489,19 @@ const styles = {
   marketCardAction: { display: "grid", gap: 10, minWidth: 0 },
   marketListingMeta: { display: "grid", gap: 5, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12, color: "#cbd5e1", fontSize: 13 },
   marketBidRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" },
+  marketHero: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 18, flexWrap: "wrap" },
+  marketTitle: { margin: "6px 0", fontSize: "clamp(34px, 5vw, 56px)", lineHeight: .95, letterSpacing: "-.055em" },
+  marketTabs: { display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap", borderBottom: "1px solid rgba(255,255,255,.13)" },
+  marketTabButton: { border: 0, borderBottom: "2px solid transparent", background: "transparent", color: "#94a3b8", padding: "0 0 16px", fontSize: 16, fontWeight: 900, cursor: "pointer" },
+  marketTabButtonActive: { color: "#34d399", borderBottomColor: "#34d399" },
+  marketSearchRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(190px, 280px)", gap: 10, alignItems: "center" },
+  marketSearchInput: { minHeight: 56, border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.035)", color: "#f8fafc", padding: "0 16px", fontSize: 16, outline: "none" },
+  marketSearchButton: { minHeight: 56, border: 0, borderRadius: 12, background: "rgba(52,211,153,.55)", color: "#03130d", padding: "0 18px", fontWeight: 950, cursor: "pointer" },
+  marketGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 18 },
+  marketListingCard: { display: "grid", gap: 10, minWidth: 0, padding: 0, border: 0, background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" },
+  marketListingFooter: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(2,6,23,.42)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12 },
+  marketDetailBidPanel: { display: "grid", gap: 10, background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 18 },
+  marketDetailPriceLine: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" },
   cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
   cardDetailModal: { width: "min(980px, 100%)", maxHeight: "92vh", overflow: "auto", position: "relative", display: "grid", gridTemplateColumns: "minmax(230px, 360px) minmax(0, 1fr)", gap: 30, background: "linear-gradient(145deg, rgba(14,20,28,.98), rgba(10,16,23,.98))", border: "1px solid rgba(148,163,184,.22)", borderRadius: 22, padding: 28, boxShadow: "0 35px 110px rgba(0,0,0,.62)" },
   cardDetailCloseButton: { position: "absolute", right: 20, top: 18, width: 34, height: 34, border: 0, borderRadius: 999, background: "rgba(255,255,255,.05)", color: "#cbd5e1", fontSize: 28, lineHeight: 1, cursor: "pointer" },
