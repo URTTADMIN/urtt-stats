@@ -6540,7 +6540,7 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
           <p style={styles.muted}>Enchérissez sur des cartes ou vendez les vôtres contre des AREKCOINS.</p>
         </div>
         <div style={styles.cardCollectionSummary}>
-          <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: "#f8c72f", color: "#f8c72f" }}>{balance} AREKCOINS</span>
+          <span style={{ ...styles.cardCollectionSummaryBadge, ...styles.arekcoinBalanceBadge }}><ArekcoinAmount amount={balance} /></span>
         </div>
       </header>
       <nav style={styles.marketTabs}>
@@ -6567,9 +6567,17 @@ function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlay
             <button type="button" key={listing.id} onClick={() => setSelectedListing(listing)} style={styles.marketListingCard}>
               <CollectionCard card={listing.card} />
               <div style={styles.marketListingFooter}>
-                <div><span style={styles.mutedSmall}>Mise actuelle</span><strong>{price} AREKCOINS</strong></div>
-                <div><span style={styles.mutedSmall}>Temps restant</span><strong>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - nowTick)}</strong></div>
-                <span style={styles.mutedSmall}>Vendu par {listing.sellerPseudo}</span>
+                <div style={styles.marketListingStats}>
+                  <div style={styles.marketListingStat}>
+                    <span style={styles.marketListingLabel}>Mise actuelle</span>
+                    <ArekcoinAmount amount={price} style={styles.marketListingValue} />
+                  </div>
+                  <div style={styles.marketListingStat}>
+                    <span style={styles.marketListingLabel}>Temps restant</span>
+                    <strong style={styles.marketListingValue}>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - nowTick)}</strong>
+                  </div>
+                </div>
+                <span style={styles.marketListingSeller}>Vendu par <strong>{listing.sellerPseudo}</strong></span>
               </div>
             </button>
           );
@@ -6613,7 +6621,7 @@ function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = 
           <section style={styles.marketDetailBidPanel}>
             <div style={styles.marketDetailPriceLine}>
               <span style={styles.auctionDetailLabel}>Mise actuelle</span>
-              <strong style={styles.auctionDetailValue}>{listing.currentBid || listing.minBid} AREKCOINS</strong>
+              <ArekcoinAmount amount={listing.currentBid || listing.minBid} style={styles.auctionDetailValue} />
             </div>
             <p style={styles.auctionDetailMuted}>Meneur : <strong>{listing.currentBidderPseudo || "Aucun"}</strong></p>
             <div style={styles.marketDetailPriceLine}>
@@ -6624,7 +6632,7 @@ function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = 
           {!idsEqual(listing.sellerId, playerId) && !ended && (
             <section style={styles.marketDetailBidPanel}>
               <div style={styles.marketDetailPriceLine}>
-                <span style={styles.auctionDetailMuted}>Votre solde : <strong style={styles.auctionDetailValue}>{balance}</strong> AREKCOINS</span>
+                <span style={styles.auctionDetailMuted}>Votre solde : <ArekcoinAmount amount={balance} style={styles.auctionDetailValue} /></span>
                 <span style={styles.auctionDetailMuted}>Mise minimum : <strong>{minimum}</strong></span>
               </div>
               <div style={styles.marketBidRow}>
@@ -6644,7 +6652,7 @@ function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = 
             {history.map((bid, index) => (
               <div key={`${bid.playerId}-${bid.createdAt}-${index}`} style={styles.marketHistoryRow}>
                 <strong>{bid.pseudo}</strong>
-                <span>{new Date(bid.createdAt).toLocaleString("fr-FR")} · {bid.amount} AREKCOINS</span>
+                <span style={styles.marketHistoryAmount}>{new Date(bid.createdAt).toLocaleString("fr-FR")} · <ArekcoinAmount amount={bid.amount} /></span>
               </div>
             ))}
             {!history.length && <p style={styles.auctionDetailMuted}>Aucune mise pour le moment.</p>}
@@ -10321,6 +10329,7 @@ function Stat({ label, value }) { return <div className="urtt-stat-card" style={
 function Input({ label, value, onChange, type = "text" }) { return <label style={styles.label}><span style={styles.labelText}>{label}</span><input type={type} value={value} onChange={(event) => onChange(event.target.value)} style={styles.input} /></label>; }
 function ColorInput({ label, value, onChange }) { return <label style={styles.label}><span style={styles.labelText}>{label}</span><div style={styles.colorInputRow}><input type="color" value={value} onChange={(event) => onChange(event.target.value)} style={styles.colorInput} /><input value={value} onChange={(event) => onChange(event.target.value)} style={styles.input} /></div></label>; }
 function Empty({ text }) { return <div style={styles.emptyBox}>{text}</div>; }
+function ArekcoinAmount({ amount, style = null }) { return <span style={{ ...styles.arekcoinAmount, ...(style || {}) }}><img src="/arekcoins.png" alt="" style={styles.arekcoinIcon} />{amount}</span>; }
 function Setting({ title, description, active }) { return <div style={styles.teamCard}><strong>{title}</strong><p style={styles.mutedSmall}>{description}</p><span style={active ? styles.badgeGreen : styles.badgeDark}>{active ? "ON" : "OFF"}</span></div>; }
 
 const styles = {
@@ -10486,6 +10495,9 @@ const styles = {
   cardRarityFilterButton: { minHeight: 36, border: "1px solid rgba(255,255,255,.16)", borderRadius: 999, padding: "0 11px", background: "rgba(255,255,255,.04)", color: "#f8fafc", fontWeight: 950, cursor: "pointer" },
   cardRarityFilterButtonActive: { borderColor: "#f8fafc", background: "rgba(255,255,255,.13)", boxShadow: "0 0 22px rgba(255,255,255,.12)" },
   cardCollectionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, 240px)", justifyContent: "start", gap: 16 },
+  arekcoinAmount: { display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", verticalAlign: "middle" },
+  arekcoinIcon: { width: 18, height: 18, objectFit: "contain", borderRadius: "50%", filter: "drop-shadow(0 0 7px rgba(248,199,47,.45))" },
+  arekcoinBalanceBadge: { borderColor: "#f8c72f", color: "#f8c72f", background: "rgba(248,199,47,.08)" },
   marketCardAction: { display: "grid", gap: 10, minWidth: 0 },
   marketListingMeta: { display: "grid", gap: 5, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12, color: "#cbd5e1", fontSize: 13 },
   marketBidRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" },
@@ -10499,7 +10511,12 @@ const styles = {
   marketSearchButton: { minHeight: 56, border: 0, borderRadius: 12, background: "rgba(52,211,153,.55)", color: "#03130d", padding: "0 18px", fontWeight: 950, cursor: "pointer" },
   marketGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, 240px)", justifyContent: "start", gap: 18 },
   marketListingCard: { width: 240, display: "grid", gap: 10, minWidth: 0, padding: 0, border: 0, background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" },
-  marketListingFooter: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(2,6,23,.42)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12 },
+  marketListingFooter: { display: "grid", gap: 10, background: "rgba(15,23,42,.82)", border: "1px solid rgba(148,163,184,.16)", borderRadius: 14, padding: 12, boxShadow: "0 14px 30px rgba(0,0,0,.22)" },
+  marketListingStats: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
+  marketListingStat: { minWidth: 0, display: "grid", gap: 4, alignContent: "start" },
+  marketListingLabel: { color: "#94a3b8", fontSize: 10, fontWeight: 900, lineHeight: 1.15 },
+  marketListingValue: { color: "#f8fafc", fontSize: 13, fontWeight: 950, lineHeight: 1.18, overflowWrap: "anywhere" },
+  marketListingSeller: { minHeight: 22, display: "flex", alignItems: "center", borderTop: "1px solid rgba(148,163,184,.14)", paddingTop: 9, color: "#94a3b8", fontSize: 11, fontWeight: 750 },
   marketDetailBidPanel: { display: "grid", gap: 12, background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.22)", borderRadius: 18, padding: 18 },
   marketDetailPriceLine: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" },
   cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
@@ -10520,6 +10537,7 @@ const styles = {
   auctionHistoryTitle: { color: "#f8fafc", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 12, fontWeight: 950, margin: 0 },
   marketHistoryPanel: { display: "grid", gap: 8, borderTop: "1px solid rgba(148,163,184,.18)", borderBottom: "1px solid rgba(148,163,184,.18)", padding: "14px 0" },
   marketHistoryRow: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#e2e8f0", background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.2)", borderRadius: 12, padding: "10px 12px", fontSize: 14 },
+  marketHistoryAmount: { display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" },
   cardDetailActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center" },
   cardDetailAuctionButton: { minHeight: 54, border: 0, borderRadius: 12, background: "#34d399", color: "#03130d", fontWeight: 950, cursor: "pointer", boxShadow: "0 18px 38px rgba(52,211,153,.2)" },
   cardDetailDestroyButton: { minHeight: 54, border: "1px solid rgba(255,255,255,.14)", borderRadius: 12, background: "rgba(239,68,68,.12)", color: "#fecaca", fontWeight: 950, cursor: "pointer" },
