@@ -6601,31 +6601,31 @@ function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = 
   const currentValue = bidValue === "" ? minimum : bidValue;
   return createPortal(
     <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
-      <div style={{ ...styles.cardDetailModal, gridTemplateColumns: "minmax(260px, 380px) minmax(0, 1fr)" }} onMouseDown={(event) => event.stopPropagation()}>
+      <div style={{ ...styles.cardDetailModal, ...styles.auctionDetailModal, gridTemplateColumns: "minmax(260px, 380px) minmax(0, 1fr)" }} onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
         <div style={styles.cardDetailPreview}><CollectionCard card={listing.card} /></div>
         <div style={styles.cardDetailContent}>
-          <button type="button" onClick={onClose} style={styles.linkButton}>← Retour aux enchères</button>
+          <button type="button" onClick={onClose} style={styles.auctionBackButton}>← Retour aux enchères</button>
           <div>
             <h2 style={styles.cardDetailTitle}>{listing.card?.name}</h2>
-            <p style={styles.muted}>Mis en vente par <strong style={{ color: "#34d399" }}>{listing.sellerPseudo}</strong></p>
+            <p style={styles.auctionDetailMuted}>Mis en vente par <strong style={{ color: "#34d399" }}>{listing.sellerPseudo}</strong></p>
           </div>
           <section style={styles.marketDetailBidPanel}>
             <div style={styles.marketDetailPriceLine}>
-              <span style={styles.labelText}>Mise actuelle</span>
-              <strong>{listing.currentBid || listing.minBid} AREKCOINS</strong>
+              <span style={styles.auctionDetailLabel}>Mise actuelle</span>
+              <strong style={styles.auctionDetailValue}>{listing.currentBid || listing.minBid} AREKCOINS</strong>
             </div>
-            <p style={styles.mutedSmall}>Meneur : {listing.currentBidderPseudo || "Aucun"}</p>
+            <p style={styles.auctionDetailMuted}>Meneur : <strong>{listing.currentBidderPseudo || "Aucun"}</strong></p>
             <div style={styles.marketDetailPriceLine}>
-              <span>Temps restant</span>
-              <strong>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - now)}</strong>
+              <span style={styles.auctionDetailLabel}>Temps restant</span>
+              <strong style={styles.auctionDetailValue}>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - now)}</strong>
             </div>
           </section>
           {!idsEqual(listing.sellerId, playerId) && !ended && (
             <section style={styles.marketDetailBidPanel}>
               <div style={styles.marketDetailPriceLine}>
-                <span>Votre solde : <strong>{balance}</strong> AREKCOINS</span>
-                <span>Mise minimum : {minimum}</span>
+                <span style={styles.auctionDetailMuted}>Votre solde : <strong style={styles.auctionDetailValue}>{balance}</strong> AREKCOINS</span>
+                <span style={styles.auctionDetailMuted}>Mise minimum : <strong>{minimum}</strong></span>
               </div>
               <div style={styles.marketBidRow}>
                 <div style={styles.auctionBidStepper}>
@@ -6635,19 +6635,19 @@ function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = 
                 </div>
                 <button type="button" onClick={() => onBid(listing, currentValue)} style={styles.cardDetailAuctionButton}>Miser</button>
               </div>
-              <p style={styles.mutedSmall}>La mise est débitée immédiatement. Si vous êtes surenchéri, elle vous est remboursée.</p>
+              <p style={styles.auctionDetailHelp}>La mise est débitée immédiatement. Si vous êtes surenchéri, elle vous est remboursée.</p>
             </section>
           )}
           {idsEqual(listing.sellerId, playerId) && ended && <button type="button" onClick={() => onCloseListing(listing)} style={styles.cardDetailAuctionButton}>Clôturer l'enchère</button>}
           <section style={styles.marketHistoryPanel}>
-            <p style={styles.kicker}>Historique des mises ({history.length})</p>
+            <p style={styles.auctionHistoryTitle}>Historique des mises ({history.length})</p>
             {history.map((bid, index) => (
               <div key={`${bid.playerId}-${bid.createdAt}-${index}`} style={styles.marketHistoryRow}>
                 <strong>{bid.pseudo}</strong>
                 <span>{new Date(bid.createdAt).toLocaleString("fr-FR")} · {bid.amount} AREKCOINS</span>
               </div>
             ))}
-            {!history.length && <p style={styles.mutedSmall}>Aucune mise pour le moment.</p>}
+            {!history.length && <p style={styles.auctionDetailMuted}>Aucune mise pour le moment.</p>}
           </section>
         </div>
       </div>
@@ -10500,7 +10500,7 @@ const styles = {
   marketGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, 240px)", justifyContent: "start", gap: 18 },
   marketListingCard: { width: 240, display: "grid", gap: 10, minWidth: 0, padding: 0, border: 0, background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" },
   marketListingFooter: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, background: "rgba(2,6,23,.42)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12 },
-  marketDetailBidPanel: { display: "grid", gap: 10, background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 18 },
+  marketDetailBidPanel: { display: "grid", gap: 12, background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.22)", borderRadius: 18, padding: 18 },
   marketDetailPriceLine: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" },
   cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
   cardDetailModal: { width: "min(980px, 100%)", maxHeight: "92vh", overflow: "auto", position: "relative", display: "grid", gridTemplateColumns: "minmax(230px, 360px) minmax(0, 1fr)", gap: 30, background: "linear-gradient(145deg, rgba(14,20,28,.98), rgba(10,16,23,.98))", border: "1px solid rgba(148,163,184,.22)", borderRadius: 22, padding: 28, boxShadow: "0 35px 110px rgba(0,0,0,.62)" },
@@ -10511,8 +10511,15 @@ const styles = {
   cardDetailPills: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 },
   marketStatsGrid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 },
   marketStatBox: { minHeight: 82, display: "grid", placeItems: "center", gap: 3, background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, textAlign: "center", color: "#94a3b8" },
-  marketHistoryPanel: { display: "grid", gap: 8, borderTop: "1px solid rgba(255,255,255,.1)", borderBottom: "1px solid rgba(255,255,255,.1)", padding: "14px 0" },
-  marketHistoryRow: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#cbd5e1", background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 12, padding: "9px 11px" },
+  auctionDetailModal: { fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", color: "#f8fafc", background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(9,14,25,.98))" },
+  auctionBackButton: { justifySelf: "start", border: "1px solid rgba(52,211,153,.28)", borderRadius: 999, background: "rgba(52,211,153,.08)", color: "#7dd3fc", fontSize: 14, fontWeight: 850, cursor: "pointer", padding: "8px 12px" },
+  auctionDetailMuted: { margin: 0, color: "#cbd5e1", fontSize: 15, lineHeight: 1.45 },
+  auctionDetailHelp: { margin: 0, color: "#94a3b8", fontSize: 13, lineHeight: 1.5 },
+  auctionDetailLabel: { color: "#94a3b8", fontSize: 13, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".08em" },
+  auctionDetailValue: { color: "#f8fafc", fontSize: 16, fontWeight: 950 },
+  auctionHistoryTitle: { color: "#f8fafc", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 12, fontWeight: 950, margin: 0 },
+  marketHistoryPanel: { display: "grid", gap: 8, borderTop: "1px solid rgba(148,163,184,.18)", borderBottom: "1px solid rgba(148,163,184,.18)", padding: "14px 0" },
+  marketHistoryRow: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#e2e8f0", background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.2)", borderRadius: 12, padding: "10px 12px", fontSize: 14 },
   cardDetailActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center" },
   cardDetailAuctionButton: { minHeight: 54, border: 0, borderRadius: 12, background: "#34d399", color: "#03130d", fontWeight: 950, cursor: "pointer", boxShadow: "0 18px 38px rgba(52,211,153,.2)" },
   cardDetailDestroyButton: { minHeight: 54, border: "1px solid rgba(255,255,255,.14)", borderRadius: 12, background: "rgba(239,68,68,.12)", color: "#fecaca", fontWeight: 950, cursor: "pointer" },
@@ -10521,9 +10528,9 @@ const styles = {
   cardDetailHeaderLine: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", paddingRight: 42 },
   auctionCreateCardRow: { display: "grid", gridTemplateColumns: "160px minmax(0, 1fr)", gap: 20, alignItems: "center", background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 16 },
   auctionCreateMiniCard: { transform: "scale(.72)", transformOrigin: "left center", width: 220, marginRight: -60, pointerEvents: "none" },
-  auctionBidStepper: { display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 48px", minHeight: 54, border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, overflow: "hidden", background: "rgba(255,255,255,.035)" },
-  auctionBidStepperButton: { border: 0, background: "rgba(255,255,255,.04)", color: "#cbd5e1", fontSize: 24, fontWeight: 800, cursor: "pointer" },
-  auctionBidStepperInput: { border: 0, background: "transparent", color: "#f8fafc", textAlign: "center", fontSize: 20, fontWeight: 900, outline: "none" },
+  auctionBidStepper: { display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 48px", minHeight: 56, border: "1px solid rgba(148,163,184,.24)", borderRadius: 12, overflow: "hidden", background: "rgba(2,6,23,.55)" },
+  auctionBidStepperButton: { border: 0, background: "rgba(148,163,184,.12)", color: "#f8fafc", fontSize: 24, fontWeight: 800, cursor: "pointer" },
+  auctionBidStepperInput: { border: 0, background: "transparent", color: "#f8fafc", textAlign: "center", fontSize: 22, fontWeight: 950, outline: "none" },
   collectionCardClickable: { cursor: "pointer", transition: "transform .18s ease, border-color .18s ease" },
   collectionCard: { width: 240, height: 320, boxSizing: "border-box", position: "relative", isolation: "isolate", background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 20, padding: 16, display: "grid", gap: 12, alignContent: "start", overflow: "hidden" },
   collectionCardAccent: { position: "absolute", top: 0, left: 0, width: 5, height: "100%", opacity: .88, zIndex: 0 },
