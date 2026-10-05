@@ -10516,7 +10516,7 @@ const styles = {
   marketListingStat: { minWidth: 0, display: "grid", gap: 4, alignContent: "start" },
   marketListingLabel: { color: "#94a3b8", fontSize: 10, fontWeight: 900, lineHeight: 1.15 },
   marketListingValue: { color: "#f8fafc", fontSize: 13, fontWeight: 950, lineHeight: 1.18, overflowWrap: "anywhere" },
-  marketListingSeller: { minHeight: 22, display: "flex", alignItems: "center", borderTop: "1px solid rgba(148,163,184,.14)", paddingTop: 9, color: "#94a3b8", fontSize: 11, fontWeight: 750 },
+  marketListingSeller: { minHeight: 22, display: "flex", alignItems: "center", gap: 4, borderTop: "1px solid rgba(148,163,184,.14)", paddingTop: 9, color: "#94a3b8", fontSize: 11, fontWeight: 750 },
   marketDetailBidPanel: { display: "grid", gap: 12, background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.22)", borderRadius: 18, padding: 18 },
   marketDetailPriceLine: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" },
   cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
