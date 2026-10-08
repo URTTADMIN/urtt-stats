@@ -80,7 +80,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "settings", icon: "⚙️", label: "Réglages" },
 ];
 const ADMIN_PAGE_GROUPS = [
-  { id: "overview", label: "Vue générale", icon: "🏠", pages: ["dashboard", "supabase"] },
+  { id: "overview", label: "Vue générale", icon: "🏠", pages: ["dashboard", "supabase", "search"] },
   { id: "management", label: "Gestion P & C", icon: "🏎️", pages: ["titles", "drivers", "teams", "development"] },
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "offseason-lemans", "offseason-indy", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
@@ -2695,7 +2695,7 @@ export default function URTTAdminPanel() {
 
   useEffect(() => {
     async function loadAdminPermissions() {
-      if (!adminUser?.email) {
+      if (!adminUser?.email || isPermissionsOwner(adminUser)) {
         setAdminPermissions(defaultAdminPermissions);
         return;
       }
