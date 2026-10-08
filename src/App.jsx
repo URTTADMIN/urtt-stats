@@ -54,6 +54,7 @@ const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_LOGO = "/retired-driver.png";
 const ADMIN_PAGE_OPTIONS = [
   { id: "dashboard", icon: "🏠", label: "Dashboard" },
+  { id: "kolti", icon: "😈", label: "T'es NUL KOLTI" },
   { id: "supabase", icon: "🗄️", label: "Supabase" },
   { id: "search", icon: "🔎", label: "Recherche" },
   { id: "titles", icon: "👑", label: "Titres" },
@@ -84,7 +85,7 @@ const ADMIN_PAGE_GROUPS = [
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "offseason-lemans", "offseason-indy", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
   { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["card-generation", "games", "channel-points", "guess-attempts", "easter-egg-admin"] },
-  { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "feedback-requests", "permissions", "settings"] },
+  { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "feedback-requests", "permissions", "settings", "kolti"] },
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
 const defaultAdminPermissions = { role: "owner", allowedCategories: ALL_CATEGORY_IDS, allowedPages: ALL_ADMIN_PAGE_IDS };
@@ -4658,6 +4659,7 @@ export default function URTTAdminPanel() {
             />
           )}
           {visibleAdminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
+          {visibleAdminPage === "kolti" && <div style={styles.section}><Card title="T'es NUL KOLTI" icon="😈"><p style={styles.mutedSmall}>T'es NUL KOLTI</p></Card></div>}
           
         </AdminLayout>
       )}
