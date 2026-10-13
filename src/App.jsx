@@ -33,17 +33,7 @@ const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
-const CARD_AUCTION_DURATION_MS = 24 * 60 * 60 * 1000;
-const CARD_AUCTION_DURATION_OPTIONS = [
-  { label: "10 min", value: 10 * 60 * 1000 },
-  { label: "30 min", value: 30 * 60 * 1000 },
-  { label: "1 h", value: 60 * 60 * 1000 },
-  { label: "3 h", value: 3 * 60 * 60 * 1000 },
-  { label: "6 h", value: 6 * 60 * 60 * 1000 },
-  { label: "12 h", value: 12 * 60 * 60 * 1000 },
-  { label: "24 h", value: 24 * 60 * 60 * 1000 },
-];
-const CARD_AUCTION_MAX_ACTIVE_SALES = 10;
+const LEGACY_MARKET_DEFAULT_DURATION_MS = 24 * 60 * 60 * 1000;
 const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
 const TCG_MARKET_ALLOWED_PSEUDOS = ["Compte Test", "Test2", "Kolti"];
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
@@ -105,13 +95,12 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "tgc-packs", label: "Packs" },
   { id: "tgc-collection", label: "Collection" },
   { id: "tgc-pokedex", label: "Catalogue" },
-  { id: "tgc-auctions", label: "Enchères" },
   { id: "other-championships", label: "À venir" },
 ];
 const PUBLIC_NAV_GROUPS = [
   { id: "championship", label: "Championnat", pages: ["standings", "seasons", "drivers", "teams", "development"] },
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
-  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex", "tgc-auctions"] },
+  { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
   { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
 ];
@@ -165,7 +154,6 @@ function getPublicPageIcon(pageId) {
     "tgc-packs": "◈",
     "tgc-collection": "▣",
     "tgc-pokedex": "◇",
-    "tgc-auctions": "◇",
     "other-championships": "+",
   }[pageId] || "•";
 }
@@ -244,7 +232,7 @@ function normalizeCardMarketListings(value) {
       const minBid = Math.max(1, Math.floor(Number(listing.minBid) || 1));
       const currentBid = Math.max(0, Math.floor(Number(listing.currentBid) || 0));
       const createdAt = Math.max(0, Number(listing.createdAt) || Date.now());
-      const endsAt = Math.max(createdAt, Number(listing.endsAt) || createdAt + CARD_AUCTION_DURATION_MS);
+      const endsAt = Math.max(createdAt, Number(listing.endsAt) || createdAt + LEGACY_MARKET_DEFAULT_DURATION_MS);
       return {
         id: String(listing.id || `auction-${createdAt}-${Math.random().toString(16).slice(2)}`),
         sellerId: String(listing.sellerId || ""),
@@ -5248,7 +5236,6 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {isTgcCardsPage && (hasCardLabAccess
           ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} specialCards={siteSettings.specialCards} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
-        {activePublicPage === "tgc-auctions" && <TcgAuctionsPage playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} />}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
         {activePublicPage === "drivers" && <><PublicDriverMultiCategorySearch search={driverStatsSearch} setSearch={setDriverStatsSearch} selectedDriverId={multiStatsDriverId} setSelectedDriverId={setMultiStatsDriverId} drivers={allDrivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allRaces={allRaces} seasonOptions={seasonOptions} onOpenDriver={openDriverDetails} /><Card title={`Stats pilotes cumulées S1 → ${seasonName(selectedSeasonId)}`} icon="👥"><DriverTable drivers={cumulativeDrivers} detailed showExtendedStats teams={teams} selectedSeasonId={selectedSeasonId} onDriverClick={openDriverDetails} /></Card>{selectedDriver && <DriverDetails driver={selectedDriver} raceResults={raceResults} teams={teams} selectedCategoryId={selectedDriverDetailsCategoryId} seasonTitles={seasonTitles} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} allRaces={allRaces} onClose={() => setSelectedDriver(null)} />}</>}
@@ -5757,8 +5744,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     counts[key] = (counts[key] || 0) + 1;
     return counts;
   }, {}), [ownedCards]);
-  const marketSales = useMemo(() => playerAccounts.flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketSales), [playerAccounts]);
-  const marketListings = useMemo(() => playerAccounts.flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings), [playerAccounts]);
   const savePlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
@@ -5852,12 +5837,18 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       stockSyncedAt: Date.now(),
     };
     setPackStock(nextStock);
-    const nextPack = drawCardPack(packCardLibrary, rarities);
+    const ownedGroupKeys = new Set(ownedCards.map((card) => getCollectionGroupKey(card)));
+    const nextPack = drawCardPack(packCardLibrary, rarities).map((card) => {
+      const groupKey = getCollectionGroupKey(card);
+      const isNewCard = !ownedGroupKeys.has(groupKey);
+      ownedGroupKeys.add(groupKey);
+      return { ...card, isNewCard };
+    });
     const openedAt = Date.now();
     setPack(nextPack);
     setOwnedCards((current) => {
       const nextOwnedCards = [
-        ...nextPack.map((card, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
+        ...nextPack.map(({ isNewCard, ...card }, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
         ...current,
       ];
       savePlayerCards(nextOwnedCards, nextStock);
@@ -5897,35 +5888,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     await savePlayerCards(removed.kept, nextStock);
     setSelectedCollectionCard(null);
     return { ok: true, message: `${card.name} détruite : +${getCardBurnValue(card)} AREKCOINS.` };
-  };
-  const createCollectionAuction = async (card, minBid = 1, durationMs = CARD_AUCTION_DURATION_MS) => {
-    if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
-    if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être mise aux enchères." };
-    const ownActiveListings = normalizeCardMarketListings(packStock.marketListings).filter((listing) => listing.status === "OPEN");
-    if (ownActiveListings.length >= CARD_AUCTION_MAX_ACTIVE_SALES) return { ok: false, message: `Tu as déjà ${CARD_AUCTION_MAX_ACTIVE_SALES} enchères actives.` };
-    const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
-    if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
-    const now = Date.now();
-    const listing = {
-      id: `auction-${playerCardAccountId || "local"}-${now}-${Math.random().toString(16).slice(2)}`,
-      sellerId: playerCardAccountId,
-      sellerPseudo: playerProfile?.pseudo || "Vendeur",
-      card: { ...(card.ownedCopies?.[0] || card), marketListedAt: now },
-      minBid: Math.max(1, Math.floor(Number(minBid) || 1)),
-      currentBid: 0,
-      currentBidderId: "",
-      currentBidderPseudo: "",
-      bidHistory: [],
-      createdAt: now,
-      endsAt: now + Math.max(10 * 60 * 1000, Number(durationMs) || CARD_AUCTION_DURATION_MS),
-      status: "OPEN",
-    };
-    const nextStock = { ...normalizeCardPackStock(packStock), marketListings: [listing, ...normalizeCardMarketListings(packStock.marketListings)], stockSyncedAt: now };
-    setOwnedCards(removed.kept);
-    setPackStock(nextStock);
-    await savePlayerCards(removed.kept, nextStock);
-    setSelectedCollectionCard(null);
-    return { ok: true, message: `${card.name} est aux enchères.` };
   };
   return (
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
@@ -6101,7 +6063,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
-      {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketSales={marketSales.filter((sale) => sale.cardKey === getCollectionGroupKey(selectedCollectionCard)).slice(0, 4)} activeListings={marketListings.filter((listing) => getCollectionGroupKey(listing.card) === getCollectionGroupKey(selectedCollectionCard) && listing.status === "OPEN")} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} onCreateAuction={createCollectionAuction} />}
+      {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
     </div>
   );
 }
@@ -6139,526 +6101,37 @@ function CollectionCard({ card, locked = false, onClick = null }) {
   );
 }
 
-function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketSales = [], activeListings = [], marketAccessAllowed = false, onClose, onDestroy, onCreateAuction }) {
-  const [view, setView] = useState("details");
-  const [minBid, setMinBid] = useState(10);
-  const [durationMs, setDurationMs] = useState(60 * 60 * 1000);
+function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketAccessAllowed = false, onClose, onDestroy }) {
   const [status, setStatus] = useState("");
   const canBurn = marketAccessAllowed && card?.rarity?.id !== "SL" && ownedCount > 1;
-  const canAuction = marketAccessAllowed && card?.rarity?.id !== "SL";
-  const latestSale = marketSales[0];
   const submitDestroy = async () => {
     const result = await onDestroy?.(card);
     setStatus(result?.message || "");
   };
-  const submitAuction = async () => {
-    const result = await onCreateAuction?.(card, minBid, durationMs);
-    setStatus(result?.message || "");
-  };
-
   return createPortal(
     <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
       <div style={styles.cardDetailModal} onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
-        {view === "details" ? (
-          <>
-            <div style={styles.cardDetailPreview}>
-              <CollectionCard card={card} />
-            </div>
-            <div style={styles.cardDetailContent}>
-              <div>
-                <h2 style={styles.cardDetailTitle}>{card.name}</h2>
-                <div style={styles.cardDetailPills}>
-                  <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: getCardRarityColor(card.rarity), color: getCardRarityColor(card.rarity) }}>{card.rarity?.name}</span>
-                  <span style={styles.cardCollectionSummaryBadge}>{getCardSeasonLabel(card)}</span>
-                  <span style={styles.cardCollectionSummaryBadge}>{card.categoryName || getCardCategoryLabel(card.categoryId)}</span>
-                </div>
-              </div>
-              <p style={styles.muted}>{card.teamName}</p>
-              <div style={styles.marketStatsGrid}>
-                <div style={styles.marketStatBox}><strong>{ownedCount}</strong><span>Exemplaire{ownedCount > 1 ? "s" : ""}</span></div>
-                <div style={styles.marketStatBox}><strong>{balance}</strong><span>AREKCOINS</span></div>
-                <div style={styles.marketStatBox}><strong>{activeListings.length}</strong><span>Enchère{activeListings.length > 1 ? "s" : ""} active{activeListings.length > 1 ? "s" : ""}</span></div>
-              </div>
-              <section style={styles.marketHistoryPanel}>
-                <p style={styles.kicker}>Dernières ventes</p>
-                {latestSale ? (
-                  <div style={styles.marketHistoryRow}>
-                    <strong>{latestSale.price} AREKCOINS</strong>
-                    <span>{latestSale.buyerPseudo ? `Achetée par ${latestSale.buyerPseudo}` : "Vente terminée"} · {new Date(latestSale.soldAt).toLocaleString("fr-FR")}</span>
-                  </div>
-                ) : <p style={styles.mutedSmall}>Aucune vente terminée pour cette carte.</p>}
-                {marketSales.slice(1, 4).map((sale) => (
-                  <div key={sale.id} style={styles.marketHistoryRow}>
-                    <strong>{sale.price} AREKCOINS</strong>
-                    <span>{new Date(sale.soldAt).toLocaleString("fr-FR")}</span>
-                  </div>
-                ))}
-              </section>
-              <div style={styles.cardDetailActions}>
-                <button type="button" onClick={() => setView("auction")} disabled={!canAuction} style={{ ...styles.cardDetailAuctionButton, ...(!canAuction ? styles.cardDetailDisabledButton : {}) }}>Mettre aux enchères</button>
-                <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>Détruire {canBurn ? `+${getCardBurnValue(card)}` : marketAccessAllowed ? "· doublon requis" : "· accès restreint"}</button>
-              </div>
-              {!marketAccessAllowed && <p style={styles.mutedSmall}>Fonctionnalité réservée aux admins et aux comptes test autorisés.</p>}
-              {status && <p style={styles.mutedSmall}>{status}</p>}
-            </div>
-          </>
-        ) : (
-          <div style={styles.auctionCreatePanel}>
-            <div style={styles.cardDetailHeaderLine}>
-              <div>
-                <p style={styles.kicker}>Mettre aux enchères</p>
-                <h2 style={styles.cardDetailTitle}>Créer l'enchère</h2>
-                <p style={styles.muted}>Un exemplaire sera mis en réserve pour la durée de l'enchère.</p>
-              </div>
-            </div>
-            <div style={styles.auctionCreateCardRow}>
-              <div style={styles.auctionCreateMiniCard}><CollectionCard card={card} /></div>
-              <div>
-                <h3 style={styles.subTitle}>{card.name}</h3>
-                <p style={styles.mutedSmall}>{getCardCategoryLabel(card.categoryId)} · {card.rarity?.name}</p>
-                <p style={{ ...styles.mutedSmall, color: "#34d399", fontWeight: 900 }}>Dernière vente : {latestSale ? `${latestSale.price} AREKCOINS` : "aucune"}</p>
-              </div>
-            </div>
-            <label style={styles.label}>
-              <span style={styles.labelText}>Mise de départ</span>
-              <div style={styles.auctionBidStepper}>
-                <button type="button" onClick={() => setMinBid((value) => Math.max(1, Number(value) - 1))} style={styles.auctionBidStepperButton}>−</button>
-                <input type="number" min="1" value={minBid} onChange={(event) => setMinBid(Math.max(1, Math.floor(Number(event.target.value) || 1)))} style={styles.auctionBidStepperInput} />
-                <button type="button" onClick={() => setMinBid((value) => Math.max(1, Number(value) + 1))} style={styles.auctionBidStepperButton}>+</button>
-              </div>
-            </label>
-            <div style={styles.cardRarityFilterGroup}>
-              <span style={styles.labelText}>Durée</span>
-              <div style={styles.cardRarityFilterRow}>
-                {CARD_AUCTION_DURATION_OPTIONS.map((option) => (
-                  <button key={option.value} type="button" onClick={() => setDurationMs(option.value)} style={{ ...styles.cardRarityFilterButton, ...(durationMs === option.value ? { ...styles.cardRarityFilterButtonActive, borderColor: "#34d399", color: "#34d399" } : {}) }}>{option.label}</button>
-                ))}
-              </div>
-            </div>
-            <div style={styles.cardDetailActions}>
-              <button type="button" onClick={() => setView("details")} style={styles.secondaryButton}>Annuler</button>
-              <button type="button" onClick={submitAuction} disabled={!canAuction} style={{ ...styles.cardDetailAuctionButton, ...(!canAuction ? styles.cardDetailDisabledButton : {}) }}>Lancer l'enchère</button>
-            </div>
-            {status && <p style={styles.mutedSmall}>{status}</p>}
-          </div>
-        )}
-      </div>
-    </div>,
-    document.body,
-  );
-}
-
-function TcgAuctionsPage({ playerProfile = null, playerAccounts = [], onSavePlayerTcgState, onPlayerLogin, onPlayerSignup, onPlayerLogout, isSavingPlayerAccount = false, marketAccessAllowed = false }) {
-  const [selectedCardKey, setSelectedCardKey] = useState("");
-  const [minBid, setMinBid] = useState(25);
-  const [bidInputs, setBidInputs] = useState({});
-  const [marketTab, setMarketTab] = useState("browse");
-  const [marketSearch, setMarketSearch] = useState("");
-  const [marketSort, setMarketSort] = useState("recent");
-  const [selectedListing, setSelectedListing] = useState(null);
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [status, setStatus] = useState("");
-  const playerId = playerProfile?.id ? String(playerProfile.id) : "";
-  const normalizedAccounts = useMemo(() => playerAccounts.map((account) => ({
-    ...account,
-    cardCollection: normalizeCardCollection(account.cardCollection),
-    cardPackStock: normalizeCardPackStock(account.cardPackStock),
-  })), [playerAccounts]);
-  const accountFromList = normalizedAccounts.find((account) => idsEqual(account.id, playerId));
-  const currentAccount = playerId ? accountFromList || playerProfile : null;
-  const localStock = readStoredCardPackStock();
-  const accountStock = normalizeCardPackStock(currentAccount?.cardPackStock);
-  const currentStock = playerId ? getFreshestCardPackStock(accountStock, localStock) : getEmptyCardPackStock();
-  const localCards = readStoredCardCollection();
-  const accountCards = normalizeCardCollection(currentAccount?.cardCollection);
-  const useLocalCards = playerId && (Number(localStock.stockSyncedAt) || 0) > (Number(accountStock.stockSyncedAt) || 0);
-  const currentCards = playerId
-    ? (currentStock.cardCollectionResetAt > getLatestCardObtainedAt(useLocalCards ? localCards : accountCards)
-      ? []
-      : useLocalCards ? localCards : accountCards)
-    : [];
-  const tradableCards = currentCards.filter((card) => card?.rarity?.id !== "SL");
-  const tradableCardCounts = tradableCards.reduce((counts, card) => {
-    const key = getCollectionGroupKey(card);
-    counts[key] = (counts[key] || 0) + 1;
-    return counts;
-  }, {});
-  const destructibleCards = tradableCards.filter((card) => (tradableCardCounts[getCollectionGroupKey(card)] || 0) > 1);
-  const destructibleCardGroups = useMemo(() => {
-    const grouped = new Map();
-    destructibleCards.forEach((card) => {
-      const key = getCollectionGroupKey(card);
-      const existing = grouped.get(key);
-      if (existing) {
-        existing.duplicateCount += 1;
-        existing.ownedCopies.push(card);
-      } else {
-        grouped.set(key, { ...card, collectionGroupKey: key, duplicateCount: 1, ownedCopies: [card] });
-      }
-    });
-    return Array.from(grouped.values());
-  }, [destructibleCards, tradableCardCounts]);
-  const activeListings = normalizedAccounts
-    .flatMap((account) => normalizeCardPackStock(account.cardPackStock).marketListings.map((listing) => ({
-      ...listing,
-      sellerId: String(listing.sellerId || account.id),
-      sellerPseudo: listing.sellerPseudo || account.pseudo || "Vendeur",
-      sellerAccount: account,
-    })))
-    .filter((listing) => listing.status === "OPEN" && listing.card?.rarity?.id !== "SL")
-    .sort((a, b) => Number(b.createdAt) - Number(a.createdAt));
-  useEffect(() => {
-    const timer = window.setInterval(() => setNowTick(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-  const mySales = activeListings.filter((listing) => idsEqual(listing.sellerId, playerId));
-  const myBids = activeListings.filter((listing) => idsEqual(listing.currentBidderId, playerId) || normalizeCardBidHistory(listing.bidHistory).some((bid) => idsEqual(bid.playerId, playerId)));
-  const searchedListings = activeListings.filter((listing) => {
-    const query = normalizeResultText(marketSearch);
-    if (!query) return true;
-    return normalizeResultText(`${listing.card?.name || ""} ${listing.card?.teamName || ""} ${listing.sellerPseudo || ""} ${listing.card?.categoryName || ""}`).includes(query);
-  });
-  const browseListings = [...searchedListings].sort((a, b) => {
-    if (marketSort === "ending") return Number(a.endsAt) - Number(b.endsAt);
-    if (marketSort === "price") return (Number(b.currentBid || b.minBid) || 0) - (Number(a.currentBid || a.minBid) || 0);
-    return Number(b.createdAt) - Number(a.createdAt);
-  });
-  const tabListings = marketTab === "my-sales" ? mySales : marketTab === "my-bids" ? myBids : browseListings;
-  const selectedCard = tradableCards.find((card) => getOwnedCardInstanceKey(card) === selectedCardKey) || tradableCards[0];
-  const balance = Number(currentStock.arekcoins) || 0;
-
-  const saveAccounts = async (updates = []) => {
-    const uniqueUpdates = Array.from(new Map(updates.filter(Boolean).map((update) => [String(update.account.id), update])).values());
-    const results = await Promise.all(uniqueUpdates.map((update) => onSavePlayerTcgState?.(update.account.id, update.cards, update.stock)));
-    const failed = results.find((result) => !result?.ok);
-    if (failed) {
-      setStatus(failed.message || "Impossible de sauvegarder l'opération.");
-      return false;
-    }
-    return true;
-  };
-
-  const getMutableAccount = (accountsById, accountId) => {
-    const key = String(accountId || "");
-    if (!accountsById.has(key)) {
-      const source = normalizedAccounts.find((account) => idsEqual(account.id, key)) || (idsEqual(playerId, key) ? currentAccount : null);
-      if (!source) return null;
-      accountsById.set(key, {
-        account: source,
-        cards: idsEqual(key, playerId) ? [...currentCards] : normalizeCardCollection(source.cardCollection),
-        stock: idsEqual(key, playerId) ? { ...currentStock } : normalizeCardPackStock(source.cardPackStock),
-      });
-    }
-    return accountsById.get(key);
-  };
-
-  const destroyCard = async (card) => {
-    if (!playerId || !card) return;
-    if (!marketAccessAllowed) {
-      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
-      return;
-    }
-    if ((tradableCardCounts[getCollectionGroupKey(card)] || 0) <= 1) {
-      setStatus("Cette carte est unique dans ta collection : il faut un doublon pour la détruire.");
-      return;
-    }
-    const key = getOwnedCardInstanceKey(card);
-    const removed = removeOwnedCardInstance(currentCards, key);
-    if (!removed.removed) {
-      setStatus("Carte introuvable dans ta collection.");
-      return;
-    }
-    const value = getCardBurnValue(card);
-    const nextStock = { ...currentStock, arekcoins: balance + value, stockSyncedAt: Date.now() };
-    const ok = await saveAccounts([{ account: currentAccount, cards: removed.kept, stock: nextStock }]);
-    if (ok) {
-      setSelectedCardKey("");
-      setStatus(`${card.name} détruite : +${value} AREKCOINS.`);
-    }
-  };
-
-  const createListing = async () => {
-    if (!playerId || !selectedCard) return;
-    if (!marketAccessAllowed) {
-      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
-      return;
-    }
-    if (mySales.length >= CARD_AUCTION_MAX_ACTIVE_SALES) {
-      setStatus(`Tu as déjà ${CARD_AUCTION_MAX_ACTIVE_SALES} enchères actives.`);
-      return;
-    }
-    const safeMinBid = Math.max(1, Math.floor(Number(minBid) || 1));
-    const removed = removeOwnedCardInstance(currentCards, getOwnedCardInstanceKey(selectedCard));
-    if (!removed.removed) {
-      setStatus("Carte introuvable dans ta collection.");
-      return;
-    }
-    const now = Date.now();
-    const listing = {
-      id: `auction-${playerId}-${now}-${Math.random().toString(16).slice(2)}`,
-      sellerId: playerId,
-      sellerPseudo: playerProfile?.pseudo || currentAccount?.pseudo || "Vendeur",
-      card: { ...selectedCard, marketListedAt: now },
-      minBid: safeMinBid,
-      currentBid: 0,
-      currentBidderId: "",
-      currentBidderPseudo: "",
-      bidHistory: [],
-      createdAt: now,
-      endsAt: now + CARD_AUCTION_DURATION_MS,
-      status: "OPEN",
-    };
-    const nextStock = { ...currentStock, marketListings: [...normalizeCardMarketListings(currentStock.marketListings), listing], stockSyncedAt: now };
-    const ok = await saveAccounts([{ account: currentAccount, cards: removed.kept, stock: nextStock }]);
-    if (ok) {
-      setSelectedCardKey("");
-      setStatus(`${selectedCard.name} est en enchère pendant 24h.`);
-    }
-  };
-
-  const bidOnListing = async (listing, forcedAmount = null) => {
-    if (!playerId) return;
-    if (!marketAccessAllowed) {
-      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
-      return;
-    }
-    if (idsEqual(listing.sellerId, playerId)) {
-      setStatus("Tu ne peux pas enchérir sur ta propre carte.");
-      return;
-    }
-    const bidAmount = Math.floor(Number(forcedAmount ?? bidInputs[listing.id]) || 0);
-    const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
-    if (bidAmount < minimum) {
-      setStatus(`Enchère minimum : ${minimum} AREKCOINS.`);
-      return;
-    }
-    const accountsById = new Map();
-    const seller = getMutableAccount(accountsById, listing.sellerId);
-    const bidder = getMutableAccount(accountsById, playerId);
-    const previousBidder = listing.currentBidderId && !idsEqual(listing.currentBidderId, playerId) ? getMutableAccount(accountsById, listing.currentBidderId) : null;
-    if (!seller || !bidder) {
-      setStatus("Compte joueur introuvable pour cette enchère.");
-      return;
-    }
-    const delta = idsEqual(listing.currentBidderId, playerId) ? bidAmount - listing.currentBid : bidAmount;
-    if ((Number(bidder.stock.arekcoins) || 0) < delta) {
-      setStatus("Tu n'as pas assez d'AREKCOINS pour cette enchère.");
-      return;
-    }
-    bidder.stock = { ...bidder.stock, arekcoins: (Number(bidder.stock.arekcoins) || 0) - delta, stockSyncedAt: Date.now() };
-    if (previousBidder) previousBidder.stock = { ...previousBidder.stock, arekcoins: (Number(previousBidder.stock.arekcoins) || 0) + listing.currentBid, stockSyncedAt: Date.now() };
-    seller.stock = {
-      ...seller.stock,
-      marketListings: normalizeCardMarketListings(seller.stock.marketListings).map((item) => item.id === listing.id ? { ...item, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur", bidHistory: [{ playerId, pseudo: playerProfile?.pseudo || "Acheteur", amount: bidAmount, createdAt: Date.now() }, ...normalizeCardBidHistory(item.bidHistory)] } : item),
-      stockSyncedAt: Date.now(),
-    };
-    const ok = await saveAccounts(Array.from(accountsById.values()));
-    if (ok) {
-      setBidInputs((current) => ({ ...current, [listing.id]: "" }));
-      setSelectedListing((current) => current?.id === listing.id ? { ...listing, currentBid: bidAmount, currentBidderId: playerId, currentBidderPseudo: playerProfile?.pseudo || "Acheteur", bidHistory: [{ playerId, pseudo: playerProfile?.pseudo || "Acheteur", amount: bidAmount, createdAt: Date.now() }, ...normalizeCardBidHistory(listing.bidHistory)] } : current);
-      setStatus(`Enchère posée à ${bidAmount} AREKCOINS.`);
-    }
-  };
-
-  const closeListing = async (listing) => {
-    if (!marketAccessAllowed) {
-      setStatus("Fonctionnalité réservée aux comptes test pour le moment.");
-      return;
-    }
-    if (Date.now() < Number(listing.endsAt)) {
-      setStatus("Cette enchère n'est pas encore terminée.");
-      return;
-    }
-    const accountsById = new Map();
-    const seller = getMutableAccount(accountsById, listing.sellerId);
-    const winner = listing.currentBidderId ? getMutableAccount(accountsById, listing.currentBidderId) : null;
-    if (!seller) {
-      setStatus("Vendeur introuvable.");
-      return;
-    }
-    seller.stock = {
-      ...seller.stock,
-      marketListings: normalizeCardMarketListings(seller.stock.marketListings).filter((item) => item.id !== listing.id),
-      stockSyncedAt: Date.now(),
-    };
-    if (winner) {
-      const soldAt = Date.now();
-      const saleRecord = {
-        id: `sale-${listing.id}-${soldAt}`,
-        cardKey: getCollectionGroupKey(listing.card),
-        card: listing.card,
-        sellerId: listing.sellerId,
-        sellerPseudo: listing.sellerPseudo,
-        buyerId: listing.currentBidderId,
-        buyerPseudo: listing.currentBidderPseudo,
-        price: listing.currentBid,
-        soldAt,
-      };
-      seller.stock = { ...seller.stock, arekcoins: (Number(seller.stock.arekcoins) || 0) + listing.currentBid, marketSales: [saleRecord, ...normalizeCardMarketSales(seller.stock.marketSales)].slice(0, 80) };
-      winner.cards = [{ ...listing.card, ownedId: `auction-win-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...winner.cards];
-    } else {
-      seller.cards = [{ ...listing.card, ownedId: `auction-return-${listing.card.cardId || listing.card.id}-${Date.now()}`, obtainedAtMs: Date.now() }, ...seller.cards];
-    }
-    const ok = await saveAccounts(Array.from(accountsById.values()));
-    if (ok) setStatus(winner ? "Enchère clôturée : carte envoyée au gagnant." : "Enchère clôturée : carte rendue au vendeur.");
-  };
-
-  if (!playerId) {
-    return (
-      <div style={styles.cardLabEmbeddedPage}>
-        <section style={styles.cardCollectionPanel}>
-          <div>
-            <p style={styles.kicker}>URTT TCG · ENCHÈRES</p>
-            <h1 style={styles.cardLabTitle}>Enchères</h1>
-            <p style={styles.muted}>Connecte-toi à ton compte joueur pour détruire des cartes, gagner des AREKCOINS et enchérir.</p>
-          </div>
-          <PlayerAccountBox profile={playerProfile} onLogin={onPlayerLogin} onSignup={onPlayerSignup} onLogout={onPlayerLogout} isSaving={isSavingPlayerAccount} triggerLabel="Se connecter" triggerStyle={styles.cardPlayerPrimary} />
-        </section>
-      </div>
-    );
-  }
-
-  if (!marketAccessAllowed) {
-    return (
-      <div style={styles.cardLabEmbeddedPage}>
-        <section style={styles.cardCollectionPanel}>
-          <div>
-            <p style={styles.kicker}>URTT TCG · ACCÈS RESTREINT</p>
-            <h1 style={styles.cardLabTitle}>Enchères</h1>
-            <p style={styles.muted}>La fonctionnalité est réservée temporairement aux admins et aux comptes joueurs autorisés : Compte Test, Test2 et Kolti.</p>
-          </div>
-        </section>
-      </div>
-    );
-  }
-
-  return (
-    <div style={styles.cardLabEmbeddedPage}>
-      <header style={styles.marketHero}>
-        <div>
-          <p style={styles.kicker}>URTT TCG · MARCHÉ</p>
-          <h1 style={styles.marketTitle}>Enchères</h1>
-          <p style={styles.muted}>Enchérissez sur des cartes ou vendez les vôtres contre des AREKCOINS.</p>
-        </div>
-        <div style={styles.cardCollectionSummary}>
-          <span style={{ ...styles.cardCollectionSummaryBadge, ...styles.arekcoinBalanceBadge }}><ArekcoinAmount amount={balance} /></span>
-        </div>
-      </header>
-      <nav style={styles.marketTabs}>
-        <button type="button" onClick={() => setMarketTab("browse")} style={{ ...styles.marketTabButton, ...(marketTab === "browse" ? styles.marketTabButtonActive : {}) }}>Parcourir</button>
-        <button type="button" onClick={() => setMarketTab("my-sales")} style={{ ...styles.marketTabButton, ...(marketTab === "my-sales" ? styles.marketTabButtonActive : {}) }}>Mes ventes ({mySales.length}/{CARD_AUCTION_MAX_ACTIVE_SALES})</button>
-        <button type="button" onClick={() => setMarketTab("my-bids")} style={{ ...styles.marketTabButton, ...(marketTab === "my-bids" ? styles.marketTabButtonActive : {}) }}>Mes enchères ({myBids.length})</button>
-      </nav>
-      {marketTab === "browse" && (
-        <div style={styles.marketSearchRow}>
-          <input value={marketSearch} onChange={(event) => setMarketSearch(event.target.value)} placeholder="Rechercher une carte..." style={styles.marketSearchInput} />
-          <button type="button" style={styles.marketSearchButton}>Rechercher</button>
-          <select value={marketSort} onChange={(event) => setMarketSort(event.target.value)} style={styles.publicDesignSelect}>
-            <option value="recent">Récemment listées</option>
-            <option value="ending">Fin bientôt</option>
-            <option value="price">Prix actuel</option>
-          </select>
-        </div>
-      )}
-      <section style={styles.marketGrid}>
-        {tabListings.map((listing) => {
-          const price = listing.currentBid || listing.minBid;
-          const ended = nowTick >= Number(listing.endsAt);
-          return (
-            <button type="button" key={listing.id} onClick={() => setSelectedListing(listing)} style={styles.marketListingCard}>
-              <CollectionCard card={listing.card} />
-              <div style={styles.marketListingFooter}>
-                <div style={styles.marketListingStats}>
-                  <div style={styles.marketListingStat}>
-                    <span style={styles.marketListingLabel}>Mise actuelle</span>
-                    <ArekcoinAmount amount={price} style={styles.marketListingValue} />
-                  </div>
-                  <div style={styles.marketListingStat}>
-                    <span style={styles.marketListingLabel}>Temps restant</span>
-                    <strong style={styles.marketListingValue}>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - nowTick)}</strong>
-                  </div>
-                </div>
-                <span style={styles.marketListingSeller}>Vendu par <strong>{listing.sellerPseudo}</strong></span>
-              </div>
-            </button>
-          );
-        })}
-        {!tabListings.length && <Empty text={marketTab === "browse" ? "Aucune carte aux enchères pour cette recherche." : marketTab === "my-sales" ? "Tu n'as aucune vente active." : "Tu n'as misé sur aucune carte active."} />}
-      </section>
-      {selectedListing && (
-        <AuctionListingDetailModal
-          listing={activeListings.find((listing) => listing.id === selectedListing.id) || selectedListing}
-          balance={balance}
-          playerId={playerId}
-          now={nowTick}
-          bidValue={bidInputs[selectedListing.id] || ""}
-          onBidValueChange={(value) => setBidInputs((current) => ({ ...current, [selectedListing.id]: value }))}
-          onClose={() => setSelectedListing(null)}
-          onBid={(listing, amount) => bidOnListing(listing, amount)}
-          onCloseListing={closeListing}
-        />
-      )}
-      {status && <p style={{ ...styles.muted, margin: 0 }}>{status}</p>}
-    </div>
-  );
-}
-
-function AuctionListingDetailModal({ listing, balance = 0, playerId = "", now = Date.now(), bidValue = "", onBidValueChange, onClose, onBid, onCloseListing }) {
-  const history = normalizeCardBidHistory(listing.bidHistory);
-  const minimum = listing.currentBid > 0 ? listing.currentBid + 1 : listing.minBid;
-  const ended = now >= Number(listing.endsAt);
-  const currentValue = bidValue === "" ? minimum : bidValue;
-  return createPortal(
-    <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
-      <div style={{ ...styles.cardDetailModal, ...styles.auctionDetailModal, gridTemplateColumns: "minmax(260px, 380px) minmax(0, 1fr)" }} onMouseDown={(event) => event.stopPropagation()}>
-        <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
-        <div style={styles.cardDetailPreview}><CollectionCard card={listing.card} /></div>
+        <div style={styles.cardDetailPreview}><CollectionCard card={card} /></div>
         <div style={styles.cardDetailContent}>
-          <button type="button" onClick={onClose} style={styles.auctionBackButton}>← Retour aux enchères</button>
           <div>
-            <h2 style={styles.cardDetailTitle}>{listing.card?.name}</h2>
-            <p style={styles.auctionDetailMuted}>Mis en vente par <strong style={{ color: "#34d399" }}>{listing.sellerPseudo}</strong></p>
+            <h2 style={styles.cardDetailTitle}>{card.name}</h2>
+            <div style={styles.cardDetailPills}>
+              <span style={{ ...styles.cardCollectionSummaryBadge, borderColor: getCardRarityColor(card.rarity), color: getCardRarityColor(card.rarity) }}>{card.rarity?.name}</span>
+              <span style={styles.cardCollectionSummaryBadge}>{getCardSeasonLabel(card)}</span>
+              <span style={styles.cardCollectionSummaryBadge}>{card.categoryName || getCardCategoryLabel(card.categoryId)}</span>
+            </div>
           </div>
-          <section style={styles.marketDetailBidPanel}>
-            <div style={styles.marketDetailPriceLine}>
-              <span style={styles.auctionDetailLabel}>Mise actuelle</span>
-              <ArekcoinAmount amount={listing.currentBid || listing.minBid} style={styles.auctionDetailValue} />
-            </div>
-            <p style={styles.auctionDetailMuted}>Meneur : <strong>{listing.currentBidderPseudo || "Aucun"}</strong></p>
-            <div style={styles.marketDetailPriceLine}>
-              <span style={styles.auctionDetailLabel}>Temps restant</span>
-              <strong style={styles.auctionDetailValue}>{ended ? "Terminée" : formatAuctionTimeLeft(Number(listing.endsAt) - now)}</strong>
-            </div>
-          </section>
-          {!idsEqual(listing.sellerId, playerId) && !ended && (
-            <section style={styles.marketDetailBidPanel}>
-              <div style={styles.marketDetailPriceLine}>
-                <span style={styles.auctionDetailMuted}>Votre solde : <ArekcoinAmount amount={balance} style={styles.auctionDetailValue} /></span>
-                <span style={styles.auctionDetailMuted}>Mise minimum : <strong>{minimum}</strong></span>
-              </div>
-              <div style={styles.marketBidRow}>
-                <div style={styles.auctionBidStepper}>
-                  <button type="button" onClick={() => onBidValueChange(Math.max(minimum, Number(currentValue) - 1))} style={styles.auctionBidStepperButton}>−</button>
-                  <input type="number" min={minimum} value={currentValue} onChange={(event) => onBidValueChange(event.target.value)} style={styles.auctionBidStepperInput} />
-                  <button type="button" onClick={() => onBidValueChange(Math.max(minimum, Number(currentValue) + 1))} style={styles.auctionBidStepperButton}>+</button>
-                </div>
-                <button type="button" onClick={() => onBid(listing, currentValue)} style={styles.cardDetailAuctionButton}>Miser</button>
-              </div>
-              <p style={styles.auctionDetailHelp}>La mise est débitée immédiatement. Si vous êtes surenchéri, elle vous est remboursée.</p>
-            </section>
-          )}
-          {idsEqual(listing.sellerId, playerId) && ended && <button type="button" onClick={() => onCloseListing(listing)} style={styles.cardDetailAuctionButton}>Clôturer l'enchère</button>}
-          <section style={styles.marketHistoryPanel}>
-            <p style={styles.auctionHistoryTitle}>Historique des mises ({history.length})</p>
-            {history.map((bid, index) => (
-              <div key={`${bid.playerId}-${bid.createdAt}-${index}`} style={styles.marketHistoryRow}>
-                <strong>{bid.pseudo}</strong>
-                <span style={styles.marketHistoryAmount}>{new Date(bid.createdAt).toLocaleString("fr-FR")} · <ArekcoinAmount amount={bid.amount} /></span>
-              </div>
-            ))}
-            {!history.length && <p style={styles.auctionDetailMuted}>Aucune mise pour le moment.</p>}
-          </section>
+          <p style={styles.muted}>{card.teamName}</p>
+          <div style={{ ...styles.marketStatsGrid, gridTemplateColumns: "repeat(2, minmax(0, 1fr))" }}>
+            <div style={styles.marketStatBox}><strong>{ownedCount}</strong><span>Exemplaire{ownedCount > 1 ? "s" : ""}</span></div>
+            <div style={styles.marketStatBox}><strong>{balance}</strong><span>AREKCOINS</span></div>
+          </div>
+          <div style={{ ...styles.cardDetailActions, gridTemplateColumns: "1fr" }}>
+            <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>{canBurn ? "Détruire +" + getCardBurnValue(card) : marketAccessAllowed ? "Détruire · doublon requis" : "Détruire · accès restreint"}</button>
+          </div>
+          {!marketAccessAllowed && <p style={styles.mutedSmall}>Fonctionnalité réservée aux admins et aux comptes test autorisés.</p>}
+          {status && <p style={styles.mutedSmall}>{status}</p>}
         </div>
       </div>
     </div>,
@@ -6737,6 +6210,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
         <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
         <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: rarityColor, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${rarityGlowColor}55`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.24), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.26), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
           <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+          {card.isNewCard && <span style={styles.cardLabNewsBadge}>NEWS</span>}
           <div style={styles.cardLabCardTop}>
             <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
@@ -10500,27 +9974,6 @@ const styles = {
   arekcoinAmount: { display: "inline-flex", alignItems: "center", gap: 6, whiteSpace: "nowrap", verticalAlign: "middle" },
   arekcoinIcon: { width: 18, height: 18, objectFit: "contain", borderRadius: "50%", filter: "drop-shadow(0 0 7px rgba(248,199,47,.45))" },
   arekcoinBalanceBadge: { borderColor: "#f8c72f", color: "#f8c72f", background: "rgba(248,199,47,.08)" },
-  marketCardAction: { display: "grid", gap: 10, minWidth: 0 },
-  marketListingMeta: { display: "grid", gap: 5, background: "rgba(2,6,23,.46)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 14, padding: 12, color: "#cbd5e1", fontSize: 13 },
-  marketBidRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 8, alignItems: "center" },
-  marketHero: { display: "flex", justifyContent: "space-between", alignItems: "start", gap: 18, flexWrap: "wrap" },
-  marketTitle: { margin: "6px 0", fontSize: "clamp(34px, 5vw, 56px)", lineHeight: .95, letterSpacing: "-.055em" },
-  marketTabs: { display: "flex", gap: 18, alignItems: "center", flexWrap: "wrap", borderBottom: "1px solid rgba(255,255,255,.13)" },
-  marketTabButton: { border: 0, borderBottom: "2px solid transparent", background: "transparent", color: "#94a3b8", padding: "0 0 16px", fontSize: 16, fontWeight: 900, cursor: "pointer" },
-  marketTabButtonActive: { color: "#34d399", borderBottomColor: "#34d399" },
-  marketSearchRow: { display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto minmax(190px, 280px)", gap: 10, alignItems: "center" },
-  marketSearchInput: { minHeight: 56, border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, background: "rgba(255,255,255,.035)", color: "#f8fafc", padding: "0 16px", fontSize: 16, outline: "none" },
-  marketSearchButton: { minHeight: 56, border: 0, borderRadius: 12, background: "rgba(52,211,153,.55)", color: "#03130d", padding: "0 18px", fontWeight: 950, cursor: "pointer" },
-  marketGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, 240px)", justifyContent: "start", gap: 18 },
-  marketListingCard: { width: 240, display: "grid", gap: 10, minWidth: 0, padding: 0, border: 0, background: "transparent", color: "inherit", textAlign: "left", cursor: "pointer" },
-  marketListingFooter: { display: "grid", gap: 10, background: "rgba(15,23,42,.82)", border: "1px solid rgba(148,163,184,.16)", borderRadius: 14, padding: 12, boxShadow: "0 14px 30px rgba(0,0,0,.22)" },
-  marketListingStats: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 },
-  marketListingStat: { minWidth: 0, display: "grid", gap: 4, alignContent: "start" },
-  marketListingLabel: { color: "#94a3b8", fontSize: 10, fontWeight: 900, lineHeight: 1.15 },
-  marketListingValue: { color: "#f8fafc", fontSize: 13, fontWeight: 950, lineHeight: 1.18, overflowWrap: "anywhere" },
-  marketListingSeller: { minHeight: 22, display: "flex", alignItems: "center", gap: 4, borderTop: "1px solid rgba(148,163,184,.14)", paddingTop: 9, color: "#94a3b8", fontSize: 11, fontWeight: 750 },
-  marketDetailBidPanel: { display: "grid", gap: 12, background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.22)", borderRadius: 18, padding: 18 },
-  marketDetailPriceLine: { display: "flex", justifyContent: "space-between", gap: 14, alignItems: "center", flexWrap: "wrap" },
   cardDetailOverlay: { position: "fixed", inset: 0, zIndex: 7600, background: "rgba(0,0,0,.76)", display: "grid", placeItems: "center", padding: 22, backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)" },
   cardDetailModal: { width: "min(980px, 100%)", maxHeight: "92vh", overflow: "auto", position: "relative", display: "grid", gridTemplateColumns: "minmax(230px, 360px) minmax(0, 1fr)", gap: 30, background: "linear-gradient(145deg, rgba(14,20,28,.98), rgba(10,16,23,.98))", border: "1px solid rgba(148,163,184,.22)", borderRadius: 22, padding: 28, boxShadow: "0 35px 110px rgba(0,0,0,.62)" },
   cardDetailCloseButton: { position: "absolute", right: 20, top: 18, width: 34, height: 34, border: 0, borderRadius: 999, background: "rgba(255,255,255,.05)", color: "#cbd5e1", fontSize: 28, lineHeight: 1, cursor: "pointer" },
@@ -10530,27 +9983,9 @@ const styles = {
   cardDetailPills: { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 10 },
   marketStatsGrid: { display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 12 },
   marketStatBox: { minHeight: 82, display: "grid", placeItems: "center", gap: 3, background: "rgba(255,255,255,.035)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, textAlign: "center", color: "#94a3b8" },
-  auctionDetailModal: { fontFamily: "Inter, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif", color: "#f8fafc", background: "linear-gradient(145deg, rgba(15,23,42,.98), rgba(9,14,25,.98))" },
-  auctionBackButton: { justifySelf: "start", border: "1px solid rgba(52,211,153,.28)", borderRadius: 999, background: "rgba(52,211,153,.08)", color: "#7dd3fc", fontSize: 14, fontWeight: 850, cursor: "pointer", padding: "8px 12px" },
-  auctionDetailMuted: { margin: 0, color: "#cbd5e1", fontSize: 15, lineHeight: 1.45 },
-  auctionDetailHelp: { margin: 0, color: "#94a3b8", fontSize: 13, lineHeight: 1.5 },
-  auctionDetailLabel: { color: "#94a3b8", fontSize: 13, fontWeight: 900, textTransform: "uppercase", letterSpacing: ".08em" },
-  auctionDetailValue: { color: "#f8fafc", fontSize: 16, fontWeight: 950 },
-  auctionHistoryTitle: { color: "#f8fafc", letterSpacing: ".12em", textTransform: "uppercase", fontSize: 12, fontWeight: 950, margin: 0 },
-  marketHistoryPanel: { display: "grid", gap: 8, borderTop: "1px solid rgba(148,163,184,.18)", borderBottom: "1px solid rgba(148,163,184,.18)", padding: "14px 0" },
-  marketHistoryRow: { display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", color: "#e2e8f0", background: "rgba(15,23,42,.72)", border: "1px solid rgba(148,163,184,.2)", borderRadius: 12, padding: "10px 12px", fontSize: 14 },
-  marketHistoryAmount: { display: "inline-flex", alignItems: "center", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" },
   cardDetailActions: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, alignItems: "center" },
-  cardDetailAuctionButton: { minHeight: 54, border: 0, borderRadius: 12, background: "#34d399", color: "#03130d", fontWeight: 950, cursor: "pointer", boxShadow: "0 18px 38px rgba(52,211,153,.2)" },
   cardDetailDestroyButton: { minHeight: 54, border: "1px solid rgba(255,255,255,.14)", borderRadius: 12, background: "rgba(239,68,68,.12)", color: "#fecaca", fontWeight: 950, cursor: "pointer" },
   cardDetailDisabledButton: { opacity: .52, cursor: "not-allowed", background: "rgba(255,255,255,.04)", color: "#94a3b8" },
-  auctionCreatePanel: { gridColumn: "1 / -1", display: "grid", gap: 22 },
-  cardDetailHeaderLine: { display: "flex", justifyContent: "space-between", gap: 16, alignItems: "start", paddingRight: 42 },
-  auctionCreateCardRow: { display: "grid", gridTemplateColumns: "160px minmax(0, 1fr)", gap: 20, alignItems: "center", background: "rgba(255,255,255,.03)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 18, padding: 16 },
-  auctionCreateMiniCard: { transform: "scale(.72)", transformOrigin: "left center", width: 220, marginRight: -60, pointerEvents: "none" },
-  auctionBidStepper: { display: "grid", gridTemplateColumns: "48px minmax(0, 1fr) 48px", minHeight: 56, border: "1px solid rgba(148,163,184,.24)", borderRadius: 12, overflow: "hidden", background: "rgba(2,6,23,.55)" },
-  auctionBidStepperButton: { border: 0, background: "rgba(148,163,184,.12)", color: "#f8fafc", fontSize: 24, fontWeight: 800, cursor: "pointer" },
-  auctionBidStepperInput: { border: 0, background: "transparent", color: "#f8fafc", textAlign: "center", fontSize: 22, fontWeight: 950, outline: "none" },
   collectionCardClickable: { cursor: "pointer", transition: "transform .18s ease, border-color .18s ease" },
   collectionCard: { width: 240, height: 320, boxSizing: "border-box", position: "relative", isolation: "isolate", background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "1px solid #475569", borderRadius: 20, padding: 16, display: "grid", gap: 12, alignContent: "start", overflow: "hidden" },
   collectionCardAccent: { position: "absolute", top: 0, left: 0, width: 5, height: "100%", opacity: .88, zIndex: 0 },
@@ -10572,6 +10007,7 @@ const styles = {
   cardLabCardBack: { position: "absolute", inset: 0, backfaceVisibility: "hidden", minHeight: 310, backgroundImage: "url('/card-back-urtt.png')", backgroundSize: "cover", backgroundPosition: "center", border: "2px solid #455574", borderRadius: 18, padding: 16, display: "grid", placeItems: "center", alignContent: "center", gap: 10, overflow: "hidden", boxShadow: "0 20px 55px rgba(0,0,0,.34)" },
   cardLabCard: { position: "absolute", inset: 0, backfaceVisibility: "hidden", transform: "rotateY(180deg)", minHeight: 310, background: "linear-gradient(160deg, rgba(15,23,42,.98), rgba(24,31,51,.96))", border: "2px solid #475569", borderRadius: 18, padding: 16, display: "grid", gap: 10, alignContent: "start", overflow: "hidden", isolation: "isolate" },
   cardLabFinalCard: { background: "radial-gradient(circle at 50% 0%, rgba(255,255,255,.16), transparent 34%), linear-gradient(160deg, rgba(21,26,43,.99), rgba(49,31,58,.98))" },
+  cardLabNewsBadge: { position: "absolute", top: 12, left: 12, zIndex: 3, border: "1px solid rgba(255,255,255,.62)", borderRadius: 999, background: "linear-gradient(135deg, #fb7185, #e11d48)", color: "#fff", padding: "5px 9px", fontSize: 10, fontWeight: 1000, letterSpacing: ".12em", boxShadow: "0 5px 18px rgba(225,29,72,.42)" },
   cardLabCardTop: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, fontSize: 12 },
   cardLabPortrait: { position: "relative", zIndex: 1, height: 112, borderRadius: 16, display: "grid", placeItems: "center", background: "radial-gradient(circle at center, rgba(255,255,255,.16), rgba(148,163,184,.08))", border: "1px solid rgba(255,255,255,.12)", fontSize: 34, fontWeight: 950, overflow: "hidden" },
   cardLabLogo: { width: 82, height: 82, objectFit: "contain" },
@@ -10788,4 +10224,3 @@ const styles = {
   logoPreviewBox: { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 18, padding: 14 },
   errorBox: { background: "rgba(127,29,29,.35)", border: "1px solid #7f1d1d", borderRadius: 18, padding: 14, marginTop: 16 },
 };
-
