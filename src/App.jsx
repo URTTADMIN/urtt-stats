@@ -6210,7 +6210,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
         <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
         <div style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: rarityColor, boxShadow: `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${rarityGlowColor}55`, background: `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.24), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.26), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
           <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
-          {card.isNewCard && <span style={styles.cardLabNewsBadge}>NEWS</span>}
+          {card.isNewCard && <span style={styles.cardLabNewsBadge}>NEW</span>}
           <div style={styles.cardLabCardTop}>
             <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
