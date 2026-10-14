@@ -4307,6 +4307,64 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function deletePlayerAccount(playerId) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: "Seul " + ADMIN_PERMISSIONS_OWNER_EMAIL + " peut supprimer un compte utilisateur." });
+      return false;
+    }
+    const target = playerAccounts.find((account) => idsEqual(account.id, playerId));
+    if (!target) {
+      setPopup({ type: "error", title: "Compte introuvable", message: "Ce compte utilisateur n’existe plus." });
+      return false;
+    }
+
+    const { data, error } = await supabase
+      .from("player_accounts")
+      .delete()
+      .eq("id", target.id)
+      .select("id")
+      .maybeSingle();
+
+    if (error) {
+      console.error("Erreur suppression compte joueur:", error);
+      const policyError = error.code === "42501" || error.message?.toLowerCase().includes("row-level security");
+      setPopup({
+        type: "error",
+        title: "Erreur Supabase",
+        message: policyError
+          ? "Supabase bloque cette suppression. Applique le script supabase-player-account-delete-policy.sql dans Supabase."
+          : error.code === "42P01"
+            ? "La table player_accounts n’existe pas encore."
+            : "Impossible de supprimer ce compte utilisateur.",
+      });
+      return false;
+    }
+    if (!data) {
+      setPopup({ type: "error", title: "Suppression non effectuée", message: "Supabase n’a supprimé aucun compte. Vérifie la règle de suppression du propriétaire." });
+      return false;
+    }
+
+    setPlayerAccounts((current) => current.filter((account) => !idsEqual(account.id, target.id)));
+    setRacePredictions((current) => current.map((prediction) => idsEqual(prediction.playerId, target.id) ? { ...prediction, playerId: "" } : prediction));
+    setGuessDriverResults((current) => current.filter((result) => !idsEqual(result.playerId, target.id)));
+    setGuessDriverAttempts((current) => current.filter((attempt) => !idsEqual(attempt.playerId, target.id)));
+    setFeedbackRequests((current) => current.map((request) => idsEqual(request.playerId, target.id) ? { ...request, playerId: "" } : request));
+
+    if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) {
+      window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
+      window.localStorage.removeItem(getEasterEggStorageKey(target.id));
+      window.localStorage.removeItem(EASTER_EGG_STORAGE_KEY);
+      window.localStorage.removeItem(CARD_COLLECTION_STORAGE_KEY);
+      window.localStorage.removeItem(CARD_PACK_STOCK_STORAGE_KEY);
+      const guessAttemptsPrefix = GUESS_DRIVER_ATTEMPTS_STORAGE_KEY + ":" + target.id + ":";
+      Object.keys(window.localStorage).filter((key) => key.startsWith(guessAttemptsPrefix)).forEach((key) => window.localStorage.removeItem(key));
+      setPlayerProfile(null);
+    }
+
+    setPopup({ type: "success", title: "Compte supprimé", message: "Le compte " + (target.pseudo || target.id) + " a été supprimé. Ses pronostics et demandes restent anonymisés." });
+    return true;
+  }
+
   async function saveRacePrediction(prediction) {
     if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
     if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
@@ -4628,7 +4686,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onDeleteAccount={deletePlayerAccount} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -8166,12 +8224,13 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards, onResetPlayerCards }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards, onResetPlayerCards, onDeleteAccount }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
   const [isCleaningDemoCards, setIsCleaningDemoCards] = useState(false);
   const [isResettingCards, setIsResettingCards] = useState(false);
+  const [deletingAccountId, setDeletingAccountId] = useState("");
   const [selectedCardAccountId, setSelectedCardAccountId] = useState("");
   const [playerCardSearch, setPlayerCardSearch] = useState("");
   const [playerCardRarityFilter, setPlayerCardRarityFilter] = useState("ALL");
@@ -8251,6 +8310,17 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     setIsResettingCards(true);
     await onResetPlayerCards({ playerId: targetId });
     setIsResettingCards(false);
+  };
+  const deleteAccount = async (account) => {
+    if (!onDeleteAccount || !account?.id || deletingAccountId) return;
+    const confirmed = window.confirm("Supprimer définitivement le compte " + (account.pseudo || account.id) + " ? Sa collection TCG, ses packs et son historique « Devine le pilote » seront supprimés. Ses pronostics et demandes seront conservés sans lien vers le compte.");
+    if (!confirmed) return;
+    setDeletingAccountId(String(account.id));
+    try {
+      await onDeleteAccount(account.id);
+    } finally {
+      setDeletingAccountId("");
+    }
   };
 
   return (
@@ -8386,6 +8456,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                     <div style={styles.actions}>
                       <button type="button" onClick={() => grantPacks(account.id)} disabled={isGrantingPacks || !onGrantPacks} style={styles.secondaryButton}>+{safePackGiftAmount}</button>
                       <button type="button" onClick={() => resetCards(account.id)} disabled={isResettingCards || !account.cardCollection.length || !onResetPlayerCards} style={styles.dangerButton}>Reset cartes</button>
+                      <button type="button" onClick={() => deleteAccount(account)} disabled={Boolean(deletingAccountId) || !onDeleteAccount} style={styles.dangerButton}>{deletingAccountId === String(account.id) ? "Suppression..." : "Supprimer le compte"}</button>
                     </div>
                   </td>
                 </tr>
