@@ -35,7 +35,7 @@ const CARD_PACK_LEGENDARY_PRICE = 100000;
 const CARD_PACK_LEGENDARY_SL_CHANCE = 0.02;
 const CARD_PACK_SHOP_OPTIONS = [
   { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true, packType: "standard" },
-  { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties · 2 % de chance de SL par carte.", image: "/card-pack-legendary.svg", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
+  { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties · 2 % de chance de SL par carte.", image: "/card-pack-urtt.png", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
 ];
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
@@ -6160,7 +6160,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       {cardsView === "opening" && (
         <section style={styles.cardPackOnlySection}>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} className={legendaryPackAvailable ? "legendary-pack-ready" : undefined} style={{ ...styles.cardPlayerPackButton, ...(legendaryPackAvailable ? styles.cardPlayerPackButtonLegendary : {}), ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label={legendaryPackAvailable ? "Ouvrir le pack légendaire URTT TCG" : "Ouvrir un pack URTT TCG"}>
-            <img src={legendaryPackAvailable ? "/card-pack-legendary.svg" : "/card-pack-urtt.png"} alt={legendaryPackAvailable ? "Pack légendaire URTT TCG" : "Pack URTT TCG"} style={styles.cardPlayerPackImage} />
+            <img src={legendaryPackAvailable ? "/card-pack-urtt.png" : "/card-pack-urtt.png"} alt={legendaryPackAvailable ? "Pack légendaire URTT TCG" : "Pack URTT TCG"} style={styles.cardPlayerPackImage} />
           </button>
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
@@ -6550,7 +6550,7 @@ function LegendaryPackIntroModal({ onSkip }) {
     <div style={{ ...styles.cardPackModalOverlay, ...styles.legendaryPackIntroOverlay }} role="status" aria-live="polite">
       <div className="legendary-pack-intro" style={styles.legendaryPackIntroCard}>
         <div className="legendary-pack-orbit" aria-hidden="true" />
-        <img className="legendary-pack-intro-image" src="/card-pack-legendary.svg" alt="Pack légendaire URTT TCG en cours d’ouverture" style={styles.legendaryPackIntroImage} />
+        <img className="legendary-pack-intro-image" src="/card-pack-urtt.png" alt="Pack légendaire URTT TCG en cours d’ouverture" style={styles.legendaryPackIntroImage} />
         <p style={styles.legendaryPackKicker}>ÉDITION LÉGENDAIRE</p>
         <h2 style={styles.legendaryPackIntroTitle}>Les 5 légendaires t’attendent</h2>
         <p style={styles.legendaryPackIntroText}>Le sceau doré se brise…</p>
