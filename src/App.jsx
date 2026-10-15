@@ -31,8 +31,10 @@ const CARD_COLLECTION_SPECIAL_CATEGORY_ID = "SPECIAL";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
 const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_PURCHASE_PRICE = 250;
+const CARD_PACK_LEGENDARY_PRICE = 100000;
 const CARD_PACK_SHOP_OPTIONS = [
-  { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true },
+  { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true, packType: "standard" },
+  { id: "legendary", name: "Pack Légendaire", description: "5 cartes légendaires garanties.", image: "/card-pack-legendary.svg", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
 ];
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
@@ -224,6 +226,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     stockSyncedAt: 0,
     arekcoins: 0,
     purchasedPacks: 0,
+    purchasedLegendaryPacks: 0,
     marketListings: [],
     marketSales: [],
   };
@@ -294,6 +297,7 @@ function getCardWalletFields(source = {}) {
   return {
     arekcoins: Math.max(0, Math.floor(Number(source?.arekcoins) || 0)),
     purchasedPacks: Math.max(0, Math.floor(Number(source?.purchasedPacks) || 0)),
+    purchasedLegendaryPacks: Math.max(0, Math.floor(Number(source?.purchasedLegendaryPacks) || 0)),
     marketListings: normalizeCardMarketListings(source?.marketListings),
     marketSales: normalizeCardMarketSales(source?.marketSales),
   };
@@ -338,7 +342,7 @@ function normalizeCardPackStock(source, now = Date.now()) {
 }
 
 function getAvailableCardPackCount(stock = {}) {
-  return Math.max(0, Math.floor(Number(stock?.packs) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedPacks) || 0));
+  return Math.max(0, Math.floor(Number(stock?.packs) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedPacks) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedLegendaryPacks) || 0));
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -5683,6 +5687,18 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
+function drawLegendaryCardPack(cards, count = 5) {
+  if (cards.length < count) return [];
+  const available = [...cards];
+  const selected = [];
+  while (selected.length < count && available.length) {
+    const index = Math.floor(Math.random() * available.length);
+    const [card] = available.splice(index, 1);
+    selected.push({ ...card, id: `${card.cardId || card.id}-${Date.now()}-${selected.length}-${Math.random()}` });
+  }
+  return selected.sort((a, b) => (CARD_RARITY_ORDER[a.rarity?.id] ?? 0) - (CARD_RARITY_ORDER[b.rarity?.id] ?? 0) || a.position - b.position);
+}
+
 function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, marketAccessAllowed = false, embedded = false, specialCards = [] }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
@@ -5708,6 +5724,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const specialCardLibrary = useMemo(() => buildSpecialCardCollection(rarities, specialCards), [rarities, specialCards]);
   const cardLibrary = useMemo(() => [...normalCardLibrary, ...specialCardLibrary], [normalCardLibrary, specialCardLibrary]);
   const packCardLibrary = useMemo(() => normalCardLibrary.length >= 5 ? [...normalCardLibrary, ...specialCardLibrary] : [], [normalCardLibrary, specialCardLibrary]);
+  const legendaryCardPool = useMemo(() => Array.from(new Map(packCardLibrary.filter((card) => card.rarity?.id === "L").map((card) => [card.cardId || card.id, card])).values()), [packCardLibrary]);
   const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
   const ownedCardKeys = useMemo(() => new Set(ownedCards.map((card) => getCollectionGroupKey(card))), [ownedCards]);
   const sortedOwnedCards = useMemo(() => [...ownedCards]
@@ -5903,7 +5920,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     return () => window.clearInterval(interval);
   }, [ownedCards, playerCardAccountId]);
   const availablePackCount = getAvailableCardPackCount(packStock);
-  const canOpenPack = packCardLibrary.length >= 5 && availablePackCount > 0;
+  const canOpenPack = availablePackCount > 0 && (packCardLibrary.length >= 5 || legendaryCardPool.length >= 5);
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${availablePackCount} pack${availablePackCount > 1 ? "s" : ""} disponible${availablePackCount > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
@@ -5914,16 +5931,19 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const openPack = () => {
     if (isPurchasingPackRef.current) return;
     const refreshedStock = normalizeCardPackStock(packStock);
-    if (packCardLibrary.length < 5 || getAvailableCardPackCount(refreshedStock) <= 0) {
+    const canOpenLegendary = refreshedStock.purchasedLegendaryPacks > 0 && legendaryCardPool.length >= 5;
+    const usesLegendaryPack = canOpenLegendary;
+    if ((!usesLegendaryPack && packCardLibrary.length < 5) || getAvailableCardPackCount(refreshedStock) <= 0) {
       setPackStock(refreshedStock);
       savePlayerCards(ownedCards, refreshedStock);
       return;
     }
-    const usesFreePack = refreshedStock.packs > 0;
+    const usesFreePack = !usesLegendaryPack && refreshedStock.packs > 0;
     const nextStock = {
       ...refreshedStock,
       packs: usesFreePack ? refreshedStock.packs - 1 : refreshedStock.packs,
-      purchasedPacks: usesFreePack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
+      purchasedPacks: usesLegendaryPack || usesFreePack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
+      purchasedLegendaryPacks: usesLegendaryPack ? Math.max(0, refreshedStock.purchasedLegendaryPacks - 1) : refreshedStock.purchasedLegendaryPacks,
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
@@ -5932,7 +5952,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     };
     setPackStock(nextStock);
     const ownedGroupKeys = new Set(ownedCards.map((card) => getCollectionGroupKey(card)));
-    const nextPack = drawCardPack(packCardLibrary, rarities).map((card) => {
+    const nextPack = (usesLegendaryPack ? drawLegendaryCardPack(legendaryCardPool) : drawCardPack(packCardLibrary, rarities)).map((card) => {
       const groupKey = getCollectionGroupKey(card);
       const isNewCard = !ownedGroupKeys.has(groupKey);
       ownedGroupKeys.add(groupKey);
@@ -5982,10 +6002,15 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       setPackPurchaseStatus(`Il te manque ${packOption.price - balance} AREKCOINS.`);
       return;
     }
+    if (packOption.packType === "legendary" && legendaryCardPool.length < 5) {
+      setPackPurchaseStatus("Le pack légendaire est indisponible : il faut au moins cinq cartes L dans la collection.");
+      return;
+    }
     const nextStock = {
       ...currentStock,
       arekcoins: balance - packOption.price,
-      purchasedPacks: currentStock.purchasedPacks + 1,
+      purchasedPacks: currentStock.purchasedPacks + (packOption.packType === "legendary" ? 0 : 1),
+      purchasedLegendaryPacks: currentStock.purchasedLegendaryPacks + (packOption.packType === "legendary" ? 1 : 0),
       stockSyncedAt: Date.now(),
     };
     isPurchasingPackRef.current = true;
@@ -6275,7 +6300,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
-      {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}
+      {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS.map((option) => option.packType === "legendary" ? { ...option, available: legendaryCardPool.length >= 5 } : option)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}
       {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
     </div>
   );
