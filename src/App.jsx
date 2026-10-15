@@ -30,11 +30,12 @@ const CARD_COLLECTION_EVENT_IDS = ["LEMANS24", "INDY300"];
 const CARD_COLLECTION_SPECIAL_CATEGORY_ID = "SPECIAL";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
 const CARD_PACK_MAX_STOCK = 10;
+const CARD_PACK_PURCHASE_PRICE = 250;
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
 const LEGACY_MARKET_DEFAULT_DURATION_MS = 24 * 60 * 60 * 1000;
-const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 60, UR: 150, L: 350, SL: 1200 };
+const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 75, UR: 260, L: 1000 };
 const TCG_MARKET_ALLOWED_PSEUDOS = ["Compte Test", "Test2", "Kolti"];
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
@@ -219,6 +220,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     resetVersion: CARD_PACK_RESET_VERSION,
     stockSyncedAt: 0,
     arekcoins: 0,
+    purchasedPacks: 0,
     marketListings: [],
     marketSales: [],
   };
@@ -288,6 +290,7 @@ function normalizeCardMarketSales(value) {
 function getCardWalletFields(source = {}) {
   return {
     arekcoins: Math.max(0, Math.floor(Number(source?.arekcoins) || 0)),
+    purchasedPacks: Math.max(0, Math.floor(Number(source?.purchasedPacks) || 0)),
     marketListings: normalizeCardMarketListings(source?.marketListings),
     marketSales: normalizeCardMarketSales(source?.marketSales),
   };
@@ -329,6 +332,10 @@ function normalizeCardPackStock(source, now = Date.now()) {
     packs = Math.min(CARD_PACK_MAX_STOCK, packs + gained);
   }
   return { packs, updatedAt: dayStart + generatedToday * CARD_PACK_REGEN_MS, generatedToday, dayKey, resetVersion: CARD_PACK_RESET_VERSION, cardCollectionResetAt, stockSyncedAt, ...walletFields };
+}
+
+function getAvailableCardPackCount(stock = {}) {
+  return Math.max(0, Math.floor(Number(stock?.packs) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedPacks) || 0));
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -5794,6 +5801,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
+  const [isPurchasingPack, setIsPurchasingPack] = useState(false);
+  const [packPurchaseStatus, setPackPurchaseStatus] = useState("");
+  const isPurchasingPackRef = useRef(false);
   const [selectedCollectionCard, setSelectedCollectionCard] = useState(null);
   const cardRevealSoundRef = useRef(null);
   const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
@@ -5807,7 +5817,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
     writeStoredCardCollection(normalizedCards);
     writeStoredCardPackStock(normalizedStock);
-    if (!playerCardAccountId) return;
+    if (!playerCardAccountId) return { ok: true };
     const { data: currentAccount, error: currentAccountError } = await supabase
       .from("player_accounts")
       .select("card_pack_stock")
@@ -5824,14 +5834,21 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }
     if (onSavePlayerTcgState) {
       const response = await onSavePlayerTcgState(playerCardAccountId, normalizedCards, normalizedStock);
-      if (!response?.ok) console.error("Erreur sauvegarde cartes joueur:", response?.message || response);
-      return;
+      if (!response?.ok) {
+        console.error("Erreur sauvegarde cartes joueur:", response?.message || response);
+        return response || { ok: false, message: "Impossible de sauvegarder les données TCG." };
+      }
+      return response;
     }
     const { error } = await supabase
       .from("player_accounts")
       .update({ card_collection: normalizedCards, card_pack_stock: normalizedStock, last_seen_at: new Date().toISOString() })
       .eq("id", playerCardAccountId);
-    if (error && !["42703", "PGRST204"].includes(error.code)) console.error("Erreur sauvegarde cartes joueur:", error);
+    if (error) {
+      console.error("Erreur sauvegarde cartes joueur:", error);
+      return { ok: false, message: "Impossible de sauvegarder les données TCG." };
+    }
+    return { ok: true };
   };
   useEffect(() => {
     setCardsView(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
@@ -5870,24 +5887,28 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const interval = window.setInterval(refreshPackStock, 1000);
     return () => window.clearInterval(interval);
   }, [ownedCards, playerCardAccountId]);
-  const canOpenPack = packCardLibrary.length >= 5 && packStock.packs > 0;
+  const availablePackCount = getAvailableCardPackCount(packStock);
+  const canOpenPack = packCardLibrary.length >= 5 && availablePackCount > 0;
   const nextPackInMs = getNextCardPackInMs(packStock);
-  const packStockText = `${packStock.packs}/${CARD_PACK_MAX_STOCK} pack${packStock.packs > 1 ? "s" : ""} disponible${packStock.packs > 1 ? "s" : ""}`;
+  const packStockText = `${availablePackCount} pack${availablePackCount > 1 ? "s" : ""} disponible${availablePackCount > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
     ? "Stock maximum"
     : Number(packStock.generatedToday) >= CARD_PACK_MAX_STOCK
       ? `Limite du jour atteinte · prochain pack dans ${formatCardPackWait(nextPackInMs)}`
       : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
   const openPack = () => {
+    if (isPurchasingPackRef.current) return;
     const refreshedStock = normalizeCardPackStock(packStock);
-    if (packCardLibrary.length < 5 || refreshedStock.packs <= 0) {
+    if (packCardLibrary.length < 5 || getAvailableCardPackCount(refreshedStock) <= 0) {
       setPackStock(refreshedStock);
       savePlayerCards(ownedCards, refreshedStock);
       return;
     }
+    const usesFreePack = refreshedStock.packs > 0;
     const nextStock = {
       ...refreshedStock,
-      packs: Math.max(0, refreshedStock.packs - 1),
+      packs: usesFreePack ? refreshedStock.packs - 1 : refreshedStock.packs,
+      purchasedPacks: usesFreePack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
@@ -5933,6 +5954,49 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (isOpeningPack) return;
     setShowPackModal(false);
   };
+  const purchaseCardPack = async () => {
+    if (isPurchasingPackRef.current || isOpeningPack) return;
+    if (!marketAccessAllowed) {
+      setPackPurchaseStatus("Achat réservé aux comptes autorisés.");
+      return;
+    }
+    const currentStock = normalizeCardPackStock(packStock);
+    const balance = Number(currentStock.arekcoins) || 0;
+    if (balance < CARD_PACK_PURCHASE_PRICE) {
+      setPackPurchaseStatus(`Il te manque ${CARD_PACK_PURCHASE_PRICE - balance} AREKCOINS.`);
+      return;
+    }
+    const nextStock = {
+      ...currentStock,
+      arekcoins: balance - CARD_PACK_PURCHASE_PRICE,
+      purchasedPacks: currentStock.purchasedPacks + 1,
+      stockSyncedAt: Date.now(),
+    };
+    isPurchasingPackRef.current = true;
+    setIsPurchasingPack(true);
+    setPackPurchaseStatus("");
+    try {
+      const result = await savePlayerCards(ownedCards, nextStock);
+      if (result?.ok === false) {
+        writeStoredCardCollection(ownedCards);
+        writeStoredCardPackStock(currentStock);
+        setPackStock(currentStock);
+        setPackPurchaseStatus(result.message || "Impossible de sauvegarder l’achat du pack.");
+        return;
+      }
+      setPackStock(nextStock);
+      setPackPurchaseStatus(`Pack acheté pour ${CARD_PACK_PURCHASE_PRICE} AREKCOINS.`);
+    } catch (error) {
+      writeStoredCardCollection(ownedCards);
+      writeStoredCardPackStock(currentStock);
+      setPackStock(currentStock);
+      setPackPurchaseStatus("Impossible de sauvegarder l’achat du pack.");
+      console.error("Erreur achat pack:", error);
+    } finally {
+      isPurchasingPackRef.current = false;
+      setIsPurchasingPack(false);
+    }
+  };
   const destroyCollectionCard = async (card) => {
     if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être détruite." };
@@ -5957,6 +6021,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
+            <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onPurchase={purchaseCardPack} />
           </div>
         </section>
       )}
@@ -5967,7 +6032,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onPurchase={purchaseCardPack} />
+          <button type="button" onClick={openPack} disabled={isOpeningPack || isPurchasingPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
       </header>}
       {cardsView === "collection" && <section style={styles.cardCollectionPanel}>
@@ -6122,6 +6188,24 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
       {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
+    </div>
+  );
+}
+
+function CardPackPurchaseControls({ visible = false, balance = 0, isPurchasing = false, isOpening = false, status = "", onPurchase }) {
+  if (!visible) return null;
+  return (
+    <div style={{ display: "grid", justifyItems: "center", gap: 7, minWidth: 0 }}>
+      <span style={{ ...styles.mutedSmall, display: "inline-flex", alignItems: "center", gap: 5 }}>Solde : <ArekcoinAmount amount={balance} /></span>
+      <button
+        type="button"
+        onClick={onPurchase}
+        disabled={isPurchasing || isOpening}
+        style={{ minHeight: 42, padding: "9px 14px", borderRadius: 12, border: "1px solid rgba(248,199,47,.58)", background: "linear-gradient(135deg, rgba(248,199,47,.2), rgba(248,199,47,.08))", color: "#fde68a", fontWeight: 950, cursor: isPurchasing || isOpening ? "wait" : "pointer", opacity: isPurchasing || isOpening ? .65 : 1 }}
+      >
+        {isPurchasing ? "Achat en cours..." : `Acheter un pack · ${CARD_PACK_PURCHASE_PRICE} AREKCOINS`}
+      </button>
+      {status && <span role="status" style={styles.mutedSmall}>{status}</span>}
     </div>
   );
 }
