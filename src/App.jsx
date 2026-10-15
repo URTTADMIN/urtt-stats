@@ -5692,6 +5692,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [collectionTypeFilter, setCollectionTypeFilter] = useState("ALL");
   const [collectionSearch, setCollectionSearch] = useState("");
   const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
+  const [selectedDuplicateKeys, setSelectedDuplicateKeys] = useState([]);
+  const [isDestroyingDuplicates, setIsDestroyingDuplicates] = useState(false);
+  const [duplicateDestroyStatus, setDuplicateDestroyStatus] = useState("");
   const normalCardLibrary = useMemo(() => {
     const categoryStandings = Object.keys(standingsByCategory || {}).length ? standingsByCategory : { [categoryId]: standingsBySeason };
     const collection = [
@@ -5819,6 +5822,11 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     return counts;
   }, {}), [ownedCards]);
   const duplicateCardCount = Object.values(ownedCardCounts).filter((count) => count > 1).length;
+  const selectableDuplicateGroups = groupedDisplayedCollectionCards.filter((card) => card.duplicateCount > 1 && card.rarity?.id !== "SL");
+  const selectedDuplicateGroups = selectableDuplicateGroups.filter((card) => selectedDuplicateKeys.includes(card.collectionGroupKey));
+  const selectedDuplicateCopies = selectedDuplicateGroups.reduce((total, card) => total + card.duplicateCount - 1, 0);
+  const selectedDuplicateReward = selectedDuplicateGroups.reduce((total, card) => total + (card.duplicateCount - 1) * getCardBurnValue(card), 0);
+  const allDuplicatesSelected = selectableDuplicateGroups.length > 0 && selectableDuplicateGroups.every((card) => selectedDuplicateKeys.includes(card.collectionGroupKey));
   const savePlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
@@ -6011,18 +6019,63 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }
   };
   const destroyCollectionCard = async (card) => {
-    if (!marketAccessAllowed) return { ok: false, message: "Fonctionnalité réservée aux comptes test pour le moment." };
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être détruite." };
     const groupKey = getCollectionGroupKey(card);
     if ((ownedCardCounts[groupKey] || 0) <= 1) return { ok: false, message: "Il faut posséder cette carte en double pour la détruire." };
     const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
     if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
     const nextStock = { ...normalizeCardPackStock(packStock), arekcoins: (Number(packStock.arekcoins) || 0) + getCardBurnValue(card), stockSyncedAt: Date.now() };
+    const result = await savePlayerCards(removed.kept, nextStock);
+    if (!result?.ok) return { ok: false, message: result?.message || "Impossible de sauvegarder la destruction." };
     setOwnedCards(removed.kept);
     setPackStock(nextStock);
-    await savePlayerCards(removed.kept, nextStock);
     setSelectedCollectionCard(null);
     return { ok: true, message: `${card.name} détruite : +${getCardBurnValue(card)} AREKCOINS.` };
+  };
+  const toggleDuplicateSelection = (groupKey) => {
+    setSelectedDuplicateKeys((current) => current.includes(groupKey) ? current.filter((key) => key !== groupKey) : [...current, groupKey]);
+    setDuplicateDestroyStatus("");
+  };
+  const toggleAllDuplicateSelection = () => {
+    setSelectedDuplicateKeys(allDuplicatesSelected ? [] : selectableDuplicateGroups.map((card) => card.collectionGroupKey));
+    setDuplicateDestroyStatus("");
+  };
+  const destroySelectedDuplicates = async () => {
+    if (isDestroyingDuplicates || !selectedDuplicateGroups.length) return;
+    setIsDestroyingDuplicates(true);
+    setDuplicateDestroyStatus("");
+    const selectedKeys = new Set(selectedDuplicateGroups.map((card) => card.collectionGroupKey));
+    const keptGroups = new Set();
+    let destroyedCount = 0;
+    const nextCards = ownedCards.filter((card) => {
+      const key = getCollectionGroupKey(card);
+      if (!selectedKeys.has(key) || card.rarity?.id === "SL") return true;
+      if (!keptGroups.has(key)) { keptGroups.add(key); return true; }
+      destroyedCount += 1;
+      return false;
+    });
+    const reward = selectedDuplicateGroups.reduce((total, card) => total + (card.duplicateCount - 1) * getCardBurnValue(card), 0);
+    const nextStock = { ...normalizeCardPackStock(packStock), arekcoins: (Number(packStock.arekcoins) || 0) + reward, stockSyncedAt: Date.now() };
+    try {
+      const result = await savePlayerCards(nextCards, nextStock);
+      if (!result?.ok) {
+        writeStoredCardCollection(ownedCards);
+        writeStoredCardPackStock(packStock);
+        setDuplicateDestroyStatus(result?.message || "Impossible de sauvegarder la destruction.");
+        return;
+      }
+      setOwnedCards(nextCards);
+      setPackStock(nextStock);
+      setSelectedDuplicateKeys([]);
+      setDuplicateDestroyStatus(`${destroyedCount} doublon${destroyedCount > 1 ? "s" : ""} détruit${destroyedCount > 1 ? "s" : ""} · +${reward} AREKCOINS.`);
+    } catch (error) {
+      writeStoredCardCollection(ownedCards);
+      writeStoredCardPackStock(packStock);
+      setDuplicateDestroyStatus("Impossible de sauvegarder la destruction.");
+      console.error("Erreur destruction des doublons:", error);
+    } finally {
+      setIsDestroyingDuplicates(false);
+    }
   };
   return (
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
@@ -6117,6 +6170,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             aria-pressed={showDuplicatesOnly}
             onClick={() => {
               const next = !showDuplicatesOnly;
+              setSelectedDuplicateKeys([]);
+              setDuplicateDestroyStatus("");
               setShowDuplicatesOnly(next);
               if (next) {
                 setCollectionSearch("");
@@ -6132,8 +6187,14 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           </button>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
+        {showDuplicatesOnly && <div style={{ ...styles.cardCollectionToolbar, alignItems: "center", marginTop: 12 }}>
+          <button type="button" onClick={toggleAllDuplicateSelection} disabled={!selectableDuplicateGroups.length || isDestroyingDuplicates} style={styles.secondaryButton}>{allDuplicatesSelected ? "Tout désélectionner" : "Tout sélectionner"}</button>
+          <span style={styles.mutedSmall}>{selectedDuplicateGroups.length} type{selectedDuplicateGroups.length === 1 ? "" : "s"} sélectionné{selectedDuplicateGroups.length === 1 ? "" : "s"} · {selectedDuplicateCopies} carte{selectedDuplicateCopies === 1 ? "" : "s"} à détruire · +{selectedDuplicateReward} AREKCOINS</span>
+          <button type="button" onClick={destroySelectedDuplicates} disabled={!selectedDuplicateGroups.length || isDestroyingDuplicates} style={styles.cardDetailDestroyButton}>{isDestroyingDuplicates ? "Destruction..." : `Détruire ${selectedDuplicateCopies} carte${selectedDuplicateCopies === 1 ? "" : "s"}`}</button>
+          {duplicateDestroyStatus && <span role="status" style={styles.mutedSmall}>{duplicateDestroyStatus}</span>}
+        </div>}
         <div style={styles.cardCollectionGrid}>
-          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} onClick={() => setSelectedCollectionCard(card)} />)}
+          {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} selected={selectedDuplicateKeys.includes(card.collectionGroupKey)} selectable={showDuplicatesOnly && card.rarity?.id !== "SL"} onClick={() => showDuplicatesOnly && card.rarity?.id !== "SL" ? toggleDuplicateSelection(card.collectionGroupKey) : setSelectedCollectionCard(card)} />)}
         </div>
         {groupedDisplayedCollectionCards.length === 0 && <Empty text={showDuplicatesOnly ? "Aucun doublon dans ta collection." : "Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir."} />}
       </section>}
@@ -6274,7 +6335,7 @@ function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, st
   );
 }
 
-function CollectionCard({ card, locked = false, onClick = null }) {
+function CollectionCard({ card, locked = false, onClick = null, selectable = false, selected = false }) {
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
   const rarityColor = getCardRarityColor(card.rarity);
@@ -6285,6 +6346,8 @@ function CollectionCard({ card, locked = false, onClick = null }) {
   return (
     <article onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+      {selectable && <span aria-hidden="true" style={{ position: "absolute", top: 10, left: 10, zIndex: 2, width: 24, height: 24, display: "grid", placeItems: "center", borderRadius: 7, border: selected ? "2px solid #22c55e" : "2px solid rgba(255,255,255,.75)", background: selected ? "#16a34a" : "rgba(15,23,42,.8)", color: "#fff", fontWeight: 900 }}>{selected ? "✓" : ""}</span>}
+      {selectable && <span style={{ position: "absolute", top: 10, left: 40, zIndex: 2, padding: "4px 7px", borderRadius: 8, background: "rgba(15,23,42,.86)", color: "#fff", fontSize: 11, fontWeight: 700, pointerEvents: "none" }}>Détruire {Math.max(0, duplicateCount - 1)}</span>}
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
       <div style={styles.collectionCardTop}>
@@ -6307,9 +6370,9 @@ function CollectionCard({ card, locked = false, onClick = null }) {
   );
 }
 
-function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketAccessAllowed = false, onClose, onDestroy }) {
+function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, onClose, onDestroy }) {
   const [status, setStatus] = useState("");
-  const canBurn = marketAccessAllowed && card?.rarity?.id !== "SL" && ownedCount > 1;
+  const canBurn = card?.rarity?.id !== "SL" && ownedCount > 1;
   const submitDestroy = async () => {
     const result = await onDestroy?.(card);
     setStatus(result?.message || "");
@@ -6334,9 +6397,8 @@ function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, marketAc
             <div style={styles.marketStatBox}><strong>{balance}</strong><span>AREKCOINS</span></div>
           </div>
           <div style={{ ...styles.cardDetailActions, gridTemplateColumns: "1fr" }}>
-            <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>{canBurn ? "Détruire +" + getCardBurnValue(card) : marketAccessAllowed ? "Détruire · doublon requis" : "Détruire · accès restreint"}</button>
+            <button type="button" onClick={submitDestroy} disabled={!canBurn} style={{ ...styles.cardDetailDestroyButton, ...(!canBurn ? styles.cardDetailDisabledButton : {}) }}>{canBurn ? "Détruire +" + getCardBurnValue(card) : "Détruire · doublon requis"}</button>
           </div>
-          {!marketAccessAllowed && <p style={styles.mutedSmall}>Fonctionnalité réservée aux admins et aux comptes test autorisés.</p>}
           {status && <p style={styles.mutedSmall}>{status}</p>}
         </div>
       </div>
