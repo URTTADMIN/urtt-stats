@@ -5970,16 +5970,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     setShowPackModal(false);
   };
   const openPackShop = () => {
-    if (isPurchasingPackRef.current || isOpeningPack) return;
+    if (isPurchasingPackRef.current || isOpeningPack || !playerCardAccountId) return;
     setPackPurchaseStatus("");
     setShowPackShopModal(true);
   };
   const purchaseCardPack = async (packOption = CARD_PACK_SHOP_OPTIONS[0]) => {
-    if (isPurchasingPackRef.current || isOpeningPack) return;
-    if (!marketAccessAllowed) {
-      setPackPurchaseStatus("Achat réservé aux comptes autorisés.");
-      return;
-    }
+    if (isPurchasingPackRef.current || isOpeningPack || !playerCardAccountId) return;
     const currentStock = normalizeCardPackStock(packStock);
     const balance = Number(currentStock.arekcoins) || 0;
     if (!packOption?.available || balance < packOption.price) {
@@ -6087,7 +6083,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
-            <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
+            <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           </div>
         </section>
       )}
@@ -6098,7 +6094,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
-          <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
+          <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           <button type="button" onClick={openPack} disabled={isOpeningPack || isPurchasingPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
       </header>}
