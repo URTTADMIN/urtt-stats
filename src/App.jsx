@@ -31,6 +31,9 @@ const CARD_COLLECTION_SPECIAL_CATEGORY_ID = "SPECIAL";
 const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
 const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_PURCHASE_PRICE = 250;
+const CARD_PACK_SHOP_OPTIONS = [
+  { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true },
+];
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
 const CARD_PACK_RESET_VERSION = "2026-10-03-paris-midnight-reset";
@@ -5688,6 +5691,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [collectionRarityFilter, setCollectionRarityFilter] = useState("ALL");
   const [collectionTypeFilter, setCollectionTypeFilter] = useState("ALL");
   const [collectionSearch, setCollectionSearch] = useState("");
+  const [showDuplicatesOnly, setShowDuplicatesOnly] = useState(false);
   const normalCardLibrary = useMemo(() => {
     const categoryStandings = Object.keys(standingsByCategory || {}).length ? standingsByCategory : { [categoryId]: standingsBySeason };
     const collection = [
@@ -5738,8 +5742,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         grouped.set(key, { ...card, collectionGroupKey: key, duplicateCount: 1, ownedCopies: [card] });
       }
     });
-    return Array.from(grouped.values());
-  }, [displayedCollectionCards]);
+    const groups = Array.from(grouped.values());
+    return showDuplicatesOnly ? groups.filter((card) => card.duplicateCount > 1) : groups;
+  }, [displayedCollectionCards, showDuplicatesOnly]);
   const rarityCounts = useMemo(() => ownedCards.reduce((counts, card) => ({
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
@@ -5800,6 +5805,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
+  const [showPackShopModal, setShowPackShopModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
   const [isPurchasingPack, setIsPurchasingPack] = useState(false);
   const [packPurchaseStatus, setPackPurchaseStatus] = useState("");
@@ -5812,6 +5818,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     counts[key] = (counts[key] || 0) + 1;
     return counts;
   }, {}), [ownedCards]);
+  const duplicateCardCount = Object.values(ownedCardCounts).filter((count) => count > 1).length;
   const savePlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
@@ -5954,7 +5961,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (isOpeningPack) return;
     setShowPackModal(false);
   };
-  const purchaseCardPack = async () => {
+  const openPackShop = () => {
+    if (isPurchasingPackRef.current || isOpeningPack) return;
+    setPackPurchaseStatus("");
+    setShowPackShopModal(true);
+  };
+  const purchaseCardPack = async (packOption = CARD_PACK_SHOP_OPTIONS[0]) => {
     if (isPurchasingPackRef.current || isOpeningPack) return;
     if (!marketAccessAllowed) {
       setPackPurchaseStatus("Achat réservé aux comptes autorisés.");
@@ -5962,13 +5974,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }
     const currentStock = normalizeCardPackStock(packStock);
     const balance = Number(currentStock.arekcoins) || 0;
-    if (balance < CARD_PACK_PURCHASE_PRICE) {
-      setPackPurchaseStatus(`Il te manque ${CARD_PACK_PURCHASE_PRICE - balance} AREKCOINS.`);
+    if (!packOption?.available || balance < packOption.price) {
+      setPackPurchaseStatus(`Il te manque ${packOption.price - balance} AREKCOINS.`);
       return;
     }
     const nextStock = {
       ...currentStock,
-      arekcoins: balance - CARD_PACK_PURCHASE_PRICE,
+      arekcoins: balance - packOption.price,
       purchasedPacks: currentStock.purchasedPacks + 1,
       stockSyncedAt: Date.now(),
     };
@@ -5985,7 +5997,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         return;
       }
       setPackStock(nextStock);
-      setPackPurchaseStatus(`Pack acheté pour ${CARD_PACK_PURCHASE_PRICE} AREKCOINS.`);
+      setPackPurchaseStatus(`${packOption.name} acheté pour ${packOption.price} AREKCOINS.`);
+      setShowPackShopModal(false);
     } catch (error) {
       writeStoredCardCollection(ownedCards);
       writeStoredCardPackStock(currentStock);
@@ -6021,7 +6034,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
-            <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onPurchase={purchaseCardPack} />
+            <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           </div>
         </section>
       )}
@@ -6032,7 +6045,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
-          <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onPurchase={purchaseCardPack} />
+          <CardPackPurchaseControls visible={marketAccessAllowed} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           <button type="button" onClick={openPack} disabled={isOpeningPack || isPurchasingPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
       </header>}
@@ -6099,12 +6112,30 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
               ))}
             </div>
           </div>
+          <button
+            type="button"
+            aria-pressed={showDuplicatesOnly}
+            onClick={() => {
+              const next = !showDuplicatesOnly;
+              setShowDuplicatesOnly(next);
+              if (next) {
+                setCollectionSearch("");
+                setCollectionTypeFilter("ALL");
+                setCollectionCategoryFilter("ALL");
+                setCollectionSeasonFilter("ALL");
+                setCollectionRarityFilter("ALL");
+              }
+            }}
+            style={{ ...styles.cardRarityFilterButton, ...(showDuplicatesOnly ? styles.cardRarityFilterButtonActive : {}), borderColor: showDuplicatesOnly ? "#f8c72f" : "rgba(248,199,47,.5)", color: "#fde68a" }}
+          >
+            Doublons · {duplicateCardCount}
+          </button>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
         <div style={styles.cardCollectionGrid}>
           {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} onClick={() => setSelectedCollectionCard(card)} />)}
         </div>
-        {displayedCollectionCards.length === 0 && <Empty text="Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir." />}
+        {groupedDisplayedCollectionCards.length === 0 && <Empty text={showDuplicatesOnly ? "Aucun doublon dans ta collection." : "Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir."} />}
       </section>}
       {cardsView === "pokedex" && <header style={styles.cardLabHeader}>
         <div>
@@ -6187,26 +6218,59 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
+      {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}
       {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
     </div>
   );
 }
 
-function CardPackPurchaseControls({ visible = false, balance = 0, isPurchasing = false, isOpening = false, status = "", onPurchase }) {
+function CardPackPurchaseControls({ visible = false, balance = 0, isPurchasing = false, isOpening = false, status = "", onOpenShop }) {
   if (!visible) return null;
   return (
     <div style={{ display: "grid", justifyItems: "center", gap: 7, minWidth: 0 }}>
       <span style={{ ...styles.mutedSmall, display: "inline-flex", alignItems: "center", gap: 5 }}>Solde : <ArekcoinAmount amount={balance} /></span>
       <button
         type="button"
-        onClick={onPurchase}
+        onClick={onOpenShop}
         disabled={isPurchasing || isOpening}
         style={{ minHeight: 42, padding: "9px 14px", borderRadius: 12, border: "1px solid rgba(248,199,47,.58)", background: "linear-gradient(135deg, rgba(248,199,47,.2), rgba(248,199,47,.08))", color: "#fde68a", fontWeight: 950, cursor: isPurchasing || isOpening ? "wait" : "pointer", opacity: isPurchasing || isOpening ? .65 : 1 }}
       >
-        {isPurchasing ? "Achat en cours..." : `Acheter un pack · ${CARD_PACK_PURCHASE_PRICE} AREKCOINS`}
+        {isPurchasing ? "Achat en cours..." : "Acheter un pack"}
       </button>
       {status && <span role="status" style={styles.mutedSmall}>{status}</span>}
     </div>
+  );
+}
+
+function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, status = "", onClose, onConfirm }) {
+  const firstAvailable = options.find((option) => option.available);
+  const [selectedId, setSelectedId] = useState(firstAvailable?.id || "");
+  const selected = options.find((option) => option.id === selectedId && option.available);
+  const canAfford = selected && balance >= selected.price;
+  return createPortal(
+    <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
+      <div style={{ ...styles.cardPackModal, width: "min(760px, 100%)" }} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={styles.cardPackModalHeader}>
+          <div><p style={styles.kicker}>BOUTIQUE URTT TCG</p><h2 style={styles.cardPackModalTitle}>Choisis ton pack</h2><p style={styles.mutedSmall}>Sélectionne une édition avant de confirmer l’achat.</p></div>
+          <button type="button" onClick={onClose} style={styles.secondaryButton}>Fermer</button>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12 }}>
+          {options.map((option) => {
+            const isSelected = option.id === selectedId;
+            return <button key={option.id} type="button" aria-pressed={isSelected} disabled={!option.available || isPurchasing} onClick={() => setSelectedId(option.id)} style={{ display: "grid", justifyItems: "center", gap: 9, textAlign: "center", padding: 16, borderRadius: 18, border: `1px solid ${isSelected ? "#f8c72f" : "rgba(255,255,255,.14)"}`, background: isSelected ? "rgba(248,199,47,.1)" : "rgba(255,255,255,.04)", color: "white", opacity: option.available ? 1 : .55, cursor: option.available ? "pointer" : "not-allowed" }}>
+              <img src={option.image} alt="" style={{ width: 110, height: 110, objectFit: "contain" }} />
+              <strong>{option.name}</strong><span style={styles.mutedSmall}>{option.description}</span><ArekcoinAmount amount={option.price} />
+              {!option.available && <span style={styles.mutedSmall}>Bientôt disponible</span>}
+            </button>;
+          })}
+        </div>
+        <div style={styles.cardPackModalFooter}>
+          <div style={{ display: "grid", gap: 4 }}><span style={styles.mutedSmall}>Ton solde : <ArekcoinAmount amount={balance} /></span>{selected && !canAfford && <span style={styles.errorText}>Solde insuffisant pour ce pack.</span>}{status && <span role="status" style={styles.mutedSmall}>{status}</span>}<span style={styles.mutedSmall}>De nouveaux packs pourront être ajoutés à cette boutique.</span></div>
+          <button type="button" onClick={() => selected && onConfirm(selected)} disabled={!canAfford || isPurchasing} style={styles.primaryButton}>{isPurchasing ? "Achat en cours..." : selected ? `Acheter · ${selected.price} AREKCOINS` : "Choisis un pack"}</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   );
 }
 
