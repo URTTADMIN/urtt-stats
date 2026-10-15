@@ -32,9 +32,10 @@ const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${
 const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_PURCHASE_PRICE = 250;
 const CARD_PACK_LEGENDARY_PRICE = 100000;
+const CARD_PACK_LEGENDARY_SL_CHANCE = 0.02;
 const CARD_PACK_SHOP_OPTIONS = [
   { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true, packType: "standard" },
-  { id: "legendary", name: "Pack Légendaire", description: "5 cartes légendaires garanties.", image: "/card-pack-legendary.svg", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
+  { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties · 2 % de chance de SL par carte.", image: "/card-pack-legendary.svg", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
 ];
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
@@ -5687,11 +5688,14 @@ function drawCardPack(cards, rarities, count = 5) {
     .sort((a, b) => (CARD_RARITY_ORDER[a.rarity.id] || 0) - (CARD_RARITY_ORDER[b.rarity.id] || 0) || a.position - b.position);
 }
 
-function drawLegendaryCardPack(cards, count = 5) {
+function drawLegendaryCardPack(cards, specialLegendaryCards = [], count = 5) {
   if (cards.length < count) return [];
-  const available = [...cards];
+  const availableLegendaries = [...cards];
+  const availableSpecialLegendaries = [...specialLegendaryCards];
   const selected = [];
-  while (selected.length < count && available.length) {
+  while (selected.length < count && availableLegendaries.length) {
+    const useSpecialLegendary = availableSpecialLegendaries.length > 0 && Math.random() < CARD_PACK_LEGENDARY_SL_CHANCE;
+    const available = useSpecialLegendary ? availableSpecialLegendaries : availableLegendaries;
     const index = Math.floor(Math.random() * available.length);
     const [card] = available.splice(index, 1);
     selected.push({ ...card, id: `${card.cardId || card.id}-${Date.now()}-${selected.length}-${Math.random()}` });
@@ -5725,6 +5729,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const cardLibrary = useMemo(() => [...normalCardLibrary, ...specialCardLibrary], [normalCardLibrary, specialCardLibrary]);
   const packCardLibrary = useMemo(() => normalCardLibrary.length >= 5 ? [...normalCardLibrary, ...specialCardLibrary] : [], [normalCardLibrary, specialCardLibrary]);
   const legendaryCardPool = useMemo(() => Array.from(new Map(packCardLibrary.filter((card) => card.rarity?.id === "L").map((card) => [card.cardId || card.id, card])).values()), [packCardLibrary]);
+  const specialLegendaryCardPool = useMemo(() => Array.from(new Map(packCardLibrary.filter((card) => card.rarity?.id === "SL").map((card) => [card.cardId || card.id, card])).values()), [packCardLibrary]);
   const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
   const ownedCardKeys = useMemo(() => new Set(ownedCards.map((card) => getCollectionGroupKey(card))), [ownedCards]);
   const sortedOwnedCards = useMemo(() => [...ownedCards]
@@ -5952,7 +5957,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     };
     setPackStock(nextStock);
     const ownedGroupKeys = new Set(ownedCards.map((card) => getCollectionGroupKey(card)));
-    const nextPack = (usesLegendaryPack ? drawLegendaryCardPack(legendaryCardPool) : drawCardPack(packCardLibrary, rarities)).map((card) => {
+    const nextPack = (usesLegendaryPack ? drawLegendaryCardPack(legendaryCardPool, specialLegendaryCardPool) : drawCardPack(packCardLibrary, rarities)).map((card) => {
       const groupKey = getCollectionGroupKey(card);
       const isNewCard = !ownedGroupKeys.has(groupKey);
       ownedGroupKeys.add(groupKey);
