@@ -209,3 +209,33 @@
 @media (prefers-reduced-motion: reduce) {
   .legendary-pack-ready, .legendary-pack-intro, .legendary-pack-intro-image, .legendary-pack-orbit, .legendary-pack-card-stage { animation: none !important; }
 }
+
+.legendary-pack-confetti {
+  position: fixed;
+  z-index: 10;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.legendary-pack-confetti span {
+  position: absolute;
+  top: -18px;
+  left: var(--confetti-left);
+  width: 8px;
+  height: 14px;
+  border-radius: 2px;
+  opacity: .95;
+  background: #f8c72f;
+  box-shadow: 0 0 8px rgba(248, 199, 47, .5);
+  animation: legendary-confetti-fall var(--confetti-duration) linear var(--confetti-delay) infinite;
+}
+.legendary-pack-confetti span:nth-child(3n) { background: #fff0a6; width: 6px; height: 10px; }
+.legendary-pack-confetti span:nth-child(3n + 1) { background: #e5a817; width: 9px; height: 6px; }
+.legendary-pack-confetti span:nth-child(4n) { border-radius: 50%; width: 7px; height: 7px; }
+@keyframes legendary-confetti-fall {
+  0% { transform: translate3d(0, -5vh, 0) rotate(var(--confetti-angle)); }
+  100% { transform: translate3d(35px, 110vh, 0) rotate(calc(var(--confetti-angle) + 720deg)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legendary-pack-confetti span { animation: none !important; display: none; }
+}
