@@ -5867,6 +5867,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [pack, setPack] = useState([]);
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
+  const [isLegendaryPackIntro, setIsLegendaryPackIntro] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [showPackShopModal, setShowPackShopModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
@@ -5964,6 +5965,15 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   }, [ownedCards, playerCardAccountId]);
   const availablePackCount = getAvailableCardPackCount(packStock);
   const canOpenPack = availablePackCount > 0 && (packCardLibrary.length >= 5 || legendaryCardPool.length >= 5);
+  const legendaryPackAvailable = Number(packStock.purchasedLegendaryPacks) > 0 && legendaryCardPool.length >= 5;
+  useEffect(() => {
+    if (!isLegendaryPackIntro) return undefined;
+    const timeout = window.setTimeout(() => {
+      setIsLegendaryPackIntro(false);
+      setShowPackModal(true);
+    }, 1900);
+    return () => window.clearTimeout(timeout);
+  }, [isLegendaryPackIntro]);
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${availablePackCount} pack${availablePackCount > 1 ? "s" : ""} disponible${availablePackCount > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
@@ -5999,21 +6009,25 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       const groupKey = getCollectionGroupKey(card);
       const isNewCard = !ownedGroupKeys.has(groupKey);
       ownedGroupKeys.add(groupKey);
-      return { ...card, isNewCard };
+      return { ...card, isNewCard, ...(usesLegendaryPack ? { packType: "legendary" } : {}) };
     });
     const openedAt = Date.now();
     setPack(nextPack);
     setOwnedCards((current) => {
       const nextOwnedCards = [
-        ...nextPack.map(({ isNewCard, ...card }, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
+        ...nextPack.map(({ isNewCard, packType, ...card }, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
         ...current,
       ];
       savePlayerCards(nextOwnedCards, nextStock);
       return nextOwnedCards;
     });
     setRevealedCount(0);
-    setShowPackModal(true);
     setIsOpeningPack(true);
+    if (usesLegendaryPack) {
+      setIsLegendaryPackIntro(true);
+    } else {
+      setShowPackModal(true);
+    }
   };
   const revealNextCard = () => {
     if (!isOpeningPack) return;
@@ -6145,8 +6159,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     <div style={embedded ? styles.cardLabEmbeddedPage : styles.cardLabPage}>
       {cardsView === "opening" && (
         <section style={styles.cardPackOnlySection}>
-          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={{ ...styles.cardPlayerPackButton, ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label="Ouvrir un pack URTT TCG">
-            <img src="/card-pack-urtt.png" alt="Pack URTT TCG" style={styles.cardPlayerPackImage} />
+          <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} className={legendaryPackAvailable ? "legendary-pack-ready" : undefined} style={{ ...styles.cardPlayerPackButton, ...(legendaryPackAvailable ? styles.cardPlayerPackButtonLegendary : {}), ...(!canOpenPack ? styles.cardPlayerPackUnavailable : {}) }} aria-label={legendaryPackAvailable ? "Ouvrir le pack légendaire URTT TCG" : "Ouvrir un pack URTT TCG"}>
+            <img src={legendaryPackAvailable ? "/card-pack-legendary.svg" : "/card-pack-urtt.png"} alt={legendaryPackAvailable ? "Pack légendaire URTT TCG" : "Pack URTT TCG"} style={styles.cardPlayerPackImage} />
           </button>
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
@@ -6342,7 +6356,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         </div>
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
-      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
+      {isLegendaryPackIntro && <LegendaryPackIntroModal onSkip={() => { setIsLegendaryPackIntro(false); setShowPackModal(true); }} />}
+      {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} isLegendaryPack={pack[0]?.packType === "legendary"} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
       {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS.map((option) => option.packType === "legendary" ? { ...option, available: legendaryCardPool.length >= 5 } : option)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}
       {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
     </div>
@@ -6507,24 +6522,39 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
   );
 }
 
-function PackOpeningModal({ pack, revealedCount, isOpeningPack, canOpenPack = true, onClose, onReplay, onRevealNext }) {
+function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack = false, canOpenPack = true, onClose, onReplay, onRevealNext }) {
   return (
-    <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
-      <div style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
-        <div style={styles.cardPackModalHeader}>
+    <div style={{ ...styles.cardPackModalOverlay, ...(isLegendaryPack ? styles.legendaryPackModalOverlay : {}) }} onMouseDown={onClose}>
+      <div style={{ ...styles.cardPackModal, ...(isLegendaryPack ? styles.legendaryPackModal : {}) }} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={{ ...styles.cardPackModalHeader, ...(isLegendaryPack ? styles.legendaryPackModalHeader : {}) }}>
           <div>
-            <p style={styles.kicker}>OUVERTURE DE PACK</p>
+            <p style={isLegendaryPack ? styles.legendaryPackKicker : styles.kicker}>{isLegendaryPack ? "OUVERTURE LÉGENDAIRE" : "OUVERTURE DE PACK"}</p>
             <h2 style={styles.cardPackModalTitle}>{isOpeningPack ? `Carte ${Math.min(revealedCount + 1, pack.length)} / ${pack.length}` : "Pack terminé"}</h2>
             <p style={styles.mutedSmall}>{isOpeningPack ? "Clique sur le pack pour révéler la prochaine carte." : "Toutes les cartes du pack ont été révélées."}</p>
           </div>
           <button type="button" onClick={onClose} disabled={isOpeningPack} style={styles.secondaryButton}>{isOpeningPack ? "Patiente..." : "Fermer"}</button>
         </div>
-        <div style={{ ...styles.cardPackModalStage, ...(isOpeningPack ? styles.cardPackModalStageClickable : {}) }} onClick={onRevealNext}>
+        <div className={isLegendaryPack ? "legendary-pack-card-stage" : undefined} style={{ ...styles.cardPackModalStage, ...(isOpeningPack ? styles.cardPackModalStageClickable : {}) }} onClick={onRevealNext}>
           {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === Math.min(revealedCount, pack.length - 1)} />)}
         </div>
         <div style={styles.cardPackModalFooter}>
           {!isOpeningPack && <button type="button" onClick={onReplay} disabled={!canOpenPack} style={styles.cardPlayerPrimary}>{canOpenPack ? "Rouvrir un pack" : "Plus de pack disponible"}</button>}
         </div>
+      </div>
+    </div>
+  );
+}
+
+function LegendaryPackIntroModal({ onSkip }) {
+  return (
+    <div style={{ ...styles.cardPackModalOverlay, ...styles.legendaryPackIntroOverlay }} role="status" aria-live="polite">
+      <div className="legendary-pack-intro" style={styles.legendaryPackIntroCard}>
+        <div className="legendary-pack-orbit" aria-hidden="true" />
+        <img className="legendary-pack-intro-image" src="/card-pack-legendary.svg" alt="Pack légendaire URTT TCG en cours d’ouverture" style={styles.legendaryPackIntroImage} />
+        <p style={styles.legendaryPackKicker}>ÉDITION LÉGENDAIRE</p>
+        <h2 style={styles.legendaryPackIntroTitle}>Les 5 légendaires t’attendent</h2>
+        <p style={styles.legendaryPackIntroText}>Le sceau doré se brise…</p>
+        <button type="button" onClick={onSkip} style={styles.legendaryPackSkipButton}>Passer l’animation</button>
       </div>
     </div>
   );
@@ -10317,6 +10347,7 @@ const styles = {
   cardPackStockPanel: { display: "inline-grid", justifyItems: "center", gap: 4, padding: "10px 16px", borderRadius: 999, background: "rgba(15,23,42,.72)", border: "1px solid rgba(204,0,255,.32)", color: "#f8fafc", fontWeight: 950, boxShadow: "0 16px 42px rgba(0,0,0,.22)" },
   cardPlayerPackScene: { minHeight: 430, position: "relative", display: "grid", placeItems: "center" },
   cardPlayerPackButton: { width: "min(390px, 82vw)", aspectRatio: "1024 / 1536", border: 0, background: "transparent", padding: 0, display: "grid", placeItems: "center", cursor: "pointer", filter: "drop-shadow(0 34px 72px rgba(204,0,255,.32))", transform: "rotate(2deg)", transition: "transform .22s ease, filter .22s ease" },
+  cardPlayerPackButtonLegendary: { filter: "drop-shadow(0 0 22px rgba(248,199,47,.48)) drop-shadow(0 0 52px rgba(248,199,47,.2))" },
   cardPlayerPackUnavailable: { cursor: "default", opacity: .55, filter: "drop-shadow(0 20px 42px rgba(148,163,184,.18)) grayscale(.45)" },
   cardPlayerPackLocked: { cursor: "default", opacity: .74, filter: "drop-shadow(0 24px 52px rgba(204,0,255,.2)) grayscale(.1)" },
   cardPlayerPackImage: { width: "100%", height: "100%", objectFit: "contain", display: "block" },
@@ -10331,6 +10362,16 @@ const styles = {
   cardPackModalStage: { minHeight: 380, display: "grid", gridTemplateColumns: "repeat(5, minmax(150px, 1fr))", gap: 16, alignItems: "center" },
   cardPackModalStageClickable: { cursor: "pointer" },
   cardPackModalFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" },
+  legendaryPackModalOverlay: { background: "radial-gradient(circle at center, rgba(248,199,47,.25), transparent 38%), rgba(2,6,23,.86)" },
+  legendaryPackModal: { background: "linear-gradient(145deg, rgba(29,24,10,.99), rgba(15,23,42,.99) 48%, rgba(36,22,8,.99))", borderColor: "rgba(248,199,47,.72)", boxShadow: "0 35px 110px rgba(0,0,0,.62), 0 0 55px rgba(248,199,47,.18)" },
+  legendaryPackModalHeader: { borderColor: "rgba(248,199,47,.24)", background: "linear-gradient(110deg, rgba(248,199,47,.1), rgba(255,255,255,.025))" },
+  legendaryPackKicker: { margin: 0, color: "#f8c72f", fontSize: 12, fontWeight: 1000, letterSpacing: ".18em" },
+  legendaryPackIntroOverlay: { background: "radial-gradient(circle at center, rgba(248,199,47,.3), transparent 42%), rgba(2,6,23,.91)" },
+  legendaryPackIntroCard: { position: "relative", isolation: "isolate", width: "min(520px, 100%)", minHeight: 570, overflow: "hidden", display: "grid", justifyItems: "center", alignContent: "center", gap: 12, padding: 28, borderRadius: 30, border: "1px solid rgba(248,199,47,.64)", background: "radial-gradient(circle at center 38%, rgba(248,199,47,.17), transparent 40%), linear-gradient(150deg, rgba(33,27,11,.99), rgba(11,17,31,.99) 52%, rgba(30,19,8,.99))", boxShadow: "0 30px 100px rgba(0,0,0,.64), 0 0 58px rgba(248,199,47,.2)", textAlign: "center" },
+  legendaryPackIntroImage: { position: "relative", zIndex: 1, width: "min(260px, 68vw)", height: 350, objectFit: "contain", filter: "drop-shadow(0 0 18px rgba(248,199,47,.62))" },
+  legendaryPackIntroTitle: { margin: 0, color: "#fff7d6", fontSize: "clamp(25px, 6vw, 36px)", lineHeight: 1.06, maxWidth: 400 },
+  legendaryPackIntroText: { margin: 0, color: "#f8d56b", fontSize: 15, fontWeight: 800 },
+  legendaryPackSkipButton: { marginTop: 10, border: "1px solid rgba(248,199,47,.38)", borderRadius: 999, padding: "10px 15px", background: "rgba(255,255,255,.06)", color: "#fff7d6", fontWeight: 850, cursor: "pointer" },
   cardLabGrid: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(320px, .8fr)", gap: 18 },
   cardLabRarityRow: { display: "grid", gridTemplateColumns: "52px minmax(0, 1fr) 92px", gap: 12, alignItems: "center", background: "#151f2e", border: "1px solid #273244", borderRadius: 14, padding: 12 },
   cardLabRarityBadge: { minWidth: 34, height: 30, border: "1px solid currentColor", borderRadius: 999, display: "inline-grid", placeItems: "center", padding: "0 8px", fontSize: 12, fontWeight: 950 },
