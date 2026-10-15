@@ -4248,6 +4248,44 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function grantPlayerArekcoins({ playerId = "", amount = 0, global = false } = {}) {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut donner des AREKCOINS.` });
+      return false;
+    }
+    const safeAmount = Math.max(1, Math.min(1000000000, Math.floor(Number(amount) || 0)));
+    const targets = global ? playerAccounts : playerAccounts.filter((account) => idsEqual(account.id, playerId));
+    if (!targets.length) {
+      setPopup({ type: "error", title: "Aucun compte", message: "Aucun compte joueur trouvé pour recevoir des AREKCOINS." });
+      return false;
+    }
+    const updates = targets.map((account) => {
+      const cardPackStock = normalizeCardPackStock(account.cardPackStock);
+      return { account, cardPackStock: { ...cardPackStock, arekcoins: cardPackStock.arekcoins + safeAmount, stockSyncedAt: Date.now() } };
+    });
+    const results = await Promise.all(updates.map(({ account, cardPackStock }) => supabase
+      .from("player_accounts")
+      .update({ card_pack_stock: cardPackStock, last_seen_at: new Date().toISOString() })
+      .eq("id", account.id)));
+    const firstError = results.find((result) => result.error)?.error;
+    if (firstError) {
+      console.error("Erreur don AREKCOINS:", firstError);
+      setPopup({ type: "error", title: "Erreur Supabase", message: firstError.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de donner les AREKCOINS." });
+      return false;
+    }
+    setPlayerAccounts((current) => current.map((account) => {
+      const update = updates.find((item) => idsEqual(item.account.id, account.id));
+      return update ? { ...account, cardPackStock: update.cardPackStock } : account;
+    }));
+    setPlayerProfile((current) => {
+      if (!current) return current;
+      const update = updates.find((item) => idsEqual(item.account.id, current.id));
+      return update ? { ...current, cardPackStock: update.cardPackStock } : current;
+    });
+    setPopup({ type: "success", title: "AREKCOINS ajoutés", message: global ? `${safeAmount} AREKCOINS ajoutés à ${updates.length} compte(s).` : `${safeAmount} AREKCOINS ajoutés au compte ${updates[0].account.pseudo}.` });
+    return true;
+  }
+
   async function cleanupPlayerDemoCards({ playerId = "", global = false } = {}) {
     if (!isPermissionsOwner(adminUser)) {
       setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut nettoyer les cartes joueurs.` });
@@ -4701,7 +4739,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onDeleteAccount={deletePlayerAccount} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onGrantArekcoins={grantPlayerArekcoins} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onDeleteAccount={deletePlayerAccount} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -6345,7 +6383,7 @@ function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, st
           {options.map((option) => {
             const isSelected = option.id === selectedId;
             return <button key={option.id} type="button" aria-pressed={isSelected} disabled={!option.available || isPurchasing} onClick={() => setSelectedId(option.id)} style={{ display: "grid", justifyItems: "center", gap: 9, textAlign: "center", padding: 16, borderRadius: 18, border: `1px solid ${isSelected ? "#f8c72f" : "rgba(255,255,255,.14)"}`, background: isSelected ? "rgba(248,199,47,.1)" : "rgba(255,255,255,.04)", color: "white", opacity: option.available ? 1 : .55, cursor: option.available ? "pointer" : "not-allowed" }}>
-              <img src={option.image} alt="" style={{ width: 110, height: 110, objectFit: "contain" }} />
+              <img src={option.image} alt="" style={{ width: 110, height: 110, objectFit: "contain", mixBlendMode: option.packType === "legendary" ? "screen" : "normal" }} />
               <strong>{option.name}</strong><span style={styles.mutedSmall}>{option.description}</span><ArekcoinAmount amount={option.price} />
               {!option.available && <span style={styles.mutedSmall}>Bientôt disponible</span>}
             </button>;
@@ -8460,8 +8498,11 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onCleanupDemoCards, onResetPlayerCards, onDeleteAccount }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onGrantArekcoins, onCleanupDemoCards, onResetPlayerCards, onDeleteAccount }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
+  const [arekcoinsGiftAmount, setArekcoinsGiftAmount] = useState(1000);
+  const [arekcoinsGiftTargetId, setArekcoinsGiftTargetId] = useState("ALL");
+  const [isGrantingArekcoins, setIsGrantingArekcoins] = useState(false);
   const [packGiftTargetId, setPackGiftTargetId] = useState("ALL");
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
   const [isCleaningDemoCards, setIsCleaningDemoCards] = useState(false);
@@ -8529,6 +8570,16 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     .filter(({ cleanup }) => cleanup.removed.length > 0);
   const demoCardTotal = demoCardRows.reduce((total, row) => total + row.cleanup.removed.length, 0);
   const safePackGiftAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(packGiftAmount) || 1)));
+  const safeArekcoinsGiftAmount = Math.max(1, Math.min(1000000000, Math.floor(Number(arekcoinsGiftAmount) || 0)));
+  const grantArekcoins = async () => {
+    if (!onGrantArekcoins || !Number.isFinite(Number(arekcoinsGiftAmount)) || Number(arekcoinsGiftAmount) < 1) return;
+    setIsGrantingArekcoins(true);
+    try {
+      await onGrantArekcoins({ amount: safeArekcoinsGiftAmount, global: arekcoinsGiftTargetId === "ALL", playerId: arekcoinsGiftTargetId });
+    } finally {
+      setIsGrantingArekcoins(false);
+    }
+  };
   const grantPacks = async (targetId = packGiftTargetId) => {
     if (!onGrantPacks) return;
     setIsGrantingPacks(true);
@@ -8588,6 +8639,25 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
           </button>
         </div>
         <p style={styles.mutedSmall}>Les packs sont ajoutés au stock actuel, avec une limite de {CARD_PACK_MAX_STOCK} packs disponibles par compte.</p>
+      </Card>
+      <Card title="Donner des AREKCOINS" icon="🪙">
+        <div style={styles.resultsInfo}>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Montant</span>
+            <input type="number" min="1" max="1000000000" step="1" value={arekcoinsGiftAmount} onChange={(event) => setArekcoinsGiftAmount(event.target.value)} style={styles.input} />
+          </label>
+          <label style={styles.label}>
+            <span style={styles.labelText}>Destinataire</span>
+            <select value={arekcoinsGiftTargetId} onChange={(event) => setArekcoinsGiftTargetId(event.target.value)} style={styles.resultsSelect}>
+              <option value="ALL">Tous les comptes ({rows.length})</option>
+              {rows.map((account) => <option key={account.id} value={account.id}>{account.pseudo || `Compte ${account.id}`} · solde {account.cardPackStock.arekcoins}</option>)}
+            </select>
+          </label>
+          <button type="button" onClick={grantArekcoins} disabled={isGrantingArekcoins || !rows.length || !onGrantArekcoins || !Number.isFinite(Number(arekcoinsGiftAmount)) || Number(arekcoinsGiftAmount) < 1} style={styles.primaryButton}>
+            {isGrantingArekcoins ? "Ajout..." : arekcoinsGiftTargetId === "ALL" ? "Donner à tout le monde" : "Donner au joueur"}
+          </button>
+        </div>
+        <p style={styles.mutedSmall}>Le montant est crédité au solde AREKCOINS du compte sélectionné.</p>
       </Card>
       <Card title="Cartes test détectées" icon="🧹">
         <div style={styles.resultsInfo}>
@@ -8663,12 +8733,13 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
       </Card>
       <Card title="Liste des comptes" icon="👥">
         <div style={styles.tableWrap}>
-          <table style={{ ...styles.table, minWidth: 1040 }}>
+          <table style={{ ...styles.table, minWidth: 1120 }}>
             <thead>
               <tr style={styles.tableHead}>
                 <th style={styles.th}>Pseudo</th>
                 <th style={styles.th}>Discord</th>
                 <th style={styles.th}>Packs</th>
+                <th style={styles.th}>AREKCOINS</th>
                 <th style={styles.th}>Créé le</th>
                 <th style={styles.th}>Dernière activité</th>
                 <th style={styles.th}>Pronos</th>
@@ -8683,6 +8754,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                   <td style={styles.td}><strong>{account.pseudo || "—"}</strong><p style={styles.mutedSmall}>ID {account.id}</p></td>
                   <td style={styles.td}>{account.discordName || "—"}</td>
                   <td style={styles.td}>{account.cardPackStock.packs}/{CARD_PACK_MAX_STOCK}</td>
+                  <td style={styles.td}><ArekcoinAmount amount={account.cardPackStock.arekcoins} /></td>
                   <td style={styles.td}>{formatAccountDate(account.createdAt)}</td>
                   <td style={styles.td}>{formatAccountDate(account.lastSeenAt)}</td>
                   <td style={styles.td}>{account.predictionsCount}</td>
