@@ -6588,7 +6588,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
             <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
           </div>
-          <div style={{ ...styles.cardLabPortrait, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 32px rgba(255,255,255,.08), 0 0 20px ${teamColor}44` }}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={getCardLogoStyle(card)} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}</div>
+          <div className={isSpecialCard ? "lab-card-special-portrait" : undefined} style={{ ...styles.cardLabPortrait, background: `linear-gradient(135deg, ${teamColor}e6, ${teamColor}73), radial-gradient(circle at 50% 18%, rgba(255,255,255,.34), rgba(2,6,23,.18) 52%, rgba(2,6,23,.38))`, borderColor: `${teamColor}cc`, boxShadow: `inset 0 0 32px rgba(255,255,255,.08), 0 0 20px ${teamColor}44` }}>{card.teamLogo ? <img src={card.teamLogo} alt={card.teamName} style={getCardLogoStyle(card)} /> : getInitials(card.name)}{card.position ? <span style={{ ...styles.collectionCardRank, borderColor: rarityColor, color: rarityColor }}>#{card.position}</span> : null}</div>
           <h2 style={styles.cardLabCardName}>{card.name}</h2>
           <p style={styles.mutedSmall}>{card.teamName}</p>
           <div style={styles.collectionCardInfoGrid}>
