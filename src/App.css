@@ -277,3 +277,64 @@
 @media (prefers-reduced-motion: reduce) {
   .legendary-pack-drop-notice { animation: none; }
 }
+
+/* Special cards have their own foil frame and identity strip. */
+.collection-card-special,
+.lab-card-special {
+  border: 2px solid #f4d46b !important;
+  border-radius: 22px 10px 22px 10px !important;
+  background:
+    radial-gradient(circle at 15% 8%, rgba(194, 81, 255, .3), transparent 36%),
+    radial-gradient(circle at 88% 92%, rgba(248, 199, 47, .22), transparent 34%),
+    linear-gradient(145deg, #17102b, #10182b 54%, #24172a) !important;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .38), 0 0 22px rgba(248, 199, 47, .2), inset 0 0 24px rgba(182, 117, 255, .1) !important;
+}
+.collection-card-special::before,
+.lab-card-special::before {
+  content: "✦  CARTE SPÉCIALE";
+  position: absolute;
+  z-index: 3;
+  top: 44px;
+  right: 12px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 239, 177, .82);
+  border-radius: 999px 4px 999px 4px;
+  color: #261b05;
+  background: linear-gradient(110deg, #fff1a8, #e5ae24 55%, #fff0a1);
+  box-shadow: 0 3px 14px rgba(248, 199, 47, .32);
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
+.collection-card-special::after,
+.lab-card-special::after {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 5px;
+  border: 1px solid rgba(235, 199, 255, .32);
+  border-radius: 18px 7px 18px 7px;
+  background: linear-gradient(125deg, transparent 26%, rgba(255, 255, 255, .12) 46%, transparent 58%);
+  opacity: .7;
+  pointer-events: none;
+}
+.collection-card-special .collection-card-special-hero {
+  border-color: rgba(248, 199, 47, .9) !important;
+  background:
+    radial-gradient(circle at 50% 42%, rgba(192, 117, 255, .28), transparent 55%),
+    linear-gradient(145deg, rgba(36, 25, 57, .98), rgba(12, 19, 36, .98)) !important;
+  box-shadow: inset 0 0 36px rgba(248, 199, 47, .13), 0 0 26px rgba(179, 104, 255, .24) !important;
+}
+.lab-card-special-portrait {
+  border-color: rgba(248, 199, 47, .9) !important;
+  background:
+    radial-gradient(circle at 50% 40%, rgba(196, 129, 255, .35), transparent 56%),
+    linear-gradient(145deg, rgba(39, 28, 63, .98), rgba(13, 20, 37, .98)) !important;
+  box-shadow: inset 0 0 34px rgba(248, 199, 47, .12), 0 0 24px rgba(184, 102, 255, .24) !important;
+}
+.lab-card-special .collectionCardInfoPill,
+.collection-card-special .collectionCardInfoPill {
+  border-color: rgba(248, 199, 47, .34);
+  background: rgba(94, 63, 17, .22);
+}
