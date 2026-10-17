@@ -338,3 +338,24 @@
   border-color: rgba(248, 199, 47, .34);
   background: rgba(94, 63, 17, .22);
 }
+
+.collection-card-special::before,
+.lab-card-special::before {
+  content: none !important;
+}
+.special-card-label {
+  position: absolute;
+  z-index: 4;
+  top: 44px;
+  right: 12px;
+  padding: 4px 8px;
+  border: 1px solid rgba(255, 239, 177, .9);
+  border-radius: 999px 4px 999px 4px;
+  color: #261b05;
+  background: linear-gradient(110deg, #fff1a8, #e5ae24 55%, #fff0a1);
+  box-shadow: 0 3px 14px rgba(248, 199, 47, .38);
+  font-size: 9px;
+  font-weight: 1000;
+  letter-spacing: .08em;
+  pointer-events: none;
+}
