@@ -33,6 +33,7 @@ const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_PURCHASE_PRICE = 250;
 const CARD_PACK_LEGENDARY_PRICE = 100000;
 const CARD_PACK_LEGENDARY_SL_CHANCE = 0.02;
+const CARD_PACK_LEGENDARY_DROP_CHANCE = 1 / 1_000_000;
 const CARD_PACK_SHOP_OPTIONS = [
   { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true, packType: "standard" },
   { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties · 2 % de chance de SL par carte.", image: "/card-pack-urtt.png", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
@@ -5868,6 +5869,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [revealedCount, setRevealedCount] = useState(5);
   const [isOpeningPack, setIsOpeningPack] = useState(false);
   const [isLegendaryPackIntro, setIsLegendaryPackIntro] = useState(false);
+  const [legendaryPackDropNotice, setLegendaryPackDropNotice] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [showPackShopModal, setShowPackShopModal] = useState(false);
   const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
@@ -5974,6 +5976,11 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }, 1900);
     return () => window.clearTimeout(timeout);
   }, [isLegendaryPackIntro]);
+  useEffect(() => {
+    if (!legendaryPackDropNotice) return undefined;
+    const timeout = window.setTimeout(() => setLegendaryPackDropNotice(false), 10000);
+    return () => window.clearTimeout(timeout);
+  }, [legendaryPackDropNotice]);
   const nextPackInMs = getNextCardPackInMs(packStock);
   const packStockText = `${availablePackCount} pack${availablePackCount > 1 ? "s" : ""} disponible${availablePackCount > 1 ? "s" : ""}`;
   const nextPackText = packStock.packs >= CARD_PACK_MAX_STOCK
@@ -5992,11 +5999,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       return;
     }
     const usesFreePack = !usesLegendaryPack && refreshedStock.packs > 0;
+    const dropsLegendaryPack = !usesLegendaryPack && Math.random() < CARD_PACK_LEGENDARY_DROP_CHANCE;
     const nextStock = {
       ...refreshedStock,
       packs: usesFreePack ? refreshedStock.packs - 1 : refreshedStock.packs,
       purchasedPacks: usesLegendaryPack || usesFreePack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
-      purchasedLegendaryPacks: usesLegendaryPack ? Math.max(0, refreshedStock.purchasedLegendaryPacks - 1) : refreshedStock.purchasedLegendaryPacks,
+      purchasedLegendaryPacks: Math.max(0, refreshedStock.purchasedLegendaryPacks + (dropsLegendaryPack ? 1 : 0) - (usesLegendaryPack ? 1 : 0)),
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
       dayKey: refreshedStock.dayKey,
@@ -6004,6 +6012,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       stockSyncedAt: Date.now(),
     };
     setPackStock(nextStock);
+    if (dropsLegendaryPack) setLegendaryPackDropNotice(true);
     const ownedGroupKeys = new Set(ownedCards.map((card) => getCollectionGroupKey(card)));
     const nextPack = (usesLegendaryPack ? drawLegendaryCardPack(legendaryCardPool, specialLegendaryCardPool) : drawCardPack(packCardLibrary, rarities)).map((card) => {
       const groupKey = getCollectionGroupKey(card);
@@ -6356,6 +6365,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         </div>
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
       </section>}
+      {legendaryPackDropNotice && <div className="legendary-pack-drop-notice" role="status" aria-live="assertive"><span aria-hidden="true">✨</span><div><strong>Incroyable ! Pack légendaire obtenu !</strong><span>Il a été ajouté à ton stock et t’attend pour sa prochaine ouverture.</span></div><button type="button" onClick={() => setLegendaryPackDropNotice(false)} aria-label="Fermer le message">×</button></div>}
       {isLegendaryPackIntro && <LegendaryPackIntroModal onSkip={() => { setIsLegendaryPackIntro(false); setShowPackModal(true); }} />}
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} isLegendaryPack={pack[0]?.packType === "legendary"} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
       {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS.map((option) => option.packType === "legendary" ? { ...option, available: legendaryCardPool.length >= 5 } : option)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}

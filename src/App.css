@@ -239,3 +239,41 @@
 @media (prefers-reduced-motion: reduce) {
   .legendary-pack-confetti span { animation: none !important; display: none; }
 }
+
+.legendary-pack-drop-notice {
+  position: fixed;
+  z-index: 100000;
+  top: max(18px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  padding: 16px 18px;
+  border: 1px solid rgba(248, 199, 47, .78);
+  border-radius: 18px;
+  color: #fff7d6;
+  background: linear-gradient(135deg, rgba(56, 42, 8, .98), rgba(17, 24, 39, .98));
+  box-shadow: 0 18px 55px rgba(0, 0, 0, .55), 0 0 32px rgba(248, 199, 47, .28);
+  animation: legendary-pack-drop-notice-in 420ms cubic-bezier(.2,.85,.25,1) both;
+}
+.legendary-pack-drop-notice > span { font-size: 28px; }
+.legendary-pack-drop-notice > div { display: grid; gap: 4px; }
+.legendary-pack-drop-notice strong { color: #f8d56b; font-size: 15px; }
+.legendary-pack-drop-notice div span { color: #f8fafc; font-size: 13px; line-height: 1.4; }
+.legendary-pack-drop-notice button {
+  border: 0;
+  background: transparent;
+  color: #fff7d6;
+  font-size: 24px;
+  cursor: pointer;
+}
+@keyframes legendary-pack-drop-notice-in {
+  from { opacity: 0; transform: translate(-50%, -14px) scale(.96); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legendary-pack-drop-notice { animation: none; }
+}
