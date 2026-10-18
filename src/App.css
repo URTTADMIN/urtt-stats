@@ -359,3 +359,28 @@
   letter-spacing: .08em;
   pointer-events: none;
 }
+
+.legendary-card-shine {
+  border-color: #ffe27a !important;
+  box-shadow: 0 18px 46px rgba(0, 0, 0, .4), 0 0 18px rgba(255, 210, 54, .45), 0 0 42px rgba(255, 193, 7, .2), inset 0 0 20px rgba(255, 232, 145, .09) !important;
+}
+.legendary-card-foil {
+  position: absolute;
+  z-index: 0;
+  inset: 2px;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+  background: linear-gradient(112deg, transparent 17%, rgba(255, 236, 163, .03) 36%, rgba(255, 244, 197, .38) 49%, rgba(255, 199, 47, .16) 53%, transparent 68%);
+  background-size: 260% 100%;
+  background-position: 150% 0;
+  animation: legendary-card-foil-sweep 3.4s ease-in-out infinite;
+}
+@keyframes legendary-card-foil-sweep {
+  0%, 14% { background-position: 150% 0; opacity: .2; }
+  58% { background-position: -10% 0; opacity: .8; }
+  100% { background-position: -80% 0; opacity: .18; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legendary-card-foil { animation: none; background-position: center; opacity: .45; }
+}
