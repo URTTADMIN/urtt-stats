@@ -384,3 +384,27 @@
 @media (prefers-reduced-motion: reduce) {
   .legendary-card-foil { animation: none; background-position: center; opacity: .45; }
 }
+
+/* Keep the legendary treatment visible on the card face, above card artwork. */
+.legendary-card-shine {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(255, 218, 87, .32), transparent 48%),
+    linear-gradient(150deg, rgba(87, 63, 12, .38), rgba(20, 24, 38, .98) 50%, rgba(78, 50, 8, .38)) !important;
+  box-shadow: 0 0 0 1px rgba(255, 227, 122, .88), 0 0 22px rgba(255, 210, 54, .58), 0 0 48px rgba(255, 193, 7, .28), inset 0 0 28px rgba(255, 232, 145, .16) !important;
+}
+.legendary-card-foil {
+  z-index: 4;
+  opacity: .48;
+  mix-blend-mode: screen;
+  background: linear-gradient(112deg, transparent 19%, rgba(255, 245, 201, .18) 36%, rgba(255, 231, 140, .78) 49%, rgba(255, 255, 255, .34) 53%, transparent 68%);
+  background-size: 280% 100%;
+  animation: legendary-card-foil-sweep 2.7s ease-in-out infinite;
+}
+@keyframes legendary-card-foil-sweep {
+  0%, 12% { background-position: 145% 0; opacity: .25; }
+  54% { background-position: 0 0; opacity: .72; }
+  100% { background-position: -100% 0; opacity: .3; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .legendary-card-foil { animation: none; background-position: center; opacity: .4; }
+}
