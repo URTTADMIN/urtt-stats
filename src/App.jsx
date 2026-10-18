@@ -6577,6 +6577,7 @@ function LegendaryPackIntroModal({ onSkip }) {
 
 function LabCard({ card, revealed = true, finalCard = false, active = false }) {
   const isSpecialCard = card.cardType === "special" || normalizeCategoryId(card.categoryId) === CARD_COLLECTION_SPECIAL_CATEGORY_ID;
+  const isLegendaryCard = card.rarity?.id === "L";
   const cardLabel = card.categoryName || getCardCategoryLabel(card.categoryId);
   const teamColor = card.teamColor || "#334155";
   const rarityColor = getCardRarityColor(card.rarity);
@@ -6588,6 +6589,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
         <div style={styles.cardLabCardBack} aria-label="Carte scellée" />
         <div className={[isSpecialCard ? "lab-card-special" : "", isLegendaryCard ? "legendary-card-shine" : ""].filter(Boolean).join(" ") || undefined} style={{ ...styles.cardLabCard, ...(finalCard ? styles.cardLabFinalCard : {}), borderColor: isSpecialCard ? "#f4d46b" : rarityColor, boxShadow: isSpecialCard ? "0 20px 55px rgba(0,0,0,.38), 0 0 32px rgba(248,199,47,.35), inset 0 0 24px rgba(182,117,255,.12)" : `0 20px 55px rgba(0,0,0,.34), 0 0 ${finalCard ? 42 : 26}px ${rarityGlowColor}55`, background: isSpecialCard ? "radial-gradient(circle at 15% 8%, rgba(194,81,255,.3), transparent 36%), radial-gradient(circle at 88% 92%, rgba(248,199,47,.22), transparent 34%), linear-gradient(145deg, #17102b, #10182b 54%, #24172a)" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.24), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.26), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${card.rarity.color}3d, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))` }}>
           <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
+          {isLegendaryCard && <div className="legendary-card-foil" aria-hidden="true" />}
           {card.isNewCard && <span style={styles.cardLabNewsBadge}>NEW</span>}
           {isSpecialCard && <span className="special-card-label">✦ CARTE SPÉCIALE</span>}
           <div style={styles.cardLabCardTop}>
