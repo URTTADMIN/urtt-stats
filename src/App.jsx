@@ -4361,6 +4361,50 @@ export default function URTTAdminPanel() {
     return true;
   }
 
+  async function resetAllPlayerTcgData() {
+    if (!isPermissionsOwner(adminUser)) {
+      setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut réinitialiser les données TCG de tous les joueurs.` });
+      return false;
+    }
+    if (!playerAccounts.length) {
+      setPopup({ type: "error", title: "Aucun compte", message: "Aucun compte joueur trouvé à réinitialiser." });
+      return false;
+    }
+
+    const resetAt = Date.now();
+    const updates = playerAccounts.map((account) => ({
+      account,
+      cardPackStock: { ...normalizeCardPackStock(account.cardPackStock), arekcoins: 0, cardCollectionResetAt: resetAt, stockSyncedAt: resetAt },
+    }));
+    const results = await Promise.all(updates.map(({ account, cardPackStock }) => supabase
+      .from("player_accounts")
+      .update({ card_collection: [], card_pack_stock: cardPackStock, last_seen_at: new Date().toISOString() })
+      .eq("id", account.id)));
+    const firstError = results.find((result) => result.error)?.error;
+    if (firstError) {
+      console.error("Erreur réinitialisation TCG globale:", firstError);
+      setPopup({ type: "error", title: "Erreur Supabase", message: firstError.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de réinitialiser toutes les données TCG. Vérifie les comptes avant de réessayer." });
+      return false;
+    }
+
+    setPlayerAccounts((current) => current.map((account) => {
+      const update = updates.find((item) => idsEqual(item.account.id, account.id));
+      return update ? { ...account, cardCollection: [], cardPackStock: update.cardPackStock } : account;
+    }));
+    setPlayerProfile((current) => {
+      if (!current) return current;
+      const update = updates.find((item) => idsEqual(item.account.id, current.id));
+      return update ? { ...current, cardCollection: [], cardPackStock: update.cardPackStock } : current;
+    });
+    const currentAccountUpdate = updates.find((item) => playerProfile?.id && idsEqual(item.account.id, playerProfile.id));
+    if (currentAccountUpdate) {
+      writeStoredCardCollection([]);
+      writeStoredCardPackStock(currentAccountUpdate.cardPackStock);
+    }
+    setPopup({ type: "success", title: "Données TCG réinitialisées", message: `Collections vidées et AREKCOINS remis à zéro pour ${updates.length} compte(s). Les stocks de packs sont conservés.` });
+    return true;
+  }
+
   async function deletePlayerAccount(playerId) {
     if (!isPermissionsOwner(adminUser)) {
       setPopup({ type: "error", title: "Accès refusé", message: "Seul " + ADMIN_PERMISSIONS_OWNER_EMAIL + " peut supprimer un compte utilisateur." });
@@ -4740,7 +4784,7 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
           {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onGrantArekcoins={grantPlayerArekcoins} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onDeleteAccount={deletePlayerAccount} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onGrantArekcoins={grantPlayerArekcoins} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onResetAllTcgData={resetAllPlayerTcgData} onDeleteAccount={deletePlayerAccount} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -8547,7 +8591,7 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onGrantArekcoins, onCleanupDemoCards, onResetPlayerCards, onDeleteAccount }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onGrantArekcoins, onCleanupDemoCards, onResetPlayerCards, onResetAllTcgData, onDeleteAccount }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [arekcoinsGiftAmount, setArekcoinsGiftAmount] = useState(1000);
   const [arekcoinsGiftTargetId, setArekcoinsGiftTargetId] = useState("ALL");
@@ -8556,6 +8600,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
   const [isGrantingPacks, setIsGrantingPacks] = useState(false);
   const [isCleaningDemoCards, setIsCleaningDemoCards] = useState(false);
   const [isResettingCards, setIsResettingCards] = useState(false);
+  const [isResettingAllTcgData, setIsResettingAllTcgData] = useState(false);
   const [deletingAccountId, setDeletingAccountId] = useState("");
   const [selectedCardAccountId, setSelectedCardAccountId] = useState("");
   const [playerCardSearch, setPlayerCardSearch] = useState("");
@@ -8646,6 +8691,17 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
     setIsResettingCards(true);
     await onResetPlayerCards({ playerId: targetId });
     setIsResettingCards(false);
+  };
+  const resetAllTcgData = async () => {
+    if (!onResetAllTcgData || !rows.length) return;
+    const confirmed = window.confirm(`Réinitialiser les données TCG de TOUS les joueurs (${rows.length} comptes) ? Toutes les collections seront vidées et tous les soldes AREKCOINS remis à 0. Les stocks de packs seront conservés. Cette action est définitive.`);
+    if (!confirmed) return;
+    setIsResettingAllTcgData(true);
+    try {
+      await onResetAllTcgData();
+    } finally {
+      setIsResettingAllTcgData(false);
+    }
   };
   const deleteAccount = async (account) => {
     if (!onDeleteAccount || !account?.id || deletingAccountId) return;
@@ -8741,6 +8797,12 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
         ) : <Empty text="Aucun joueur n'a d'ancienne carte test TCG." />}
       </Card>
       <Card title="Cartes des joueurs" icon="🃏">
+        <div style={styles.resultsInfo}>
+          <span style={styles.mutedSmall}>Action globale : vider les collections TCG et remettre les AREKCOINS de tous les comptes à zéro.</span>
+          <button type="button" onClick={resetAllTcgData} disabled={isResettingAllTcgData || !rows.length || !onResetAllTcgData} style={styles.dangerButton}>
+            {isResettingAllTcgData ? "Réinitialisation globale…" : `Reset TCG + AREKCOINS de tout le monde (${rows.length})`}
+          </button>
+        </div>
         <div style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
             <span style={styles.labelText}>Joueur</span>
