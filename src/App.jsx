@@ -2320,6 +2320,10 @@ export default function URTTAdminPanel() {
         to { text-shadow: 0 0 10px rgba(168,85,247,.95), 0 0 18px rgba(220,38,38,.55); }
       }
       @media (max-width: 760px) {
+        html, body, #root {
+          max-width: 100%;
+          overflow-x: clip;
+        }
         .urtt-public-app {
           display: block !important;
         }
@@ -2327,16 +2331,65 @@ export default function URTTAdminPanel() {
           display: none !important;
         }
         .urtt-public-content {
-          padding: 0 16px 45px !important;
+          min-width: 0 !important;
+          padding: 0 12px 32px !important;
         }
         .urtt-public-topbar {
           min-height: auto !important;
-          padding: 14px 0 !important;
+          padding: 9px 0 !important;
           display: grid !important;
           align-items: start !important;
+          gap: 8px !important;
+        }
+        .urtt-public-topbar-actions {
+          display: grid !important;
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto !important;
+          align-items: center !important;
+          justify-content: stretch !important;
+          gap: 7px !important;
+          width: 100% !important;
+        }
+        .urtt-public-topbar-actions .urtt-tcg-reminder-control {
+          grid-column: 1 / -1;
+          display: flex !important;
+          flex-wrap: wrap;
+          justify-content: flex-start !important;
+          gap: 6px !important;
+          min-width: 0;
+        }
+        .urtt-public-topbar-actions .urtt-tcg-reminder-control button {
+          min-height: 42px !important;
+        }
+        .urtt-public-topbar-actions .urtt-public-filter {
+          width: 100% !important;
+          min-width: 0 !important;
+          padding: 10px 24px 10px 9px !important;
+          font-size: 12px !important;
+        }
+        .urtt-public-topbar-actions > .urtt-public-access-wrap {
+          justify-self: end;
+        }
+        .urtt-public-topbar-actions .urtt-session-badge {
+          grid-column: 1 / -1;
+          white-space: normal !important;
         }
         .urtt-public-mobile-nav {
           display: flex !important;
+          gap: 6px !important;
+          margin: 0 -2px;
+          padding: 7px 2px 10px !important;
+          scroll-snap-type: x proximity;
+          scrollbar-width: none;
+          -webkit-overflow-scrolling: touch;
+        }
+        .urtt-public-mobile-nav::-webkit-scrollbar {
+          display: none;
+        }
+        .urtt-public-mobile-nav button {
+          flex: 0 0 auto;
+          min-height: 42px;
+          scroll-snap-align: start;
+          padding: 10px 13px !important;
         }
         .urtt-public-page [style*="grid-template-columns: minmax(0px, 1.35fr)"],
         .urtt-public-page [style*="grid-template-columns: minmax(0, 1.35fr)"] {
@@ -2365,8 +2418,107 @@ export default function URTTAdminPanel() {
           flex: 0 0 auto !important;
         }
         .urtt-public-main {
-          padding: 14px 14px 32px !important;
-          gap: 14px !important;
+          min-width: 0 !important;
+          padding: 12px 0 28px !important;
+          gap: 12px !important;
+        }
+        .urtt-public-main > *,
+        .urtt-admin-main > * {
+          min-width: 0 !important;
+          max-width: 100%;
+        }
+        .urtt-public-main .urtt-card,
+        .urtt-admin-main .urtt-card {
+          min-width: 0 !important;
+          padding: 14px !important;
+        }
+        .urtt-public-main [style*="overflowX: auto"],
+        .urtt-admin-main [style*="overflowX: auto"] {
+          max-width: 100% !important;
+          overscroll-behavior-x: contain;
+          -webkit-overflow-scrolling: touch;
+        }
+        .urtt-public-main input,
+        .urtt-public-main select,
+        .urtt-public-main textarea,
+        .urtt-admin-main input,
+        .urtt-admin-main select,
+        .urtt-admin-main textarea {
+          min-width: 0;
+          max-width: 100%;
+          font-size: 16px;
+        }
+        .urtt-public-main button,
+        .urtt-admin-main button {
+          touch-action: manipulation;
+        }
+        .urtt-public-main .urtt-tcg-card-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 10px !important;
+        }
+        .urtt-public-main .urtt-tcg-filter-toolbar {
+          display: grid !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          align-items: stretch !important;
+          gap: 9px !important;
+          padding: 10px !important;
+        }
+        .urtt-public-main .urtt-tcg-filter-toolbar > label {
+          min-width: 0 !important;
+          width: 100%;
+        }
+        .urtt-public-main .urtt-tcg-filter-toolbar > :first-child,
+        .urtt-public-main .urtt-tcg-filter-toolbar > :last-child {
+          grid-column: 1 / -1;
+        }
+        .urtt-public-main .urtt-tcg-filter-toolbar .urtt-tcg-filter-group {
+          grid-column: 1 / -1;
+        }
+        .urtt-public-main .urtt-tcg-card {
+          width: 100% !important;
+          min-width: 0 !important;
+          height: auto !important;
+          min-height: 300px;
+          padding: 10px !important;
+          gap: 8px !important;
+          border-radius: 15px !important;
+          grid-template-rows: auto minmax(100px, 1fr) auto auto !important;
+        }
+        .urtt-public-main .urtt-tcg-card [style*="min-height: 160px"] {
+          min-height: 100px !important;
+          border-radius: 12px !important;
+        }
+        .urtt-public-main .urtt-tcg-card [style*="width: 112px"] {
+          width: 72px !important;
+          height: 72px !important;
+        }
+        .urtt-public-main .urtt-tcg-card h3 {
+          font-size: 18px !important;
+        }
+        .urtt-public-main .urtt-tcg-card .urtt-muted-small {
+          font-size: 11px !important;
+        }
+        .urtt-public-main .cardLabHeader,
+        .urtt-public-main [style*="justify-content: space-between"][style*="border-radius: 22px"] {
+          gap: 12px !important;
+        }
+        .urtt-public-main [style*="repeat(5, minmax(150px, 1fr))"] {
+          min-height: 0 !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 9px !important;
+        }
+        .urtt-public-main [style*="min-height: 330px"] {
+          min-height: 250px !important;
+        }
+        .urtt-public-main [style*="min-height: 310px"] {
+          min-height: 235px !important;
+        }
+        .urtt-public-main [style*="min-height: 720px"] {
+          min-height: 0 !important;
+        }
+        .urtt-public-main [style*="repeat(auto-fill, 240px)"] {
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 10px !important;
         }
         .urtt-admin-logo {
           margin-bottom: 0 !important;
@@ -2415,7 +2567,57 @@ export default function URTTAdminPanel() {
           border-radius: 18px !important;
         }
         th, td {
-          padding: 10px !important;
+          padding: 8px !important;
+        }
+        .urtt-mobile-dialog-overlay {
+          align-items: start !important;
+          overflow-y: auto !important;
+          padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)) !important;
+        }
+        .urtt-mobile-dialog {
+          width: 100% !important;
+          max-height: calc(100dvh - 16px) !important;
+          border-radius: 18px !important;
+          padding: 12px !important;
+          gap: 12px !important;
+          overflow: auto !important;
+        }
+        .urtt-mobile-dialog-card-grid {
+          min-height: 0 !important;
+          grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+          gap: 8px !important;
+        }
+        .urtt-mobile-dialog-card-grid > div,
+        .urtt-mobile-dialog-card-grid [style*="min-height: 330px"],
+        .urtt-mobile-dialog-card-grid [style*="min-height: 310px"] {
+          min-height: 235px !important;
+        }
+        .urtt-mobile-dialog-card-grid .urtt-tcg-card {
+          width: 100% !important;
+          min-height: 0 !important;
+          height: auto !important;
+        }
+        .urtt-mobile-card-detail .urtt-tcg-card {
+          width: 100% !important;
+          min-height: 0 !important;
+          height: auto !important;
+        }
+        .urtt-mobile-card-detail {
+          grid-template-columns: minmax(0, 1fr) !important;
+          gap: 14px !important;
+        }
+        .urtt-mobile-card-detail > :first-child {
+          width: min(220px, 72vw);
+          justify-self: center;
+        }
+        .urtt-mobile-card-detail-content {
+          padding-right: 0 !important;
+        }
+        .urtt-mobile-intro-card {
+          width: 100% !important;
+          min-height: min(520px, calc(100dvh - 24px)) !important;
+          padding: 18px !important;
+          border-radius: 22px !important;
         }
       }
       @media (max-width: 420px) {
@@ -2424,6 +2626,32 @@ export default function URTTAdminPanel() {
         }
         .urtt-public-title {
           font-size: 28px !important;
+        }
+        .urtt-public-content {
+          padding-right: 9px !important;
+          padding-left: 9px !important;
+        }
+        .urtt-public-topbar-actions {
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px 38px !important;
+        }
+        .urtt-public-topbar-actions .urtt-tcg-reminder-control {
+          justify-content: center !important;
+        }
+        .urtt-public-main .urtt-tcg-card {
+          min-height: 278px;
+          padding: 8px !important;
+        }
+        .urtt-public-main .urtt-tcg-card [style*="width: 112px"] {
+          width: 62px !important;
+          height: 62px !important;
+        }
+      }
+      @media (max-width: 360px) {
+        .urtt-public-main .urtt-tcg-card-grid {
+          grid-template-columns: minmax(0, 1fr) !important;
+        }
+        .urtt-public-main .urtt-tcg-card {
+          min-height: 360px;
         }
       }
       @media (min-width: 761px) {
@@ -5360,13 +5588,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         <div className="urtt-public-content" style={styles.publicContentShell}>
           <header className="urtt-public-topbar" style={styles.publicTopbar}>
             <div style={styles.publicCrumb}>URTT <span style={{ padding: "0 8px" }}>/</span> <strong>{activePublicPageOption.label}</strong></div>
-            <div style={styles.publicTopbarActions}>
+            <div className="urtt-public-topbar-actions" style={styles.publicTopbarActions}>
               {isTgcCardsPage && <TcgReminderControl compact />}
-              <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
-              <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
+              <select className="urtt-public-filter" aria-label="Catégorie" value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
+              <select className="urtt-public-filter" aria-label="Saison" value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
               <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾" : "☀"}</button>
-              {adminUser?.email && <span style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
-              <div style={styles.publicAccessWrap}>
+              {adminUser?.email && <span className="urtt-session-badge" style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
+              <div className="urtt-public-access-wrap" style={styles.publicAccessWrap}>
                 <button onClick={() => setShowAccessMenu((current) => !current)} style={styles.publicAdminBubble} aria-label="Interface utilisateur et admin">INT<span style={{ ...styles.publicUserStatusDot, ...(playerProfile?.id ? styles.publicUserStatusDotConnected : styles.publicUserStatusDotDisconnected) }} /></button>
                 {showAccessMenu && (
                   <div style={styles.publicAccessMenu}>
@@ -6251,7 +6479,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             ))}
           </div>
         </div>
-        <div style={styles.cardCollectionToolbar}>
+        <div className="urtt-tcg-filter-toolbar" style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
             <span style={styles.labelText}>Rechercher par nom</span>
             <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie..." style={styles.resultsSelect} />
@@ -6278,7 +6506,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
               {collectionSeasonOptions.map((season) => <option key={season.id} value={season.id}>{seasonName(season.id)} ({season.count})</option>)}
             </select>
           </label>
-          <div style={styles.cardRarityFilterGroup}>
+          <div className="urtt-tcg-filter-group" style={styles.cardRarityFilterGroup}>
             <span style={styles.labelText}>Filtrer par rareté</span>
             <div style={styles.cardRarityFilterRow}>
               <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {searchFilteredCollectionCards.length}</button>
@@ -6321,13 +6549,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           </button>
           <button type="button" onClick={openPack} disabled={isOpeningPack || !canOpenPack} style={styles.secondaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
         </div>
-        {showDuplicatesOnly && <div style={{ ...styles.cardCollectionToolbar, alignItems: "center", marginTop: 12 }}>
+        {showDuplicatesOnly && <div className="urtt-tcg-filter-toolbar" style={{ ...styles.cardCollectionToolbar, alignItems: "center", marginTop: 12 }}>
           <button type="button" onClick={toggleAllDuplicateSelection} disabled={!selectableDuplicateGroups.length || isDestroyingDuplicates} style={styles.secondaryButton}>{allDuplicatesSelected ? "Tout désélectionner" : "Tout sélectionner"}</button>
           <span style={styles.mutedSmall}>{selectedDuplicateGroups.length} type{selectedDuplicateGroups.length === 1 ? "" : "s"} sélectionné{selectedDuplicateGroups.length === 1 ? "" : "s"} · {selectedDuplicateCopies} carte{selectedDuplicateCopies === 1 ? "" : "s"} à détruire · +{selectedDuplicateReward} AREKCOINS</span>
           <button type="button" onClick={destroySelectedDuplicates} disabled={!selectedDuplicateGroups.length || isDestroyingDuplicates} style={styles.cardDetailDestroyButton}>{isDestroyingDuplicates ? "Destruction..." : `Détruire ${selectedDuplicateCopies} carte${selectedDuplicateCopies === 1 ? "" : "s"}`}</button>
           {duplicateDestroyStatus && <span role="status" style={styles.mutedSmall}>{duplicateDestroyStatus}</span>}
         </div>}
-        <div style={styles.cardCollectionGrid}>
+          <div className="urtt-tcg-card-grid" style={styles.cardCollectionGrid}>
           {groupedDisplayedCollectionCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.ownedId || card.id} card={card} selected={selectedDuplicateKeys.includes(card.collectionGroupKey)} selectable={showDuplicatesOnly && card.rarity?.id !== "SL"} onClick={() => showDuplicatesOnly && card.rarity?.id !== "SL" ? toggleDuplicateSelection(card.collectionGroupKey) : setSelectedCollectionCard(card)} />)}
         </div>
         {groupedDisplayedCollectionCards.length === 0 && <Empty text={showDuplicatesOnly ? "Aucun doublon dans ta collection." : "Aucune carte dans ta collection pour cette sélection. Ouvre un pack pour en obtenir."} />}
@@ -6357,7 +6585,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             ))}
           </div>
         </div>
-        <div style={styles.cardCollectionToolbar}>
+        <div className="urtt-tcg-filter-toolbar" style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
             <span style={styles.labelText}>Rechercher par nom</span>
             <input value={collectionSearch} onChange={(event) => setCollectionSearch(event.target.value)} placeholder="Pilote, écurie..." style={styles.resultsSelect} />
@@ -6384,7 +6612,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
               {pokedexSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.id === "SPECIAL" ? "Spécial" : seasonName(season.id)} ({season.count})</option>)}
             </select>
           </label>
-          <div style={styles.cardRarityFilterGroup}>
+          <div className="urtt-tcg-filter-group" style={styles.cardRarityFilterGroup}>
             <span style={styles.labelText}>Filtrer par rareté</span>
             <div style={styles.cardRarityFilterRow}>
               <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {pokedexSearchFilteredCards.length}</button>
@@ -6407,7 +6635,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             </div>
           </div>
         </div>
-        <div style={styles.cardCollectionGrid}>
+        <div className="urtt-tcg-card-grid" style={styles.cardCollectionGrid}>
           {displayedPokedexCards.map((card) => <CollectionCard key={card.collectionGroupKey || card.cardId || card.id} card={card} locked={!card.owned} />)}
         </div>
         {displayedPokedexCards.length === 0 && <Empty text="Aucune carte dans le catalogue pour cette sélection." />}
@@ -6520,7 +6748,7 @@ function TcgReminderControl({ compact = false }) {
   const reminderActive = Boolean(subscription && isSubscriptionSaved);
 
   return (
-    <div style={{ display: "grid", gap: compact ? 2 : 5, justifyItems: "center", textAlign: "center" }}>
+    <div className="urtt-tcg-reminder-control" style={{ display: "grid", gap: compact ? 2 : 5, justifyItems: "center", textAlign: "center" }}>
       <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} title={reminderActive ? "Rappel activé sur cet appareil · tous les jours à 20 h" : "Activer le rappel quotidien à 20 h"} style={{ ...styles.secondaryButton, minHeight: compact ? 38 : 36, padding: compact ? "7px 9px" : "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
         {isSaving ? "Enregistrement…" : subscription ? (compact ? "🔔 Activé" : "Désactiver le rappel de 20 h") : (compact ? "🔔 Rappel 20 h" : "🔔 Rappel quotidien à 20 h")}
       </button>
@@ -6558,8 +6786,8 @@ function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, st
   const selected = options.find((option) => option.id === selectedId && option.available);
   const canAfford = selected && balance >= selected.price;
   return createPortal(
-    <div style={styles.cardPackModalOverlay} onMouseDown={onClose}>
-      <div style={{ ...styles.cardPackModal, width: "min(760px, 100%)" }} onMouseDown={(event) => event.stopPropagation()}>
+    <div className="urtt-mobile-dialog-overlay" style={styles.cardPackModalOverlay} onMouseDown={onClose}>
+      <div className="urtt-mobile-dialog" style={{ ...styles.cardPackModal, width: "min(760px, 100%)" }} onMouseDown={(event) => event.stopPropagation()}>
         <div style={styles.cardPackModalHeader}>
           <div><p style={styles.kicker}>BOUTIQUE URTT TCG</p><h2 style={styles.cardPackModalTitle}>Choisis ton pack</h2><p style={styles.mutedSmall}>Sélectionne une édition avant de confirmer l’achat.</p></div>
           <button type="button" onClick={onClose} style={styles.secondaryButton}>Fermer</button>
@@ -6595,7 +6823,7 @@ function CollectionCard({ card, locked = false, onClick = null, selectable = fal
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   const duplicateCount = Number(card.duplicateCount) || 1;
   return (
-    <article className={!locked && (isSpecialCard || isLegendaryCard) ? [isSpecialCard ? "collection-card-special" : "", isLegendaryCard ? "legendary-card-shine" : ""].filter(Boolean).join(" ") : undefined} onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : isSpecialCard ? "#f4d46b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : isSpecialCard ? "0 18px 44px rgba(0,0,0,.38), 0 0 26px rgba(248,199,47,.32), inset 0 0 24px rgba(182,117,255,.13)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : isSpecialCard ? "radial-gradient(circle at 15% 8%, rgba(194,81,255,.3), transparent 36%), radial-gradient(circle at 88% 92%, rgba(248,199,47,.22), transparent 34%), linear-gradient(145deg, #17102b, #10182b 54%, #24172a)" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
+    <article className={["urtt-tcg-card", !locked && isSpecialCard ? "collection-card-special" : "", !locked && isLegendaryCard ? "legendary-card-shine" : ""].filter(Boolean).join(" ")} onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : isSpecialCard ? "#f4d46b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : isSpecialCard ? "0 18px 44px rgba(0,0,0,.38), 0 0 26px rgba(248,199,47,.32), inset 0 0 24px rgba(182,117,255,.13)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : isSpecialCard ? "radial-gradient(circle at 15% 8%, rgba(194,81,255,.3), transparent 36%), radial-gradient(circle at 88% 92%, rgba(248,199,47,.22), transparent 34%), linear-gradient(145deg, #17102b, #10182b 54%, #24172a)" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       {isLegendaryCard && <div className="legendary-card-foil" aria-hidden="true" style={{ position: "absolute", inset: 2, zIndex: 4, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }} />}
       {selectable && <span aria-hidden="true" style={{ position: "absolute", top: 10, left: 10, zIndex: 2, width: 24, height: 24, display: "grid", placeItems: "center", borderRadius: 7, border: selected ? "2px solid #22c55e" : "2px solid rgba(255,255,255,.75)", background: selected ? "#16a34a" : "rgba(15,23,42,.8)", color: "#fff", fontWeight: 900 }}>{selected ? "✓" : ""}</span>}
@@ -6631,11 +6859,11 @@ function CollectionCardActionModal({ card, ownedCount = 1, balance = 0, onClose,
     setStatus(result?.message || "");
   };
   return createPortal(
-    <div style={styles.cardDetailOverlay} onMouseDown={onClose}>
-      <div style={styles.cardDetailModal} onMouseDown={(event) => event.stopPropagation()}>
+    <div className="urtt-mobile-dialog-overlay" style={styles.cardDetailOverlay} onMouseDown={onClose}>
+      <div className="urtt-mobile-dialog urtt-mobile-card-detail" style={styles.cardDetailModal} onMouseDown={(event) => event.stopPropagation()}>
         <button type="button" onClick={onClose} style={styles.cardDetailCloseButton}>×</button>
         <div style={styles.cardDetailPreview}><CollectionCard card={card} /></div>
-        <div style={styles.cardDetailContent}>
+        <div className="urtt-mobile-card-detail-content" style={styles.cardDetailContent}>
           <div>
             <h2 style={styles.cardDetailTitle}>{card.name}</h2>
             <div style={styles.cardDetailPills}>
@@ -6698,8 +6926,8 @@ function CardLabAccessGate({ playerProfile, onPlayerLogin, onPlayerSignup, onPla
 
 function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack = false, canOpenPack = true, onClose, onReplay, onRevealNext }) {
   return (
-    <div style={{ ...styles.cardPackModalOverlay, ...(isLegendaryPack ? styles.legendaryPackModalOverlay : {}) }} onMouseDown={onClose}>
-      <div style={{ ...styles.cardPackModal, ...(isLegendaryPack ? styles.legendaryPackModal : {}) }} onMouseDown={(event) => event.stopPropagation()}>
+    <div className="urtt-mobile-dialog-overlay" style={{ ...styles.cardPackModalOverlay, ...(isLegendaryPack ? styles.legendaryPackModalOverlay : {}) }} onMouseDown={onClose}>
+      <div className="urtt-mobile-dialog" style={{ ...styles.cardPackModal, ...(isLegendaryPack ? styles.legendaryPackModal : {}) }} onMouseDown={(event) => event.stopPropagation()}>
         <div style={{ ...styles.cardPackModalHeader, ...(isLegendaryPack ? styles.legendaryPackModalHeader : {}) }}>
           <div>
             <p style={isLegendaryPack ? styles.legendaryPackKicker : styles.kicker}>{isLegendaryPack ? "OUVERTURE LÉGENDAIRE" : "OUVERTURE DE PACK"}</p>
@@ -6708,7 +6936,7 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack 
           </div>
           <button type="button" onClick={onClose} disabled={isOpeningPack} style={styles.secondaryButton}>{isOpeningPack ? "Patiente..." : "Fermer"}</button>
         </div>
-        <div className={isLegendaryPack ? "legendary-pack-card-stage" : undefined} style={{ ...styles.cardPackModalStage, ...(isOpeningPack ? styles.cardPackModalStageClickable : {}) }} onClick={onRevealNext}>
+        <div className={`urtt-mobile-dialog-card-grid${isLegendaryPack ? " legendary-pack-card-stage" : ""}`} style={{ ...styles.cardPackModalStage, ...(isOpeningPack ? styles.cardPackModalStageClickable : {}) }} onClick={onRevealNext}>
           {pack.map((card, index) => <LabCard key={card.id} card={card} revealed={index < revealedCount} finalCard={index === pack.length - 1} active={isOpeningPack && index === Math.min(revealedCount, pack.length - 1)} />)}
         </div>
         <div style={styles.cardPackModalFooter}>
@@ -6721,9 +6949,9 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack 
 
 function LegendaryPackIntroModal({ onSkip }) {
   return (
-    <div style={{ ...styles.cardPackModalOverlay, ...styles.legendaryPackIntroOverlay }} role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
+    <div className="urtt-mobile-dialog-overlay" style={{ ...styles.cardPackModalOverlay, ...styles.legendaryPackIntroOverlay }} role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
       <div className="legendary-pack-confetti" aria-hidden="true">{Array.from({ length: 32 }, (_, index) => <span key={index} style={{ "--confetti-left": `${(index * 37) % 100}%`, "--confetti-delay": `${-((index * 173) % 2400)}ms`, "--confetti-duration": `${2200 + (index % 5) * 320}ms`, "--confetti-angle": `${(index * 47) % 360}deg` }} />)}</div>
-      <div className="legendary-pack-intro" style={styles.legendaryPackIntroCard}>
+      <div className="legendary-pack-intro urtt-mobile-intro-card" style={styles.legendaryPackIntroCard}>
         <div className="legendary-pack-orbit" aria-hidden="true" />
         <img className="legendary-pack-intro-image" src="/card-pack-legendary-transparent.svg" alt="Pack légendaire URTT TCG en cours d’ouverture" style={styles.legendaryPackIntroImage} />
         <p style={styles.legendaryPackKicker}>ÉDITION LÉGENDAIRE</p>
