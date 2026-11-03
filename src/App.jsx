@@ -6433,6 +6433,7 @@ function TcgReminderControl() {
   const [publicKey, setPublicKey] = useState("");
   const [configLoaded, setConfigLoaded] = useState(false);
   const [subscription, setSubscription] = useState(null);
+  const [isSubscriptionSaved, setIsSubscriptionSaved] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [status, setStatus] = useState("");
 
@@ -6475,6 +6476,7 @@ function TcgReminderControl() {
         if (!response.ok) throw new Error("Impossible de désactiver le rappel côté serveur.");
         await subscription.unsubscribe();
         setSubscription(null);
+        setIsSubscriptionSaved(false);
         setStatus("Rappel désactivé sur cet appareil.");
         return;
       }
@@ -6482,7 +6484,13 @@ function TcgReminderControl() {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") throw new Error("Autorise les notifications pour recevoir le rappel.");
 
-      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      let registration = await navigator.serviceWorker.getRegistration("/");
+      if (!registration) {
+        registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      }
+      if (!registration.active) {
+        registration = await navigator.serviceWorker.ready;
+      }
       let nextSubscription = await registration.pushManager.getSubscription();
       if (!nextSubscription) {
         nextSubscription = await registration.pushManager.subscribe({
@@ -6500,6 +6508,7 @@ function TcgReminderControl() {
         throw new Error("Impossible d’enregistrer l’abonnement au rappel.");
       }
       setSubscription(nextSubscription);
+      setIsSubscriptionSaved(true);
       setStatus("Rappel activé chaque jour à 20 h, heure de Paris.");
     } catch (error) {
       setStatus(error?.message || "Impossible de modifier le rappel.");
@@ -6508,12 +6517,15 @@ function TcgReminderControl() {
     }
   };
 
+  const reminderActive = Boolean(subscription && isSubscriptionSaved);
+
   return (
     <div style={{ display: "grid", gap: 5, justifyItems: "center", textAlign: "center" }}>
-      <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} style={{ ...styles.secondaryButton, minHeight: 36, padding: "7px 12px", borderColor: subscription ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: subscription ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
+      <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} style={{ ...styles.secondaryButton, minHeight: 36, padding: "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
         {isSaving ? "Enregistrement…" : subscription ? "Désactiver le rappel de 20 h" : "🔔 Rappel quotidien à 20 h"}
       </button>
       <span style={styles.mutedSmall}>Notification push · heure de Paris</span>
+      {reminderActive && <span role="status" style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: 12, fontWeight: 800 }}>✓ Rappel activé sur cet appareil · tous les jours à 20 h</span>}
       {!supported && !needsHomeScreenInstall && <span style={styles.mutedSmall}>Les notifications push ne sont pas disponibles dans ce navigateur.</span>}
       {supported && configLoaded && !publicKey && <span style={styles.mutedSmall}>Le rappel doit encore être configuré par le site.</span>}
       {needsHomeScreenInstall && <span style={styles.mutedSmall}>Sur iPhone ou iPad (iOS/iPadOS 16.4+), ajoute urtt.fr à l’écran d’accueil puis active le rappel depuis l’app.</span>}
