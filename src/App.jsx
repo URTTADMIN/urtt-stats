@@ -397,6 +397,8 @@ function writeStoredCardCollection(cards = []) {
 
 function readStoredPublicPage() {
   if (typeof window === "undefined") return "home";
+  const requestedPage = new URLSearchParams(window.location.search).get("page");
+  if (PUBLIC_PAGE_OPTIONS.some((page) => page.id === requestedPage)) return requestedPage;
   const storedPage = window.localStorage.getItem(PUBLIC_PAGE_STORAGE_KEY);
   return PUBLIC_PAGE_OPTIONS.some((page) => page.id === storedPage) ? storedPage : "home";
 }

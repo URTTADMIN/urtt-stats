@@ -117,7 +117,7 @@ export default async function handler(request, response) {
           await webPush.sendNotification(row.subscription, JSON.stringify({
             title: "URTT TCG",
             body: "Viens ouvrir tes pack",
-            url: "/",
+            url: "/?page=tgc-packs",
           }));
           await markSent(supabaseUrl, serviceKey, row.id, localDate);
           return "sent";
