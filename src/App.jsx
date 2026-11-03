@@ -6218,6 +6218,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
+            <TcgReminderControl />
             <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           </div>
         </section>
@@ -6414,6 +6415,107 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       {showPackModal && <PackOpeningModal pack={pack} revealedCount={revealedCount} isOpeningPack={isOpeningPack} isLegendaryPack={pack[0]?.packType === "legendary"} canOpenPack={canOpenPack} onClose={closePackModal} onReplay={openPack} onRevealNext={revealNextCard} />}
       {showPackShopModal && <CardPackShopModal options={CARD_PACK_SHOP_OPTIONS.map((option) => option.packType === "legendary" ? { ...option, available: legendaryCardPool.length >= 5 } : option)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} status={packPurchaseStatus} onClose={() => setShowPackShopModal(false)} onConfirm={purchaseCardPack} />}
       {selectedCollectionCard && <CollectionCardActionModal card={selectedCollectionCard} ownedCount={ownedCardCounts[getCollectionGroupKey(selectedCollectionCard)] || 1} balance={Number(packStock.arekcoins) || 0} marketAccessAllowed={marketAccessAllowed} onClose={() => setSelectedCollectionCard(null)} onDestroy={destroyCollectionCard} />}
+    </div>
+  );
+}
+
+function base64UrlToUint8Array(value) {
+  const padding = "=".repeat((4 - (value.length % 4)) % 4);
+  const base64 = `${value.replace(/-/g, "+").replace(/_/g, "/")}${padding}`;
+  return Uint8Array.from(window.atob(base64), (character) => character.charCodeAt(0));
+}
+
+function TcgReminderControl() {
+  const [supported, setSupported] = useState(false);
+  const [needsHomeScreenInstall, setNeedsHomeScreenInstall] = useState(false);
+  const [publicKey, setPublicKey] = useState("");
+  const [configLoaded, setConfigLoaded] = useState(false);
+  const [subscription, setSubscription] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [status, setStatus] = useState("");
+
+  useEffect(() => {
+    const isAppleMobile = /iPhone|iPad|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+    const isInstalled = window.matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+    const needsInstall = isAppleMobile && !isInstalled;
+    setNeedsHomeScreenInstall(needsInstall);
+    const canPush = !needsInstall && "serviceWorker" in navigator
+      && "PushManager" in window
+      && "Notification" in window;
+    setSupported(canPush);
+    let active = true;
+    fetch("/api/tcg-push-config")
+      .then(async (response) => response.ok ? response.json() : null)
+      .then((config) => { if (active) setPublicKey(config?.publicKey || ""); })
+      .catch(() => {})
+      .finally(() => { if (active) setConfigLoaded(true); });
+    if (canPush) {
+      navigator.serviceWorker.getRegistration("/")
+        .then((registration) => registration?.pushManager.getSubscription())
+        .then((current) => { if (active) setSubscription(current || null); })
+        .catch(() => {});
+    }
+    return () => { active = false; };
+  }, []);
+
+  const toggleReminder = async () => {
+    if (!supported || isSaving || (!subscription && !publicKey)) return;
+    setIsSaving(true);
+    setStatus("");
+    try {
+      if (subscription) {
+        const response = await fetch("/api/tcg-push-subscriptions", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ endpoint: subscription.endpoint }),
+        });
+        if (!response.ok) throw new Error("Impossible de désactiver le rappel côté serveur.");
+        await subscription.unsubscribe();
+        setSubscription(null);
+        setStatus("Rappel désactivé sur cet appareil.");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") throw new Error("Autorise les notifications pour recevoir le rappel.");
+
+      const registration = await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+      let nextSubscription = await registration.pushManager.getSubscription();
+      if (!nextSubscription) {
+        nextSubscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: base64UrlToUint8Array(publicKey),
+        });
+      }
+      const saveResponse = await fetch("/api/tcg-push-subscriptions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription: nextSubscription.toJSON() }),
+      });
+      if (!saveResponse.ok) {
+        if (nextSubscription !== subscription) await nextSubscription.unsubscribe();
+        throw new Error("Impossible d’enregistrer l’abonnement au rappel.");
+      }
+      setSubscription(nextSubscription);
+      setStatus("Rappel activé chaque jour à 20 h, heure de Paris.");
+    } catch (error) {
+      setStatus(error?.message || "Impossible de modifier le rappel.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  return (
+    <div style={{ display: "grid", gap: 5, justifyItems: "center", textAlign: "center" }}>
+      <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} style={{ ...styles.secondaryButton, minHeight: 36, padding: "7px 12px", borderColor: subscription ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: subscription ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
+        {isSaving ? "Enregistrement…" : subscription ? "Désactiver le rappel de 20 h" : "🔔 Rappel quotidien à 20 h"}
+      </button>
+      <span style={styles.mutedSmall}>Notification push · heure de Paris</span>
+      {!supported && !needsHomeScreenInstall && <span style={styles.mutedSmall}>Les notifications push ne sont pas disponibles dans ce navigateur.</span>}
+      {supported && configLoaded && !publicKey && <span style={styles.mutedSmall}>Le rappel doit encore être configuré par le site.</span>}
+      {needsHomeScreenInstall && <span style={styles.mutedSmall}>Sur iPhone ou iPad (iOS/iPadOS 16.4+), ajoute urtt.fr à l’écran d’accueil puis active le rappel depuis l’app.</span>}
+      {status && <span role="status" style={styles.mutedSmall}>{status}</span>}
     </div>
   );
 }
