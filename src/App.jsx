@@ -2394,7 +2394,7 @@ export default function URTTAdminPanel() {
         }
         .urtt-public-topbar-actions {
           display: grid !important;
-          grid-template-columns: minmax(68px, auto) minmax(76px, 1fr) 64px 38px !important;
+          grid-template-columns: minmax(64px, auto) minmax(54px, .75fr) minmax(72px, 1fr) 64px 38px !important;
           align-items: center !important;
           justify-content: stretch !important;
           gap: 7px !important;
@@ -2425,11 +2425,11 @@ export default function URTTAdminPanel() {
           font-size: 12px !important;
         }
         .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(1) {
-          grid-column: 1;
+          grid-column: 2;
           grid-row: 1;
         }
         .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(2) {
-          grid-column: 2;
+          grid-column: 3;
           grid-row: 1;
         }
         .urtt-public-topbar-tcg .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(1) {
@@ -2437,11 +2437,11 @@ export default function URTTAdminPanel() {
           grid-row: 1;
         }
         .urtt-public-topbar-tcg .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(2) {
-          grid-column: 1 / 3;
-          grid-row: 2;
+          grid-column: 3;
+          grid-row: 1;
         }
         .urtt-public-topbar-actions > button {
-          grid-column: 3;
+          grid-column: 4;
           grid-row: 1;
           width: 64px !important;
           min-width: 64px !important;
@@ -2453,20 +2453,13 @@ export default function URTTAdminPanel() {
           white-space: nowrap;
         }
         .urtt-public-topbar-actions > .urtt-public-access-wrap {
-          grid-column: 4;
+          grid-column: 5;
           grid-row: 1;
           justify-self: end;
           align-self: center;
         }
         .urtt-public-topbar-actions .urtt-session-badge {
-          grid-column: 2 / 5;
-          grid-row: 2;
-          white-space: normal !important;
-          overflow-wrap: anywhere;
-        }
-        .urtt-public-topbar-tcg .urtt-public-topbar-actions .urtt-session-badge {
-          grid-column: 3 / 5;
-          grid-row: 2;
+          display: none !important;
         }
         .urtt-public-mobile-nav {
           display: flex !important;
@@ -2727,7 +2720,11 @@ export default function URTTAdminPanel() {
           padding-left: 9px !important;
         }
         .urtt-public-topbar-actions {
-          grid-template-columns: minmax(68px, auto) minmax(76px, 1fr) 64px 38px !important;
+          grid-template-columns: minmax(55px, auto) minmax(44px, .65fr) minmax(66px, 1fr) 58px 38px !important;
+        }
+        .urtt-public-topbar-actions > button {
+          width: 58px !important;
+          min-width: 58px !important;
         }
         .urtt-public-topbar-actions .urtt-tcg-reminder-control button {
           padding: 6px 7px !important;
