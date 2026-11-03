@@ -5361,6 +5361,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           <header className="urtt-public-topbar" style={styles.publicTopbar}>
             <div style={styles.publicCrumb}>URTT <span style={{ padding: "0 8px" }}>/</span> <strong>{activePublicPageOption.label}</strong></div>
             <div style={styles.publicTopbarActions}>
+              {isTgcCardsPage && <TcgReminderControl compact />}
               <select value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
               <select value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
               <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾" : "☀"}</button>
@@ -6220,7 +6221,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div style={styles.cardPackStockPanel}>
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
-            <TcgReminderControl />
             <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           </div>
         </section>
@@ -6427,7 +6427,7 @@ function base64UrlToUint8Array(value) {
   return Uint8Array.from(window.atob(base64), (character) => character.charCodeAt(0));
 }
 
-function TcgReminderControl() {
+function TcgReminderControl({ compact = false }) {
   const [supported, setSupported] = useState(false);
   const [needsHomeScreenInstall, setNeedsHomeScreenInstall] = useState(false);
   const [publicKey, setPublicKey] = useState("");
@@ -6520,12 +6520,12 @@ function TcgReminderControl() {
   const reminderActive = Boolean(subscription && isSubscriptionSaved);
 
   return (
-    <div style={{ display: "grid", gap: 5, justifyItems: "center", textAlign: "center" }}>
-      <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} style={{ ...styles.secondaryButton, minHeight: 36, padding: "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
-        {isSaving ? "Enregistrement…" : subscription ? "Désactiver le rappel de 20 h" : "🔔 Rappel quotidien à 20 h"}
+    <div style={{ display: "grid", gap: compact ? 2 : 5, justifyItems: "center", textAlign: "center" }}>
+      <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} title={reminderActive ? "Rappel activé sur cet appareil · tous les jours à 20 h" : "Activer le rappel quotidien à 20 h"} style={{ ...styles.secondaryButton, minHeight: compact ? 38 : 36, padding: compact ? "7px 9px" : "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
+        {isSaving ? "Enregistrement…" : subscription ? (compact ? "🔔 Activé" : "Désactiver le rappel de 20 h") : (compact ? "🔔 Rappel 20 h" : "🔔 Rappel quotidien à 20 h")}
       </button>
-      <span style={styles.mutedSmall}>Notification push · heure de Paris</span>
-      {reminderActive && <span role="status" style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: 12, fontWeight: 800 }}>✓ Rappel activé sur cet appareil · tous les jours à 20 h</span>}
+      {!compact && <span style={styles.mutedSmall}>Notification push · heure de Paris</span>}
+      {reminderActive && <span role="status" style={{ padding: compact ? "2px 6px" : "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: compact ? 10 : 12, fontWeight: 800 }}>{compact ? "✓ Activé · 20 h" : "✓ Rappel activé sur cet appareil · tous les jours à 20 h"}</span>}
       {!supported && !needsHomeScreenInstall && <span style={styles.mutedSmall}>Les notifications push ne sont pas disponibles dans ce navigateur.</span>}
       {supported && configLoaded && !publicKey && <span style={styles.mutedSmall}>Le rappel doit encore être configuré par le site.</span>}
       {needsHomeScreenInstall && <span style={styles.mutedSmall}>Sur iPhone ou iPad (iOS/iPadOS 16.4+), ajoute urtt.fr à l’écran d’accueil puis active le rappel depuis l’app.</span>}
