@@ -7,7 +7,7 @@ function json(response, status, body) {
 function getSupabaseConfig() {
   return {
     url: String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/+$/, ""),
-    serviceKey: process.env.SUPABASE_SERVICE_ROLE_KEY || "",
+    serviceKey: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "",
   };
 }
 
@@ -63,11 +63,8 @@ export default async function handler(request, response) {
     return json(response, 400, { error: "Invalid push endpoint" });
   }
 
-  const headers = {
-    apikey: serviceKey,
-    Authorization: `Bearer ${serviceKey}`,
-    "Content-Type": "application/json",
-  };
+  const headers = { apikey: serviceKey, "Content-Type": "application/json" };
+  if (!serviceKey.startsWith("sb_secret_")) headers.Authorization = `Bearer ${serviceKey}`;
   const table = `${url}${TABLE_URL}`;
 
   try {

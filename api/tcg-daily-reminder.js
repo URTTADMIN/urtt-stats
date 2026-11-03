@@ -30,7 +30,9 @@ function hasValidCronSecret(request) {
 }
 
 function supabaseHeaders(serviceKey, extra = {}) {
-  return { apikey: serviceKey, Authorization: `Bearer ${serviceKey}`, ...extra };
+  const headers = { apikey: serviceKey, ...extra };
+  if (!serviceKey.startsWith("sb_secret_")) headers.Authorization = `Bearer ${serviceKey}`;
+  return headers;
 }
 
 async function deleteSubscription(url, serviceKey, id) {
@@ -90,7 +92,7 @@ export default async function handler(request, response) {
   if (hour !== "20") return json(response, 200, { skipped: "Not 20:00 in Europe/Paris" });
 
   const supabaseUrl = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "").replace(/\/+$/, "");
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+  const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || "";
   const publicKey = process.env.WEB_PUSH_PUBLIC_KEY || "";
   const privateKey = process.env.WEB_PUSH_PRIVATE_KEY || "";
   const subject = process.env.WEB_PUSH_SUBJECT || "https://urtt.fr/";

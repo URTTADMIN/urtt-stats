@@ -7,15 +7,15 @@ export default async function handler(request, response) {
   const publicKey = process.env.WEB_PUSH_PUBLIC_KEY;
   const privateKey = process.env.WEB_PUSH_PRIVATE_KEY;
   const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
   const cronSecret = process.env.CRON_SECRET;
   if (!publicKey || !privateKey || !supabaseUrl || !serviceKey || !cronSecret) {
     return response.status(503).json({ error: "Push notifications are not configured" });
   }
   try {
-    const databaseCheck = await fetch(`${String(supabaseUrl).replace(/\/+$/, "")}/rest/v1/tcg_push_subscriptions?select=id&limit=1`, {
-      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
-    });
+    const headers = { apikey: serviceKey };
+    if (!serviceKey.startsWith("sb_secret_")) headers.Authorization = `Bearer ${serviceKey}`;
+    const databaseCheck = await fetch(`${String(supabaseUrl).replace(/\/+$/, "")}/rest/v1/tcg_push_subscriptions?select=id&limit=1`, { headers });
     if (!databaseCheck.ok) return response.status(503).json({ error: "Push subscription storage is not configured" });
   } catch {
     return response.status(503).json({ error: "Push subscription storage is not available" });

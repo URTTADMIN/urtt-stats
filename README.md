@@ -22,7 +22,7 @@ Le rappel push quotidien indique « Viens ouvrir tes pack » à 20 h, heure de P
 2. Générer une paire VAPID avec `npx web-push generate-vapid-keys`.
 3. Ajouter ces variables dans les paramètres Vercel, pour l'environnement Production :
    - `WEB_PUSH_PUBLIC_KEY` et `WEB_PUSH_PRIVATE_KEY` : paire générée à l'étape 2.
-   - `SUPABASE_SERVICE_ROLE_KEY` : clé service role du projet Supabase. Garder cette clé uniquement côté serveur ; ne pas la préfixer avec `VITE_`.
+   - `SUPABASE_SECRET_KEY` : clé de la section « Secret keys » du projet Supabase (la clé `default`). L'ancienne variable `SUPABASE_SERVICE_ROLE_KEY` reste compatible. Garder cette clé uniquement côté serveur ; ne pas la préfixer avec `VITE_`.
    - `CRON_SECRET` : chaîne aléatoire secrète d'au moins 16 caractères.
    - `WEB_PUSH_SUBJECT` (facultatif) : adresse de contact `mailto:` ou URL du site ; valeur par défaut `https://urtt.fr/`.
 4. Redéployer le projet. Le cron Vercel appelle l'API à 18 h et 19 h UTC ; la fonction envoie seulement pendant l'heure 20 h à Paris, ce qui suit automatiquement le changement d'heure.
