@@ -4773,7 +4773,7 @@ export default function URTTAdminPanel() {
 )}
           {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {visibleAdminPage === "championship-stats" && <ChampionshipStatsAdminPanel drivers={drivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allCalendarRaces={allCalendarRaces} categoryOptions={adminCategoryOptions} seasonOptions={seasonOptions} />}
-          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} isSaving={isSaving} />}
+          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} standingsByCategory={cardStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={drivers} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} isSaving={isSaving} />}
           {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
@@ -10092,6 +10092,9 @@ function TitlesPanel({
 }
 function SeasonCardsAdminPanel({
   standingsBySeason = {},
+  standingsByCategory = {},
+  offSeasonEntries = [],
+  allDrivers = [],
   teams = [],
   selectedCategoryId,
   setSelectedCategoryId,
@@ -10120,6 +10123,31 @@ function SeasonCardsAdminPanel({
     }
   });
   const standings = standingsBySeason?.[cardSeasonId] || [];
+  const pilotRarityRows = useMemo(() => {
+    const cards = [
+      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((categoryId) => buildSeasonCardCollection(
+        standingsByCategory[categoryId] || {}, CARD_COLLECTION_SEASON_IDS, categoryId, teams,
+      )),
+      ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS),
+    ];
+    const grouped = new Map();
+    cards.forEach((card) => {
+      if (card.cardType === "team" || card.cardType === "special") return;
+      const key = card.driverId != null ? String(card.driverId) : normalizeResultText(card.name);
+      if (!key) return;
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          key,
+          name: card.name || "Pilote inconnu",
+          counts: Object.fromEntries(CARD_RARITY_PRESETS.map((rarity) => [rarity.id, 0])),
+        });
+      }
+      const row = grouped.get(key);
+      const rarityId = card.rarity?.id;
+      if (rarityId in row.counts) row.counts[rarityId] += 1;
+    });
+    return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
+  }, [standingsByCategory, offSeasonEntries, allDrivers, teams]);
   const previewCards = useMemo(
     () => buildSeasonCardEdition(standings, cardSeasonId, selectedCategoryId, teams),
     [standings, cardSeasonId, selectedCategoryId, teams],
@@ -10168,9 +10196,57 @@ function SeasonCardsAdminPanel({
     reader.onload = () => setSpecialCardForm((current) => ({ ...current, image: String(reader.result || "") }));
     reader.readAsDataURL(file);
   };
+  const exportPilotRarityCsv = () => {
+    const headers = ["Pilote", ...CARD_RARITY_PRESETS.map((rarity) => `${rarity.id} - ${rarity.name}`), "Total"];
+    const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
+    const lines = [headers, ...pilotRarityRows.map((row) => [
+      row.name,
+      ...CARD_RARITY_PRESETS.map((rarity) => row.counts[rarity.id] || 0),
+      CARD_RARITY_PRESETS.reduce((total, rarity) => total + (row.counts[rarity.id] || 0), 0),
+    ])].map((line) => line.map(escapeCsv).join(";"));
+    const blob = new Blob([`\uFEFF${lines.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "urtt-tcg-cartes-par-pilote.csv";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  };
 
   return (
     <div style={styles.section}>
+      <Card title="Cartes du catalogue par pilote" icon="📊">
+        <div style={styles.stack}>
+          <div style={{ ...styles.resultsInfo, alignItems: "center" }}>
+            <p style={styles.mutedSmall}>Nombre de cartes présentes dans le catalogue, toutes saisons et catégories confondues. Les cartes d’écurie et les cartes spéciales sont exclues.</p>
+            <button type="button" onClick={exportPilotRarityCsv} disabled={!pilotRarityRows.length} style={styles.secondaryButton}>Exporter en CSV</button>
+          </div>
+          <div style={{ overflowX: "auto", maxHeight: 560, overflowY: "auto", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12 }}>
+            <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", textAlign: "left" }}>
+              <thead style={{ position: "sticky", top: 0, zIndex: 1, background: "#111827" }}>
+                <tr>
+                  <th style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,.14)" }}>Pilote</th>
+                  {CARD_RARITY_PRESETS.map((rarity) => <th key={rarity.id} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,.14)", color: rarity.color, whiteSpace: "nowrap" }}>{rarity.id} · {rarity.name}</th>)}
+                  <th style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,.14)" }}>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pilotRarityRows.map((row) => {
+                  const total = CARD_RARITY_PRESETS.reduce((sum, rarity) => sum + (row.counts[rarity.id] || 0), 0);
+                  return <tr key={row.key}>
+                    <td style={{ padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,.07)", fontWeight: 700 }}>{row.name}</td>
+                    {CARD_RARITY_PRESETS.map((rarity) => <td key={rarity.id} style={{ padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,.07)", color: rarity.color, fontVariantNumeric: "tabular-nums" }}>{row.counts[rarity.id] || 0}</td>)}
+                    <td style={{ padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,.07)", fontWeight: 800, fontVariantNumeric: "tabular-nums" }}>{total}</td>
+                  </tr>;
+                })}
+                {!pilotRarityRows.length && <tr><td colSpan={CARD_RARITY_PRESETS.length + 2} style={{ padding: 14, color: "#94a3b8" }}>Aucune carte pilote trouvée dans le catalogue.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Card>
       <Card title="Création de carte spéciale" icon="⚙️">
         <div style={styles.stack}>
           <div style={styles.resultsInfo}>
