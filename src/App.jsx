@@ -1875,6 +1875,11 @@ export default function URTTAdminPanel() {
       .urtt-public-theme-light .urtt-public-mobile-nav button {
         color: #334155 !important;
       }
+      .urtt-public-theme-light .urtt-public-mobile-nav button:not(.urtt-mobile-nav-active) {
+        background: #e2e8f0 !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #334155 !important;
+      }
       .urtt-public-theme-light .urtt-site-nav button[style*="background: rgb(41, 32, 58)"],
       .urtt-public-theme-light .urtt-site-nav button[style*="background:#29203a"] {
         color: white !important;
@@ -2009,6 +2014,52 @@ export default function URTTAdminPanel() {
       }
       .urtt-public-theme-light .urtt-development-stat-value {
         color: #0f172a !important;
+      }
+      .urtt-public-theme-light .urtt-public-crumb {
+        color: #475569 !important;
+      }
+      .urtt-public-theme-light .urtt-public-sidebar-bottom,
+      .urtt-public-theme-light .urtt-public-sidebar-bottom span,
+      .urtt-public-theme-light .urtt-public-main [style*="color: rgb(161, 161, 170)"],
+      .urtt-public-theme-light .urtt-public-main [style*="color: #a1a1aa"] {
+        color: #475569 !important;
+      }
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(9, 9, 11)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(20, 26, 40)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(21, 31, 46)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(24, 24, 27)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(26, 33, 48)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(39, 39, 42)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(39, 39, 46)"],
+      .urtt-public-theme-light .urtt-public-main [style*="background: rgb(63, 63, 70)"] {
+        background: #f8fafc !important;
+        background-image: none !important;
+        border-color: #cbd5e1 !important;
+        color: #1e293b !important;
+      }
+      .urtt-public-theme-light .urtt-tcg-card h3,
+      .urtt-public-theme-light .urtt-tcg-card h3 {
+        color: #f8fafc !important;
+      }
+      .urtt-public-theme-light .urtt-tcg-card .urtt-tcg-card-rarity strong {
+        color: var(--tcg-rarity-color) !important;
+      }
+      .urtt-public-theme-light .urtt-tcg-card p {
+        color: #cbd5e1 !important;
+      }
+      .urtt-public-theme-light .urtt-public-topbar-actions .urtt-tcg-reminder-control button {
+        color: #7e22ce !important;
+        border-color: rgba(126,34,206,.48) !important;
+      }
+      .urtt-public-theme-light .urtt-public-topbar-actions .urtt-tcg-reminder-control button[style*="rgba(34, 197, 94"] {
+        color: #166534 !important;
+      }
+      .urtt-public-theme-light .urtt-public-mobile-nav button {
+        background: #e2e8f0 !important;
+        border: 1px solid #cbd5e1 !important;
+      }
+      .urtt-public-theme-light .urtt-public-mobile-nav button.urtt-mobile-nav-active {
+        color: #ffffff !important;
       }
       .urtt-champion-banner {
         max-width: 1280px;
@@ -2343,14 +2394,15 @@ export default function URTTAdminPanel() {
         }
         .urtt-public-topbar-actions {
           display: grid !important;
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto !important;
+          grid-template-columns: minmax(68px, auto) minmax(76px, 1fr) 64px 38px !important;
           align-items: center !important;
           justify-content: stretch !important;
           gap: 7px !important;
           width: 100% !important;
         }
         .urtt-public-topbar-actions .urtt-tcg-reminder-control {
-          grid-column: 1 / -1;
+          grid-column: 1;
+          grid-row: 1;
           display: flex !important;
           flex-wrap: wrap;
           justify-content: flex-start !important;
@@ -2358,7 +2410,10 @@ export default function URTTAdminPanel() {
           min-width: 0;
         }
         .urtt-public-topbar-actions .urtt-tcg-reminder-control button {
-          min-height: 42px !important;
+          min-height: 36px !important;
+          padding: 6px 8px !important;
+          font-size: 11px !important;
+          white-space: nowrap;
         }
         .urtt-public-topbar-actions .urtt-public-filter {
           width: 100% !important;
@@ -2366,12 +2421,48 @@ export default function URTTAdminPanel() {
           padding: 10px 24px 10px 9px !important;
           font-size: 12px !important;
         }
+        .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(1) {
+          grid-column: 1;
+          grid-row: 1;
+        }
+        .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(2) {
+          grid-column: 2;
+          grid-row: 1;
+        }
+        .urtt-public-topbar-tcg .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(1) {
+          grid-column: 2;
+          grid-row: 1;
+        }
+        .urtt-public-topbar-tcg .urtt-public-topbar-actions select.urtt-public-filter:nth-of-type(2) {
+          grid-column: 1 / 3;
+          grid-row: 2;
+        }
+        .urtt-public-topbar-actions > button {
+          grid-column: 3;
+          grid-row: 1;
+          width: 64px !important;
+          height: 38px !important;
+          min-height: 38px !important;
+          border-radius: 12px !important;
+          padding: 0 4px !important;
+          font-size: 11px !important;
+          white-space: nowrap;
+        }
         .urtt-public-topbar-actions > .urtt-public-access-wrap {
+          grid-column: 4;
+          grid-row: 1;
           justify-self: end;
+          align-self: center;
         }
         .urtt-public-topbar-actions .urtt-session-badge {
-          grid-column: 1 / -1;
+          grid-column: 2 / 5;
+          grid-row: 2;
           white-space: normal !important;
+          overflow-wrap: anywhere;
+        }
+        .urtt-public-topbar-tcg .urtt-public-topbar-actions .urtt-session-badge {
+          grid-column: 3 / 5;
+          grid-row: 2;
         }
         .urtt-public-mobile-nav {
           display: flex !important;
@@ -2632,10 +2723,11 @@ export default function URTTAdminPanel() {
           padding-left: 9px !important;
         }
         .urtt-public-topbar-actions {
-          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 38px 38px !important;
+          grid-template-columns: minmax(68px, auto) minmax(76px, 1fr) 64px 38px !important;
         }
-        .urtt-public-topbar-actions .urtt-tcg-reminder-control {
-          justify-content: center !important;
+        .urtt-public-topbar-actions .urtt-tcg-reminder-control button {
+          padding: 6px 7px !important;
+          font-size: 10px !important;
         }
         .urtt-public-main .urtt-tcg-card {
           min-height: 278px;
@@ -5586,13 +5678,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           </div>
         </aside>
         <div className="urtt-public-content" style={styles.publicContentShell}>
-          <header className="urtt-public-topbar" style={styles.publicTopbar}>
+          <header className={`urtt-public-topbar${isTgcCardsPage ? " urtt-public-topbar-tcg" : ""}`} style={styles.publicTopbar}>
             <div style={styles.publicCrumb}>URTT <span style={{ padding: "0 8px" }}>/</span> <strong>{activePublicPageOption.label}</strong></div>
             <div className="urtt-public-topbar-actions" style={styles.publicTopbarActions}>
               {isTgcCardsPage && <TcgReminderControl compact />}
               <select className="urtt-public-filter" aria-label="Catégorie" value={selectedCategoryId} onChange={(event) => requestPublicNavigation(() => setSelectedCategoryId(event.target.value))} style={styles.publicDesignSelect}>{CATEGORY_OPTIONS.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select>
               <select className="urtt-public-filter" aria-label="Saison" value={seasonSelectValue} onChange={(event) => requestPublicNavigation(() => setSelectedSeasonId(event.target.value))} disabled={!seasonOptions.length} style={styles.publicDesignSelect}>{seasonOptions.map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select>
-              <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={styles.themeToggleButton} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾" : "☀"}</button>
+              <button type="button" onClick={() => setPublicTheme((current) => current === "light" ? "dark" : "light")} style={{ ...styles.themeToggleButton, ...(isLightTheme ? { background: "#ffffff", color: "#334155", borderColor: "#94a3b8" } : { background: "#141a28", color: "#fef08a", borderColor: "#475569" }) }} aria-label={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"} aria-pressed={isLightTheme} title={isLightTheme ? "Passer en mode sombre" : "Passer en mode clair"}>{isLightTheme ? "☾ Sombre" : "☀ Clair"}</button>
               {adminUser?.email && <span className="urtt-session-badge" style={styles.sessionBadge}>Admin : <strong>{adminUser.email}</strong></span>}
               <div className="urtt-public-access-wrap" style={styles.publicAccessWrap}>
                 <button onClick={() => setShowAccessMenu((current) => !current)} style={styles.publicAdminBubble} aria-label="Interface utilisateur et admin">INT<span style={{ ...styles.publicUserStatusDot, ...(playerProfile?.id ? styles.publicUserStatusDotConnected : styles.publicUserStatusDotDisconnected) }} /></button>
@@ -5608,7 +5700,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           <nav className="urtt-public-mobile-nav" style={styles.publicMobileNav}>
             {publicMobilePages.map((key) => {
               const label = PUBLIC_PAGE_OPTIONS.find((page) => page.id === key)?.label || key;
-              return <button key={key} type="button" onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicMobileNavButton, ...(activePublicPage === key ? { ...styles.publicMobileNavButtonActive, background: categoryColor } : {}) }}>{label}</button>;
+              return <button key={key} type="button" className={activePublicPage === key ? "urtt-mobile-nav-active" : undefined} onClick={() => key !== activePublicPage && requestPublicNavigation(() => setPublicPage(key))} style={{ ...styles.publicMobileNavButton, ...(activePublicPage === key ? { ...styles.publicMobileNavButtonActive, background: categoryColor } : {}) }}>{label}</button>;
             })}
           </nav>
           {championMode && (
@@ -6750,10 +6842,10 @@ function TcgReminderControl({ compact = false }) {
   return (
     <div className="urtt-tcg-reminder-control" style={{ display: "grid", gap: compact ? 2 : 5, justifyItems: "center", textAlign: "center" }}>
       <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} title={reminderActive ? "Rappel activé sur cet appareil · tous les jours à 20 h" : "Activer le rappel quotidien à 20 h"} style={{ ...styles.secondaryButton, minHeight: compact ? 38 : 36, padding: compact ? "7px 9px" : "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
-        {isSaving ? "Enregistrement…" : subscription ? (compact ? "🔔 Activé" : "Désactiver le rappel de 20 h") : (compact ? "🔔 Rappel 20 h" : "🔔 Rappel quotidien à 20 h")}
+        {isSaving ? "Enregistrement…" : subscription ? (compact ? "✓ 20 h" : "Désactiver le rappel de 20 h") : (compact ? "🔔 20 h" : "🔔 Rappel quotidien à 20 h")}
       </button>
       {!compact && <span style={styles.mutedSmall}>Notification push · heure de Paris</span>}
-      {reminderActive && <span role="status" style={{ padding: compact ? "2px 6px" : "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: compact ? 10 : 12, fontWeight: 800 }}>{compact ? "✓ Activé · 20 h" : "✓ Rappel activé sur cet appareil · tous les jours à 20 h"}</span>}
+      {reminderActive && !compact && <span role="status" style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: 12, fontWeight: 800 }}>✓ Rappel activé sur cet appareil · tous les jours à 20 h</span>}
       {!supported && !needsHomeScreenInstall && <span style={styles.mutedSmall}>Les notifications push ne sont pas disponibles dans ce navigateur.</span>}
       {supported && configLoaded && !publicKey && <span style={styles.mutedSmall}>Le rappel doit encore être configuré par le site.</span>}
       {needsHomeScreenInstall && <span style={styles.mutedSmall}>Sur iPhone ou iPad (iOS/iPadOS 16.4+), ajoute urtt.fr à l’écran d’accueil puis active le rappel depuis l’app.</span>}
@@ -6823,7 +6915,7 @@ function CollectionCard({ card, locked = false, onClick = null, selectable = fal
   const rarityBadgeStyle = getCardRarityBadgeStyle(card.rarity);
   const duplicateCount = Number(card.duplicateCount) || 1;
   return (
-    <article className={["urtt-tcg-card", !locked && isSpecialCard ? "collection-card-special" : "", !locked && isLegendaryCard ? "legendary-card-shine" : ""].filter(Boolean).join(" ")} onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : isSpecialCard ? "#f4d46b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : isSpecialCard ? "0 18px 44px rgba(0,0,0,.38), 0 0 26px rgba(248,199,47,.32), inset 0 0 24px rgba(182,117,255,.13)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : isSpecialCard ? "radial-gradient(circle at 15% 8%, rgba(194,81,255,.3), transparent 36%), radial-gradient(circle at 88% 92%, rgba(248,199,47,.22), transparent 34%), linear-gradient(145deg, #17102b, #10182b 54%, #24172a)" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
+    <article className={["urtt-tcg-card", !locked && isSpecialCard ? "collection-card-special" : "", !locked && isLegendaryCard ? "legendary-card-shine" : ""].filter(Boolean).join(" ")} onClick={onClick || undefined} role={onClick ? "button" : undefined} tabIndex={onClick ? 0 : undefined} onKeyDown={onClick ? (event) => { if (event.key === "Enter" || event.key === " ") onClick(); } : undefined} style={{ ...styles.collectionCard, "--tcg-rarity-color": rarityColor, ...(onClick ? styles.collectionCardClickable : {}), borderColor: locked ? "#64748b" : isSpecialCard ? "#f4d46b" : rarityColor, boxShadow: locked ? "0 18px 42px rgba(0,0,0,.28)" : isSpecialCard ? "0 18px 44px rgba(0,0,0,.38), 0 0 26px rgba(248,199,47,.32), inset 0 0 24px rgba(182,117,255,.13)" : `0 18px 42px rgba(0,0,0,.34), 0 0 28px ${rarityGlowColor}33`, background: locked ? "linear-gradient(160deg, rgba(31,41,55,.82), rgba(15,23,42,.96))" : isSpecialCard ? "radial-gradient(circle at 15% 8%, rgba(194,81,255,.3), transparent 36%), radial-gradient(circle at 88% 92%, rgba(248,199,47,.22), transparent 34%), linear-gradient(145deg, #17102b, #10182b 54%, #24172a)" : `${card.rarity.id === "SL" ? "radial-gradient(circle at 18% 0%, rgba(204,0,255,.22), transparent 32%), radial-gradient(circle at 82% 0%, rgba(248,199,47,.24), transparent 34%), " : `radial-gradient(circle at 50% 0%, ${raritySurface}, transparent 38%), `}linear-gradient(160deg, rgba(13,20,37,.98), rgba(20,27,45,.98) 62%, rgba(8,12,23,.98))`, opacity: locked ? .72 : 1 }}>
       <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
       {isLegendaryCard && <div className="legendary-card-foil" aria-hidden="true" style={{ position: "absolute", inset: 2, zIndex: 4, borderRadius: "inherit", overflow: "hidden", pointerEvents: "none" }} />}
       {selectable && <span aria-hidden="true" style={{ position: "absolute", top: 10, left: 10, zIndex: 2, width: 24, height: 24, display: "grid", placeItems: "center", borderRadius: 7, border: selected ? "2px solid #22c55e" : "2px solid rgba(255,255,255,.75)", background: selected ? "#16a34a" : "rgba(15,23,42,.8)", color: "#fff", fontWeight: 900 }}>{selected ? "✓" : ""}</span>}
@@ -6831,7 +6923,7 @@ function CollectionCard({ card, locked = false, onClick = null, selectable = fal
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
       {!locked && isSpecialCard && <span className="special-card-label">✦ CARTE SPÉCIALE</span>}
-      <div style={styles.collectionCardTop}>
+      <div className="urtt-tcg-card-rarity" style={styles.collectionCardTop}>
         <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
         <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
       </div>
@@ -10743,7 +10835,7 @@ const styles = {
   publicMobileNav: { display: "none", overflowX: "auto", gap: 7, padding: "9px 0", borderBottom: "1px solid #252d3c" },
   publicMobileNavButton: { whiteSpace: "nowrap", background: "#1a2130", border: 0, color: "#c0cadb", borderRadius: 7, padding: "9px 12px", fontSize: 12, fontWeight: 800 },
   publicMobileNavButtonActive: { color: "white" },
-  themeToggleButton: { width: 34, height: 34, border: "1px solid #30394b", background: "#141a28", color: "#e5eaf3", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 16, fontWeight: 900, cursor: "pointer" },
+  themeToggleButton: { minWidth: 88, height: 38, padding: "0 10px", border: "1px solid #30394b", background: "#141a28", color: "#e5eaf3", borderRadius: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: 12, fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" },
   publicAccessWrap: { position: "relative", display: "grid", placeItems: "center" },
   publicAccessMenu: { position: "absolute", top: "calc(100% + 10px)", right: 0, zIndex: 80, minWidth: 190, background: "rgba(17,24,43,.98)", border: "1px solid #33415f", borderRadius: 16, padding: 10, display: "grid", gap: 8, boxShadow: "0 18px 45px rgba(0,0,0,.28)" },
   accessChoiceButton: { width: "100%", border: "1px solid #33415f", background: "#141a28", color: "#eef1f7", borderRadius: 12, padding: "11px 12px", fontSize: 13, fontWeight: 900, textAlign: "left", cursor: "pointer" },
