@@ -2415,6 +2415,9 @@ export default function URTTAdminPanel() {
           font-size: 11px !important;
           white-space: nowrap;
         }
+        .urtt-public-topbar-actions .urtt-tcg-reminder-control > span {
+          display: none !important;
+        }
         .urtt-public-topbar-actions .urtt-public-filter {
           width: 100% !important;
           min-width: 0 !important;
