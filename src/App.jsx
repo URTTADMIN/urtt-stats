@@ -2444,6 +2444,7 @@ export default function URTTAdminPanel() {
           grid-column: 3;
           grid-row: 1;
           width: 64px !important;
+          min-width: 64px !important;
           height: 38px !important;
           min-height: 38px !important;
           border-radius: 12px !important;
