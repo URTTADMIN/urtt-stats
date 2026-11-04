@@ -5096,7 +5096,7 @@ export default function URTTAdminPanel() {
 )}
           {visibleAdminPage === "drivers" && <AdminDrivers drivers={filteredDrivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} categoryOptions={adminCategoryOptions} form={driverForm} setForm={setDriverForm} editingId={editingDriverId} isSaving={isSaving} onSave={saveDriver} onEdit={(driver) => { setEditingDriverId(driver.id); setDriverForm({ ...driver, teamHistory: driver.teamHistory || {}, participations: driver.participations || {} }); }} onDelete={deleteDriver} onCancel={() => { setDriverForm(emptyDriver); setEditingDriverId(null); }} search={search} setSearch={setSearch} />}
           {visibleAdminPage === "championship-stats" && <ChampionshipStatsAdminPanel drivers={drivers} teams={teams} raceResults={raceResults} seasonTitles={seasonTitles} allCalendarRaces={allCalendarRaces} categoryOptions={adminCategoryOptions} seasonOptions={seasonOptions} />}
-          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} standingsByCategory={cardStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={drivers} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} isSaving={isSaving} />}
+          {visibleAdminPage === "card-generation" && <SeasonCardsAdminPanel standingsBySeason={computed.driverStatsBySeason} standingsByCategory={cardStandingsByCategory} teamStandingsByCategory={cardTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={drivers} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} seasonOptions={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} isSaving={isSaving} />}
           {visibleAdminPage === "teams" && <AdminTeams teams={teams} form={teamForm} setForm={setTeamForm} editingId={editingTeamId} isSaving={isSaving} onSave={saveTeam} onEdit={(team) => { setEditingTeamId(team.id); setTeamForm(team); }} onDelete={deleteTeam} onCancel={() => { setTeamForm(emptyTeam); setEditingTeamId(null); }} />}
           {visibleAdminPage === "races" && <AdminRaces raceForm={raceForm} setRaceForm={setRaceForm} raceLibrary={raceLibrary} allCalendarRaces={allCalendarRaces} calendarRaceForm={calendarRaceForm} setCalendarRaceForm={setCalendarRaceForm} racesBySeason={adminRacesBySelectedCategory} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={selectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveRace} onAddToSeason={addRaceToSeason} onDelete={deleteRace} onDeleteLibraryRace={deleteRaceFromLibrary} onUpdateLibraryRaceName={updateRaceName} onUpdateLibraryRaceCountry={updateRaceCountry} onMoveRace={moveRace} onUpdateStartAt={updateRaceStartAt} isSavingRace={isSavingRace} />}
           {visibleAdminPage === "planning" && <PlanningPanel races={allCalendarRaces} calendarEvents={calendarEvents} eventForm={calendarEventForm} setEventForm={setCalendarEventForm} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onUpdateStartAt={updateRaceStartAt} onSaveEvent={saveCalendarEvent} onDeleteEvent={deleteCalendarEvent} isSavingEvent={isSavingEvent} />}
@@ -10530,6 +10530,7 @@ function TitlesPanel({
 function SeasonCardsAdminPanel({
   standingsBySeason = {},
   standingsByCategory = {},
+  teamStandingsByCategory = {},
   offSeasonEntries = [],
   allDrivers = [],
   teams = [],
@@ -10585,6 +10586,57 @@ function SeasonCardsAdminPanel({
     });
     return Array.from(grouped.values()).sort((a, b) => a.name.localeCompare(b.name, "fr"));
   }, [standingsByCategory, offSeasonEntries, allDrivers, teams]);
+  const seasonExport = useMemo(() => {
+    const seasonIds = Array.from({ length: 18 }, (_, index) => `S${index + 1}`);
+    const eventTypes = ["LEMANS24", "INDY300"];
+    const eventLabels = { LEMANS24: "SX Le Mans", INDY300: "SX Indy" };
+    const driverCards = CARD_COLLECTION_CATEGORY_IDS.flatMap((categoryId) => buildSeasonCardCollection(
+      standingsByCategory[categoryId] || {}, seasonIds, categoryId, teams,
+    ));
+    const teamCards = CARD_COLLECTION_CATEGORY_IDS.flatMap((categoryId) => buildSeasonTeamCardCollection(
+      teamStandingsByCategory[categoryId] || {}, seasonIds, categoryId,
+    ));
+    const offSeasonCards = buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS);
+    const eventSeasonKeys = new Set(offSeasonEntries.map((entry) => `${normalizeCategoryId(entry.eventType)}:${normalizeSeasonId(entry.seasonId)}`));
+    const columns = seasonIds.flatMap((seasonId) => [
+      { key: seasonId, label: `Saison ${getSeasonNumber(seasonId)}` },
+      ...eventTypes
+        .filter((eventType) => eventSeasonKeys.has(`${eventType}:${seasonId}`))
+        .map((eventType) => ({ key: `${eventType}:${seasonId}`, label: `${eventLabels[eventType]} · Saison ${getSeasonNumber(seasonId)}` })),
+    ]);
+    const rowMap = new Map();
+    const addCard = (card, kind) => {
+      const entityId = kind === "team"
+        ? card.teamId ?? normalizeResultText(card.name)
+        : card.driverId ?? normalizeResultText(card.name);
+      if (entityId === "" || entityId == null) return;
+      const rowKey = `${kind}:${String(entityId)}`;
+      if (!rowMap.has(rowKey)) {
+        rowMap.set(rowKey, {
+          key: rowKey,
+          kind,
+          name: card.name || (kind === "team" ? "Écurie inconnue" : "Pilote inconnu"),
+          counts: Object.fromEntries(columns.map((column) => [column.key, 0])),
+        });
+      }
+      const row = rowMap.get(rowKey);
+      const columnKey = CARD_COLLECTION_EVENT_IDS.includes(normalizeCategoryId(card.categoryId))
+        ? `${normalizeCategoryId(card.categoryId)}:${normalizeSeasonId(card.seasonId)}`
+        : normalizeSeasonId(card.seasonId);
+      if (columnKey in row.counts) row.counts[columnKey] += 1;
+    };
+    driverCards.forEach((card) => addCard(card, "driver"));
+    teamCards.forEach((card) => addCard(card, "team"));
+    offSeasonCards.forEach((card) => {
+      addCard(card, "driver");
+      if (card.teamId || card.teamName && card.teamName !== "Sans écurie") {
+        addCard({ ...card, name: card.teamName }, "team");
+      }
+    });
+    const driversRows = Array.from(rowMap.values()).filter((row) => row.kind === "driver").sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    const teamsRows = Array.from(rowMap.values()).filter((row) => row.kind === "team").sort((a, b) => a.name.localeCompare(b.name, "fr"));
+    return { columns, driversRows, teamsRows };
+  }, [standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams]);
   const previewCards = useMemo(
     () => buildSeasonCardEdition(standings, cardSeasonId, selectedCategoryId, teams),
     [standings, cardSeasonId, selectedCategoryId, teams],
@@ -10633,19 +10685,19 @@ function SeasonCardsAdminPanel({
     reader.onload = () => setSpecialCardForm((current) => ({ ...current, image: String(reader.result || "") }));
     reader.readAsDataURL(file);
   };
-  const exportPilotRarityCsv = () => {
-    const headers = ["Pilote", ...CARD_RARITY_PRESETS.map((rarity) => `${rarity.id} - ${rarity.name}`), "Total"];
+  const exportSeasonCsv = () => {
     const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
-    const lines = [headers, ...pilotRarityRows.map((row) => [
-      row.name,
-      ...CARD_RARITY_PRESETS.map((rarity) => row.counts[rarity.id] || 0),
-      CARD_RARITY_PRESETS.reduce((total, rarity) => total + (row.counts[rarity.id] || 0), 0),
-    ])].map((line) => line.map(escapeCsv).join(";"));
-    const blob = new Blob([`\uFEFF${lines.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
+    const headers = ["Pilote / Écurie", ...seasonExport.columns.map((column) => column.label)];
+    const rowToCsv = (row) => [row.name, ...seasonExport.columns.map((column) => row.counts[column.key] || 0)];
+    const lines = [headers, ...seasonExport.driversRows.map(rowToCsv)];
+    if (seasonExport.teamsRows.length) lines.push(["— ÉCURIES —", ...seasonExport.columns.map(() => "")]);
+    lines.push(...seasonExport.teamsRows.map(rowToCsv));
+    const serializedLines = lines.map((line) => line.map(escapeCsv).join(";"));
+    const blob = new Blob([`\uFEFF${serializedLines.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = "urtt-tcg-cartes-par-pilote.csv";
+    link.download = "urtt-tcg-cartes-par-saison.csv";
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -10657,8 +10709,8 @@ function SeasonCardsAdminPanel({
       <Card title="Cartes du catalogue par pilote" icon="📊">
         <div style={styles.stack}>
           <div style={{ ...styles.resultsInfo, alignItems: "center" }}>
-            <p style={styles.mutedSmall}>Nombre de cartes présentes dans le catalogue, toutes saisons et catégories confondues. Les cartes d’écurie et les cartes spéciales sont exclues.</p>
-            <button type="button" onClick={exportPilotRarityCsv} disabled={!pilotRarityRows.length} style={styles.secondaryButton}>Exporter en CSV</button>
+            <p style={styles.mutedSmall}>L’aperçu détaille les cartes pilotes par rareté. L’export CSV donne le nombre de cartes par saison (S1 à S18), inclut Le Mans et Indy hors saison, puis liste les écuries sous les pilotes.</p>
+            <button type="button" onClick={exportSeasonCsv} disabled={!seasonExport.driversRows.length && !seasonExport.teamsRows.length} style={styles.secondaryButton}>Exporter par saison en CSV</button>
           </div>
           <div style={{ overflowX: "auto", maxHeight: 560, overflowY: "auto", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12 }}>
             <table style={{ width: "100%", minWidth: 760, borderCollapse: "collapse", textAlign: "left" }}>
