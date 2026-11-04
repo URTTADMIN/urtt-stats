@@ -10617,13 +10617,24 @@ function SeasonCardsAdminPanel({
           kind,
           name: card.name || (kind === "team" ? "Écurie inconnue" : "Pilote inconnu"),
           counts: Object.fromEntries(columns.map((column) => [column.key, 0])),
+          teamsByColumn: Object.fromEntries(columns.map((column) => [column.key, ""])),
         });
       }
       const row = rowMap.get(rowKey);
       const columnKey = CARD_COLLECTION_EVENT_IDS.includes(normalizeCategoryId(card.categoryId))
         ? `${normalizeCategoryId(card.categoryId)}:${normalizeSeasonId(card.seasonId)}`
         : normalizeSeasonId(card.seasonId);
-      if (columnKey in row.counts) row.counts[columnKey] += 1;
+      if (!(columnKey in row.counts)) return;
+      row.counts[columnKey] += 1;
+      if (kind === "driver") {
+        const teamName = card.teamName && card.teamName !== "Écurie"
+          ? card.teamName
+          : getTeamNameById(teams, card.teamId);
+        const existing = row.teamsByColumn[columnKey];
+        const names = existing ? existing.split(" / ") : [];
+        if (!names.includes(teamName)) names.push(teamName);
+        row.teamsByColumn[columnKey] = names.join(" / ");
+      }
     };
     driverCards.forEach((card) => addCard(card, "driver"));
     teamCards.forEach((card) => addCard(card, "team"));
@@ -10688,10 +10699,11 @@ function SeasonCardsAdminPanel({
   const exportSeasonCsv = () => {
     const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
     const headers = ["Pilote / Écurie", ...seasonExport.columns.map((column) => column.label)];
-    const rowToCsv = (row) => [row.name, ...seasonExport.columns.map((column) => row.counts[column.key] || 0)];
-    const lines = [headers, ...seasonExport.driversRows.map(rowToCsv)];
+    const driverToCsv = (row) => [row.name, ...seasonExport.columns.map((column) => row.teamsByColumn[column.key] || "")];
+    const teamToCsv = (row) => [row.name, ...seasonExport.columns.map((column) => row.counts[column.key] || 0)];
+    const lines = [headers, ...seasonExport.driversRows.map(driverToCsv)];
     if (seasonExport.teamsRows.length) lines.push(["— ÉCURIES —", ...seasonExport.columns.map(() => "")]);
-    lines.push(...seasonExport.teamsRows.map(rowToCsv));
+    lines.push(...seasonExport.teamsRows.map(teamToCsv));
     const serializedLines = lines.map((line) => line.map(escapeCsv).join(";"));
     const blob = new Blob([`\uFEFF${serializedLines.join("\r\n")}`], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -10709,7 +10721,7 @@ function SeasonCardsAdminPanel({
       <Card title="Cartes du catalogue par pilote" icon="📊">
         <div style={styles.stack}>
           <div style={{ ...styles.resultsInfo, alignItems: "center" }}>
-            <p style={styles.mutedSmall}>L’aperçu détaille les cartes pilotes par rareté. L’export CSV donne le nombre de cartes par saison (S1 à S18), inclut Le Mans et Indy hors saison, puis liste les écuries sous les pilotes.</p>
+            <p style={styles.mutedSmall}>L’aperçu détaille les cartes pilotes par rareté. Dans l’export CSV, les lignes pilotes affichent leur écurie par saison et épreuve hors saison ; les lignes des écuries indiquent leur nombre de cartes.</p>
             <button type="button" onClick={exportSeasonCsv} disabled={!seasonExport.driversRows.length && !seasonExport.teamsRows.length} style={styles.secondaryButton}>Exporter par saison en CSV</button>
           </div>
           <div style={{ overflowX: "auto", maxHeight: 560, overflowY: "auto", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12 }}>
