@@ -10550,6 +10550,7 @@ function SeasonCardsAdminPanel({
   const specialCards = normalizeSpecialCards(siteSettings.specialCards);
   const cardSeasonId = cardSettings.seasonId;
   const [specialCardForm, setSpecialCardForm] = useState(EMPTY_SPECIAL_CARD_FORM);
+  const [editingSpecialCardId, setEditingSpecialCardId] = useState("");
   const [allowedDraft, setAllowedDraft] = useState(() => cardSettings.allowedPseudos.join("\n"));
   useEffect(() => {
     setAllowedDraft(cardSettings.allowedPseudos.join("\n"));
@@ -10658,14 +10659,26 @@ function SeasonCardsAdminPanel({
     saveCardSettings({ allowedPseudos: allowedDraft });
   };
   const saveSpecialCard = () => {
-    const normalizedCard = normalizeSpecialCards([{ ...specialCardForm, id: getSpecialCardId(specialCardForm.name) }])[0];
+    const normalizedCard = normalizeSpecialCards([{ ...specialCardForm, id: editingSpecialCardId || getSpecialCardId(specialCardForm.name) }])[0];
     if (!normalizedCard || !onUpdateSetting) return;
-    const nextCards = normalizeSpecialCards([...specialCards, normalizedCard]);
+    const nextCards = editingSpecialCardId
+      ? normalizeSpecialCards(specialCards.map((card) => card.id === editingSpecialCardId ? normalizedCard : card))
+      : normalizeSpecialCards([...specialCards, normalizedCard]);
     onUpdateSetting("specialCards", nextCards);
+    setSpecialCardForm(EMPTY_SPECIAL_CARD_FORM);
+    setEditingSpecialCardId("");
+  };
+  const editSpecialCard = (card) => {
+    setEditingSpecialCardId(card.id);
+    setSpecialCardForm({ name: card.name, label: card.label || "Carte spéciale", rarityId: card.rarityId, image: card.image, color: card.color });
+  };
+  const cancelSpecialCardEdit = () => {
+    setEditingSpecialCardId("");
     setSpecialCardForm(EMPTY_SPECIAL_CARD_FORM);
   };
   const deleteSpecialCard = (cardId) => {
     onUpdateSetting?.("specialCards", specialCards.filter((card) => card.id !== cardId));
+    if (editingSpecialCardId === cardId) cancelSpecialCardEdit();
   };
   const handleSpecialCardImage = (file) => {
     if (!file) return;
@@ -10723,7 +10736,7 @@ function SeasonCardsAdminPanel({
           </div>
         </div>
       </Card>
-      <Card title="Création de carte spéciale" icon="⚙️">
+      <Card title={editingSpecialCardId ? "Modification de carte spéciale" : "Création de carte spéciale"} icon="⚙️">
         <div style={styles.stack}>
           <div style={styles.resultsInfo}>
             <Input label="Nom de la carte" value={specialCardForm.name} onChange={(value) => setSpecialCardForm((current) => ({ ...current, name: value }))} />
@@ -10745,7 +10758,8 @@ function SeasonCardsAdminPanel({
               <span style={styles.labelText}>Image URL / data</span>
               <input value={specialCardForm.image} onChange={(event) => setSpecialCardForm((current) => ({ ...current, image: event.target.value }))} placeholder="/mon-image.png ou image importée" style={styles.input} />
             </label>
-            <button type="button" onClick={saveSpecialCard} disabled={isSaving || !specialCardForm.name.trim() || !specialCardForm.image.trim() || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Créer la carte spéciale"}</button>
+            <button type="button" onClick={saveSpecialCard} disabled={isSaving || !specialCardForm.name.trim() || !specialCardForm.image.trim() || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : editingSpecialCardId ? "Enregistrer les modifications" : "Créer la carte spéciale"}</button>
+            {editingSpecialCardId && <button type="button" onClick={cancelSpecialCardEdit} disabled={isSaving} style={styles.secondaryButton}>Annuler</button>}
           </div>
           {specialCardPreview && <SeasonCardGenerationGrid cards={[specialCardPreview]} compact />}
           {specialCards.length > 0 && (
@@ -10757,6 +10771,7 @@ function SeasonCardsAdminPanel({
                   .map((card) => (
                     <div key={card.cardId} style={styles.stack}>
                       <CollectionCard card={card} />
+                      <button type="button" onClick={() => editSpecialCard(specialCards.find((item) => item.id === card.cardId.replace(/^special-/, "")))} disabled={isSaving} style={styles.secondaryButton}>Modifier</button>
                       <button type="button" onClick={() => deleteSpecialCard(card.cardId.replace(/^special-/, ""))} style={styles.dangerButton}>Supprimer</button>
                     </div>
                   ))}
