@@ -46,7 +46,7 @@ const CARD_BURN_VALUES = { C: 5, PC: 10, R: 25, SR: 75, UR: 260, L: 1000 };
 const TCG_MARKET_ALLOWED_PSEUDOS = ["Compte Test", "Test2", "Kolti"];
 const CARD_LAB_ALLOWED_PLAYER_PSEUDOS = ["kolti"];
 const DEFAULT_CARD_LAB_SETTINGS = { seasonId: CARD_TEST_SEASON_ID, allowedPseudos: CARD_LAB_ALLOWED_PLAYER_PSEUDOS };
-const EMPTY_SPECIAL_CARD_FORM = { name: "", label: "CARTE SPÉCIALE", rarityId: "C", image: "", color: "#cc00ff" };
+const EMPTY_SPECIAL_CARD_FORM = { name: "", label: "Carte spéciale", rarityId: "C", image: "", color: "#cc00ff" };
 const DRIVER_NUMBER_LABEL = "N\u00b0";
 const RETIRED_LABEL = "Retrait\u00e9";
 const RETIRED_DRIVER_LOGO = "/retired-driver.png";
@@ -1307,7 +1307,7 @@ function normalizeSpecialCards(value) {
       return {
         id,
         name,
-        label: String(card?.label || "CARTE SPÉCIALE").trim().replace(/\s+/g, " ").slice(0, 40) || "CARTE SPÉCIALE",
+        label: String(card?.label || "Carte spéciale").trim().replace(/\s+/g, " ").slice(0, 40) || "Carte spéciale",
         rarityId,
         image,
         color: /^#[0-9a-f]{6}$/i.test(String(card?.color || "")) ? card.color : "#cc00ff",
@@ -6045,12 +6045,12 @@ function buildSpecialCardCollection(rarities = CARD_RARITY_PRESETS, customSpecia
       cardId: `special-${card.id}`,
       cardType: "special",
       name: card.name,
-      specialLabel: card.label || "CARTE SPÉCIALE",
+      specialLabel: "CARTE SPÉCIALE",
       position: 0,
       seasonId: "SPECIAL",
       categoryId: CARD_COLLECTION_SPECIAL_CATEGORY_ID,
       categoryName: "Spécial",
-      teamName: "Carte spéciale",
+      teamName: card.label || "Carte spéciale",
       teamLogo: card.image,
       teamColor: card.color,
       points: 0,
@@ -6925,7 +6925,7 @@ function CollectionCard({ card, locked = false, onClick = null, selectable = fal
       {selectable && <span style={{ position: "absolute", top: 10, left: 40, zIndex: 2, padding: "4px 7px", borderRadius: 8, background: "rgba(15,23,42,.86)", color: "#fff", fontSize: 11, fontWeight: 700, pointerEvents: "none" }}>Détruire {Math.max(0, duplicateCount - 1)}</span>}
       {duplicateCount > 1 && <span style={{ ...styles.collectionCardDuplicateBadge, borderColor: rarityColor, color: rarityColor }}>x{duplicateCount}</span>}
       {locked && <span style={styles.collectionCardLockedBadge}>Non obtenue</span>}
-      {!locked && isSpecialCard && <span className="special-card-label">✦ {card.specialLabel || "CARTE SPÉCIALE"}</span>}
+      {!locked && isSpecialCard && <span className="special-card-label">✦ CARTE SPÉCIALE</span>}
       <div className="urtt-tcg-card-rarity" style={styles.collectionCardTop}>
         <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
         <strong style={{ color: rarityColor }}>{card.rarity.name}</strong>
@@ -7074,7 +7074,7 @@ function LabCard({ card, revealed = true, finalCard = false, active = false }) {
           <div style={{ ...styles.collectionCardAccent, background: card.rarity.id === "SL" ? CARD_SL_GRADIENT : `linear-gradient(180deg, ${card.rarity.color}, transparent)` }} />
           {isLegendaryCard && <div className="legendary-card-foil" aria-hidden="true" />}
           {card.isNewCard && <span style={styles.cardLabNewsBadge}>NEW</span>}
-          {isSpecialCard && <span className="special-card-label">✦ {card.specialLabel || "CARTE SPÉCIALE"}</span>}
+          {isSpecialCard && <span className="special-card-label">✦ CARTE SPÉCIALE</span>}
           <div style={styles.cardLabCardTop}>
             <span style={{ ...styles.cardLabRarityBadge, ...rarityBadgeStyle }}>{card.rarity.id}</span>
             <strong>{card.rarity.name}</strong>
@@ -10727,7 +10727,7 @@ function SeasonCardsAdminPanel({
         <div style={styles.stack}>
           <div style={styles.resultsInfo}>
             <Input label="Nom de la carte" value={specialCardForm.name} onChange={(value) => setSpecialCardForm((current) => ({ ...current, name: value }))} />
-            <Input label="Texte du badge" value={specialCardForm.label} onChange={(value) => setSpecialCardForm((current) => ({ ...current, label: value.slice(0, 40) }))} />
+            <Input label="Texte sous le nom" value={specialCardForm.label} onChange={(value) => setSpecialCardForm((current) => ({ ...current, label: value.slice(0, 40) }))} />
             <label style={styles.label}>
               <span style={styles.labelText}>Rareté</span>
               <select value={specialCardForm.rarityId} onChange={(event) => setSpecialCardForm((current) => ({ ...current, rarityId: event.target.value }))} style={styles.resultsSelect}>
