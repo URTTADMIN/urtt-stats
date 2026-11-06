@@ -22,6 +22,7 @@ const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const PUBLIC_PAGE_STORAGE_KEY = "urtt-public-page";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_COLLECTION_STORAGE_KEY = "urtt-card-collection-v4";
+const CARD_COLLECTION_OWNER_STORAGE_KEY = "urtt-card-collection-owner-v1";
 const CARD_PACK_STOCK_STORAGE_KEY = "urtt-card-pack-stock-v4";
 const CARD_TEST_SEASON_ID = "S1";
 const CARD_COLLECTION_CATEGORY_ID = "F1";
@@ -365,34 +366,76 @@ function getFreshestCardPackStock(primary, fallback) {
   return (Number(fallbackStock.stockSyncedAt) || 0) > (Number(primaryStock.stockSyncedAt) || 0) ? fallbackStock : primaryStock;
 }
 
-function readStoredCardPackStock() {
+function readStoredCardPackStock(accountId = "") {
   if (typeof window === "undefined") return getEmptyCardPackStock();
   try {
-    const rawStock = window.localStorage.getItem(CARD_PACK_STOCK_STORAGE_KEY);
+    const safeAccountId = String(accountId || "");
+    const scopedKey = safeAccountId ? `${CARD_PACK_STOCK_STORAGE_KEY}:${safeAccountId}` : CARD_PACK_STOCK_STORAGE_KEY;
+    let rawStock = window.localStorage.getItem(scopedKey);
+    if (safeAccountId && !rawStock) {
+      const cachedOwnerId = window.localStorage.getItem(CARD_COLLECTION_OWNER_STORAGE_KEY) || "";
+      const sessionId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY) || "";
+      if (cachedOwnerId === safeAccountId || (!cachedOwnerId && sessionId === safeAccountId)) {
+        rawStock = window.localStorage.getItem(CARD_PACK_STOCK_STORAGE_KEY);
+        if (rawStock) window.localStorage.setItem(scopedKey, rawStock);
+      }
+    }
     return rawStock ? normalizeCardPackStock(JSON.parse(rawStock)) : getEmptyCardPackStock();
   } catch {
     return getEmptyCardPackStock();
   }
 }
 
-function writeStoredCardPackStock(stock) {
+function writeStoredCardPackStock(stock, accountId = "") {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(CARD_PACK_STOCK_STORAGE_KEY, JSON.stringify(normalizeCardPackStock(stock)));
+  const safeAccountId = String(accountId || "");
+  const storageKey = safeAccountId ? `${CARD_PACK_STOCK_STORAGE_KEY}:${safeAccountId}` : CARD_PACK_STOCK_STORAGE_KEY;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(normalizeCardPackStock(stock)));
+    if (safeAccountId) window.localStorage.setItem(CARD_COLLECTION_OWNER_STORAGE_KEY, safeAccountId);
+    return true;
+  } catch (error) {
+    console.warn("Le stock TCG n'a pas pu être enregistré localement:", error);
+    return false;
+  }
 }
 
-function readStoredCardCollection() {
+function readStoredCardCollection(accountId = "") {
   if (typeof window === "undefined") return [];
   try {
-    const cards = JSON.parse(window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY) || "[]");
+    const safeAccountId = String(accountId || "");
+    const scopedKey = safeAccountId ? `${CARD_COLLECTION_STORAGE_KEY}:${safeAccountId}` : CARD_COLLECTION_STORAGE_KEY;
+    let raw = window.localStorage.getItem(scopedKey);
+    if (safeAccountId && !raw) {
+      const cachedOwnerId = window.localStorage.getItem(CARD_COLLECTION_OWNER_STORAGE_KEY) || "";
+      const sessionId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY) || "";
+      if (cachedOwnerId === safeAccountId || (!cachedOwnerId && sessionId === safeAccountId)) {
+        raw = window.localStorage.getItem(CARD_COLLECTION_STORAGE_KEY);
+        if (raw) {
+          window.localStorage.setItem(scopedKey, raw);
+          window.localStorage.setItem(CARD_COLLECTION_OWNER_STORAGE_KEY, safeAccountId);
+        }
+      }
+    }
+    const cards = JSON.parse(raw || "[]");
     return Array.isArray(cards) ? cards : [];
   } catch {
     return [];
   }
 }
 
-function writeStoredCardCollection(cards = []) {
+function writeStoredCardCollection(cards = [], accountId = "") {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(CARD_COLLECTION_STORAGE_KEY, JSON.stringify(Array.isArray(cards) ? cards : []));
+  const safeAccountId = String(accountId || "");
+  const storageKey = safeAccountId ? `${CARD_COLLECTION_STORAGE_KEY}:${safeAccountId}` : CARD_COLLECTION_STORAGE_KEY;
+  try {
+    window.localStorage.setItem(storageKey, JSON.stringify(Array.isArray(cards) ? cards : []));
+    if (safeAccountId) window.localStorage.setItem(CARD_COLLECTION_OWNER_STORAGE_KEY, safeAccountId);
+    return true;
+  } catch (error) {
+    console.warn("La collection TCG n'a pas pu être enregistrée localement:", error);
+    return false;
+  }
 }
 
 function readStoredPublicPage() {
@@ -4484,6 +4527,7 @@ export default function URTTAdminPanel() {
   }
 
   async function logoutPlayerAccount() {
+    if (playerProfile?.id) window.localStorage.setItem(CARD_COLLECTION_OWNER_STORAGE_KEY, String(playerProfile.id));
     window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
     setPlayerProfile(null);
   }
@@ -4524,10 +4568,6 @@ export default function URTTAdminPanel() {
 
     setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, targetId) ? { ...account, cardCollection: normalizedCards, cardPackStock: normalizedStock } : account));
     setPlayerProfile((current) => current && idsEqual(current.id, targetId) ? { ...current, cardCollection: normalizedCards, cardPackStock: normalizedStock } : current);
-    if (playerProfile?.id && idsEqual(playerProfile.id, targetId)) {
-      writeStoredCardCollection(normalizedCards);
-      writeStoredCardPackStock(normalizedStock);
-    }
     return { ok: true };
   }
 
@@ -4678,8 +4718,8 @@ export default function URTTAdminPanel() {
     setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, target.id) ? { ...account, cardCollection: [], cardPackStock: nextCardPackStock } : account));
     setPlayerProfile((current) => current && idsEqual(current.id, target.id) ? { ...current, cardCollection: [], cardPackStock: nextCardPackStock } : current);
     if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) {
-      writeStoredCardCollection([]);
-      writeStoredCardPackStock(nextCardPackStock);
+      writeStoredCardCollection([], target.id);
+      writeStoredCardPackStock(nextCardPackStock, target.id);
     }
     setPopup({ type: "success", title: "Cartes reset", message: `La collection de ${target.pseudo || "ce joueur"} a été vidée.` });
     return true;
@@ -4722,8 +4762,8 @@ export default function URTTAdminPanel() {
     });
     const currentAccountUpdate = updates.find((item) => playerProfile?.id && idsEqual(item.account.id, playerProfile.id));
     if (currentAccountUpdate) {
-      writeStoredCardCollection([]);
-      writeStoredCardPackStock(currentAccountUpdate.cardPackStock);
+      writeStoredCardCollection([], playerProfile.id);
+      writeStoredCardPackStock(currentAccountUpdate.cardPackStock, playerProfile.id);
     }
     setPopup({ type: "success", title: "Données TCG réinitialisées", message: `Collections vidées et AREKCOINS remis à zéro pour ${updates.length} compte(s). Les stocks de packs sont conservés.` });
     return true;
@@ -4777,7 +4817,10 @@ export default function URTTAdminPanel() {
       window.localStorage.removeItem(getEasterEggStorageKey(target.id));
       window.localStorage.removeItem(EASTER_EGG_STORAGE_KEY);
       window.localStorage.removeItem(CARD_COLLECTION_STORAGE_KEY);
+      window.localStorage.removeItem(`${CARD_COLLECTION_STORAGE_KEY}:${target.id}`);
       window.localStorage.removeItem(CARD_PACK_STOCK_STORAGE_KEY);
+      window.localStorage.removeItem(`${CARD_PACK_STOCK_STORAGE_KEY}:${target.id}`);
+      if (window.localStorage.getItem(CARD_COLLECTION_OWNER_STORAGE_KEY) === String(target.id)) window.localStorage.removeItem(CARD_COLLECTION_OWNER_STORAGE_KEY);
       const guessAttemptsPrefix = GUESS_DRIVER_ATTEMPTS_STORAGE_KEY + ":" + target.id + ":";
       Object.keys(window.localStorage).filter((key) => key.startsWith(guessAttemptsPrefix)).forEach((key) => window.localStorage.removeItem(key));
       setPlayerProfile(null);
@@ -6139,7 +6182,16 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const packCardLibrary = useMemo(() => normalCardLibrary.length >= 5 ? [...normalCardLibrary, ...specialCardLibrary] : [], [normalCardLibrary, specialCardLibrary]);
   const legendaryCardPool = useMemo(() => Array.from(new Map(packCardLibrary.filter((card) => card.rarity?.id === "L").map((card) => [card.cardId || card.id, card])).values()), [packCardLibrary]);
   const specialLegendaryCardPool = useMemo(() => Array.from(new Map(packCardLibrary.filter((card) => card.rarity?.id === "SL").map((card) => [card.cardId || card.id, card])).values()), [packCardLibrary]);
-  const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection());
+  const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
+  const [ownedCards, setOwnedCards] = useState(() => readStoredCardCollection(playerCardAccountId));
+  const ownedCardsRef = useRef(ownedCards);
+  const cardSaveQueueRef = useRef(Promise.resolve());
+  const setOwnedCardsLatest = (cards) => {
+    const nextCards = typeof cards === "function" ? cards(ownedCardsRef.current) : cards;
+    ownedCardsRef.current = nextCards;
+    setOwnedCards(nextCards);
+    return nextCards;
+  };
   const ownedCardKeys = useMemo(() => new Set(ownedCards.map((card) => getCollectionGroupKey(card))), [ownedCards]);
   const sortedOwnedCards = useMemo(() => [...ownedCards]
     .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || getSeasonNumber(b.seasonId) - getSeasonNumber(a.seasonId) || a.position - b.position || Number(b.obtainedAtMs || 0) - Number(a.obtainedAtMs || 0) || a.name.localeCompare(b.name)),
@@ -6242,13 +6294,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [legendaryPackDropNotice, setLegendaryPackDropNotice] = useState(false);
   const [showPackModal, setShowPackModal] = useState(false);
   const [showPackShopModal, setShowPackShopModal] = useState(false);
-  const [packStock, setPackStock] = useState(() => readStoredCardPackStock());
+  const [packStock, setPackStock] = useState(() => readStoredCardPackStock(playerCardAccountId));
   const [isPurchasingPack, setIsPurchasingPack] = useState(false);
   const [packPurchaseStatus, setPackPurchaseStatus] = useState("");
+  const [cardSyncStatus, setCardSyncStatus] = useState("");
   const isPurchasingPackRef = useRef(false);
   const [selectedCollectionCard, setSelectedCollectionCard] = useState(null);
   const cardRevealSoundRef = useRef(null);
-  const playerCardAccountId = playerProfile?.id ? String(playerProfile.id) : "";
   const ownedCardCounts = useMemo(() => ownedCards.reduce((counts, card) => {
     const key = getCollectionGroupKey(card);
     counts[key] = (counts[key] || 0) + 1;
@@ -6260,11 +6312,9 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const selectedDuplicateCopies = selectedDuplicateGroups.reduce((total, card) => total + card.duplicateCount - 1, 0);
   const selectedDuplicateReward = selectedDuplicateGroups.reduce((total, card) => total + (card.duplicateCount - 1) * getCardBurnValue(card), 0);
   const allDuplicatesSelected = selectableDuplicateGroups.length > 0 && selectableDuplicateGroups.every((card) => selectedDuplicateKeys.includes(card.collectionGroupKey));
-  const savePlayerCards = async (cards, stock) => {
+  const persistPlayerCards = async (cards, stock) => {
     let normalizedCards = normalizeCardCollection(cards);
     let normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
-    writeStoredCardCollection(normalizedCards);
-    writeStoredCardPackStock(normalizedStock);
     if (!playerCardAccountId) return { ok: true };
     const { data: currentAccount, error: currentAccountError } = await supabase
       .from("player_accounts")
@@ -6276,8 +6326,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       if (serverStock.cardCollectionResetAt > normalizedStock.cardCollectionResetAt && serverStock.cardCollectionResetAt > getLatestCardObtainedAt(normalizedCards)) {
         normalizedCards = [];
         normalizedStock = { ...normalizedStock, cardCollectionResetAt: serverStock.cardCollectionResetAt };
-        writeStoredCardCollection([]);
-        writeStoredCardPackStock(normalizedStock);
+        writeStoredCardCollection([], playerCardAccountId);
+        writeStoredCardPackStock(normalizedStock, playerCardAccountId);
       }
     }
     if (onSavePlayerTcgState) {
@@ -6298,25 +6348,38 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     }
     return { ok: true };
   };
+  const savePlayerCards = (cards, stock) => {
+    const normalizedCards = normalizeCardCollection(cards);
+    const normalizedStock = normalizeCardPackStock(stock);
+    const localSaved = writeStoredCardCollection(normalizedCards, playerCardAccountId) !== false
+      && writeStoredCardPackStock(normalizedStock, playerCardAccountId) !== false;
+    const pendingSave = cardSaveQueueRef.current.catch(() => {}).then(() => persistPlayerCards(normalizedCards, normalizedStock)).then((result) => {
+      if (!playerCardAccountId && !localSaved) return { ok: false, localSaved: false, message: "Le navigateur n’a pas pu enregistrer le tirage. Libère de l’espace de stockage et réessaie." };
+      return { ...result, localSaved };
+    });
+    cardSaveQueueRef.current = pendingSave.then(() => undefined, () => undefined);
+    return pendingSave;
+  };
   useEffect(() => {
     setCardsView(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   }, [initialView]);
   useEffect(() => {
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
-    const localCards = readStoredCardCollection();
-    const localStock = readStoredCardPackStock();
+    const localCards = readStoredCardCollection(playerCardAccountId);
+    const localStock = readStoredCardPackStock(playerCardAccountId);
     const nextStock = playerCardAccountId
       ? getFreshestCardPackStock(playerProfile?.cardPackStock, localStock)
       : localStock;
+    const mergedCards = playerCardAccountId ? mergeCardCollections(accountCards, localCards) : localCards;
     const nextCards = playerCardAccountId
-      ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(accountCards) ? [] : accountCards
+      ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(mergedCards) ? [] : mergedCards
       : localCards;
-    setOwnedCards(nextCards);
+    setOwnedCardsLatest(nextCards);
     setPackStock(nextStock);
     if (playerCardAccountId) {
-      writeStoredCardCollection(nextCards);
-      writeStoredCardPackStock(nextStock);
-      if (!playerProfile?.cardPackStock) savePlayerCards(nextCards, nextStock);
+      writeStoredCardCollection(nextCards, playerCardAccountId);
+      writeStoredCardPackStock(nextStock, playerCardAccountId);
+      if (!playerProfile?.cardPackStock || JSON.stringify(nextCards) !== JSON.stringify(accountCards)) savePlayerCards(nextCards, nextStock);
     }
   }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
@@ -6327,7 +6390,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const refreshPackStock = () => {
       setPackStock((current) => {
         const next = normalizeCardPackStock(current);
-        if (next.packs !== current.packs || next.updatedAt !== current.updatedAt) savePlayerCards(ownedCards, next);
+        if (next.packs !== current.packs || next.updatedAt !== current.updatedAt) savePlayerCards(ownedCardsRef.current, next);
         return next;
       });
     };
@@ -6383,7 +6446,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     };
     setPackStock(nextStock);
     if (dropsLegendaryPack) setLegendaryPackDropNotice(true);
-    const ownedGroupKeys = new Set(ownedCards.map((card) => getCollectionGroupKey(card)));
+    const ownedGroupKeys = new Set(ownedCardsRef.current.map((card) => getCollectionGroupKey(card)));
     const nextPack = (usesLegendaryPack ? drawLegendaryCardPack(legendaryCardPool, specialLegendaryCardPool) : drawCardPack(packCardLibrary, rarities)).map((card) => {
       const groupKey = getCollectionGroupKey(card);
       const isNewCard = !ownedGroupKeys.has(groupKey);
@@ -6392,14 +6455,19 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     });
     const openedAt = Date.now();
     setPack(nextPack);
-    setOwnedCards((current) => {
-      const nextOwnedCards = [
-        ...nextPack.map(({ isNewCard, packType, ...card }, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
-        ...current,
-      ];
-      savePlayerCards(nextOwnedCards, nextStock);
-      return nextOwnedCards;
-    });
+    const nextOwnedCards = setOwnedCardsLatest((current) => [
+      ...nextPack.map(({ isNewCard, packType, ...card }, index) => ({ ...card, ownedId: `${card.cardId}-${openedAt}-${index}`, obtainedAtMs: openedAt + index })),
+      ...current,
+    ]);
+    if (playerCardAccountId) {
+      setCardSyncStatus("Synchronisation du tirage…");
+      savePlayerCards(nextOwnedCards, nextStock)
+        .then((result) => setCardSyncStatus(result?.ok ? (result.localSaved === false ? "Tirage sauvegardé sur ton compte." : "Tirage sauvegardé.") : result.message || "Tirage non synchronisé. Réessaie avant de fermer la page."))
+        .catch((error) => {
+          console.error("Erreur sauvegarde du tirage TCG:", error);
+          setCardSyncStatus("Tirage non synchronisé. Réessaie avant de fermer la page.");
+        });
+    }
     setRevealedCount(0);
     setIsOpeningPack(true);
     if (usesLegendaryPack) {
@@ -6455,8 +6523,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     try {
       const result = await savePlayerCards(ownedCards, nextStock);
       if (result?.ok === false) {
-        writeStoredCardCollection(ownedCards);
-        writeStoredCardPackStock(currentStock);
+        writeStoredCardCollection(ownedCardsRef.current, playerCardAccountId);
+        writeStoredCardPackStock(currentStock, playerCardAccountId);
         setPackStock(currentStock);
         setPackPurchaseStatus(result.message || "Impossible de sauvegarder l’achat du pack.");
         return;
@@ -6465,8 +6533,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       setPackPurchaseStatus(`${packOption.name} acheté pour ${packOption.price} AREKCOINS.`);
       setShowPackShopModal(false);
     } catch (error) {
-      writeStoredCardCollection(ownedCards);
-      writeStoredCardPackStock(currentStock);
+      writeStoredCardCollection(ownedCardsRef.current, playerCardAccountId);
+      writeStoredCardPackStock(currentStock, playerCardAccountId);
       setPackStock(currentStock);
       setPackPurchaseStatus("Impossible de sauvegarder l’achat du pack.");
       console.error("Erreur achat pack:", error);
@@ -6479,12 +6547,16 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (!card || card.rarity?.id === "SL") return { ok: false, message: "Cette carte ne peut pas être détruite." };
     const groupKey = getCollectionGroupKey(card);
     if ((ownedCardCounts[groupKey] || 0) <= 1) return { ok: false, message: "Il faut posséder cette carte en double pour la détruire." };
-    const removed = removeOwnedCardInstance(ownedCards, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
+    const removed = removeOwnedCardInstance(ownedCardsRef.current, getOwnedCardInstanceKey(card.ownedCopies?.[0] || card));
     if (!removed.removed) return { ok: false, message: "Carte introuvable dans ta collection." };
     const nextStock = { ...normalizeCardPackStock(packStock), arekcoins: (Number(packStock.arekcoins) || 0) + getCardBurnValue(card), stockSyncedAt: Date.now() };
     const result = await savePlayerCards(removed.kept, nextStock);
-    if (!result?.ok) return { ok: false, message: result?.message || "Impossible de sauvegarder la destruction." };
-    setOwnedCards(removed.kept);
+    if (!result?.ok) {
+      writeStoredCardCollection(ownedCardsRef.current, playerCardAccountId);
+      writeStoredCardPackStock(packStock, playerCardAccountId);
+      return { ok: false, message: result?.message || "Impossible de sauvegarder la destruction." };
+    }
+    setOwnedCardsLatest(removed.kept);
     setPackStock(nextStock);
     setSelectedCollectionCard(null);
     return { ok: true, message: `${card.name} détruite : +${getCardBurnValue(card)} AREKCOINS.` };
@@ -6504,7 +6576,8 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const selectedKeys = new Set(selectedDuplicateGroups.map((card) => card.collectionGroupKey));
     const keptGroups = new Set();
     let destroyedCount = 0;
-    const nextCards = ownedCards.filter((card) => {
+    const currentOwnedCards = ownedCardsRef.current;
+    const nextCards = currentOwnedCards.filter((card) => {
       const key = getCollectionGroupKey(card);
       if (!selectedKeys.has(key) || card.rarity?.id === "SL") return true;
       if (!keptGroups.has(key)) { keptGroups.add(key); return true; }
@@ -6516,18 +6589,18 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     try {
       const result = await savePlayerCards(nextCards, nextStock);
       if (!result?.ok) {
-        writeStoredCardCollection(ownedCards);
-        writeStoredCardPackStock(packStock);
+        writeStoredCardCollection(ownedCardsRef.current, playerCardAccountId);
+        writeStoredCardPackStock(packStock, playerCardAccountId);
         setDuplicateDestroyStatus(result?.message || "Impossible de sauvegarder la destruction.");
         return;
       }
-      setOwnedCards(nextCards);
+      setOwnedCardsLatest(nextCards);
       setPackStock(nextStock);
       setSelectedDuplicateKeys([]);
       setDuplicateDestroyStatus(`${destroyedCount} doublon${destroyedCount > 1 ? "s" : ""} détruit${destroyedCount > 1 ? "s" : ""} · +${reward} AREKCOINS.`);
     } catch (error) {
-      writeStoredCardCollection(ownedCards);
-      writeStoredCardPackStock(packStock);
+      writeStoredCardCollection(ownedCardsRef.current, playerCardAccountId);
+      writeStoredCardPackStock(packStock, playerCardAccountId);
       setDuplicateDestroyStatus("Impossible de sauvegarder la destruction.");
       console.error("Erreur destruction des doublons:", error);
     } finally {
@@ -6545,6 +6618,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             <strong>{packStockText}</strong>
             <span>{nextPackText}</span>
             <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
+            {cardSyncStatus && <span role="status" style={styles.mutedSmall}>{cardSyncStatus}</span>}
           </div>
         </section>
       )}
@@ -6557,6 +6631,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div style={styles.actions}>
           <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
           <button type="button" onClick={openPack} disabled={isOpeningPack || isPurchasingPack || !canOpenPack} style={styles.primaryButton}>{isOpeningPack ? "Ouverture..." : "Ouvrir un pack"}</button>
+          {cardSyncStatus && <span role="status" style={styles.mutedSmall}>{cardSyncStatus}</span>}
         </div>
       </header>}
       {cardsView === "collection" && <section style={styles.cardCollectionPanel}>
