@@ -3101,18 +3101,14 @@ export default function URTTAdminPanel() {
         { data: seasonsData, error: seasonsError },
         { data: calendarData, error: calendarError },
         { data: calendarEventsData, error: calendarEventsError },
-        { data: calendarFeedHitsData, error: calendarFeedHitsError },
         { data: specialEditionsData, error: specialEditionsError },
         { data: offSeasonEntriesData, error: offSeasonEntriesError },
         { data: seasonTitlesData, error: seasonTitlesError },
         { data: developmentData, error: developmentError },
         { data: racePredictionsData, error: racePredictionsError },
         { data: predictionControlsData, error: predictionControlsError },
-        { data: playerAccountsData, error: playerAccountsError },
         { data: guessDriverResultsData, error: guessDriverResultsError },
         { data: guessDriverAttemptsData, error: guessDriverAttemptsError },
-        { data: feedbackRequestsData, error: feedbackRequestsError },
-        { data: adminPermissionsData, error: adminPermissionsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
@@ -3124,18 +3120,14 @@ export default function URTTAdminPanel() {
         supabase.from("seasons").select("*").order("sort_order", { ascending: true }),
         supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
-        supabase.from("calendar_feed_hits").select("visitor_hash, user_agent, created_at").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }),
         supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
         supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
         supabase.from("race_predictions").select("*").order("created_at", { ascending: false }),
         supabase.from("race_prediction_controls").select("*").order("race_id", { ascending: true }),
-        supabase.from("player_accounts").select("*").order("created_at", { ascending: false }),
         supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
         supabase.from("guess_driver_attempts").select("*").order("created_at", { ascending: false }),
-        supabase.from("feedback_requests").select("*").order("created_at", { ascending: false }),
-        supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
@@ -3149,18 +3141,14 @@ export default function URTTAdminPanel() {
         seasonsError && seasonsError.code !== "42P01" && `seasons: ${seasonsError.message}`,
         calendarError && `season_calendar: ${calendarError.message}`,
         calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
-        calendarFeedHitsError && calendarFeedHitsError.code !== "42P01" && `calendar_feed_hits: ${calendarFeedHitsError.message}`,
         specialEditionsError && specialEditionsError.code !== "42P01" && `special_event_editions: ${specialEditionsError.message}`,
         offSeasonEntriesError && offSeasonEntriesError.code !== "42P01" && `off_season_championship_entries: ${offSeasonEntriesError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
         racePredictionsError && racePredictionsError.code !== "42P01" && `race_predictions: ${racePredictionsError.message}`,
         predictionControlsError && predictionControlsError.code !== "42P01" && `race_prediction_controls: ${predictionControlsError.message}`,
-        playerAccountsError && playerAccountsError.code !== "42P01" && `player_accounts: ${playerAccountsError.message}`,
         guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
         guessDriverAttemptsError && guessDriverAttemptsError.code !== "42P01" && `guess_driver_attempts: ${guessDriverAttemptsError.message}`,
-        feedbackRequestsError && feedbackRequestsError.code !== "42P01" && `feedback_requests: ${feedbackRequestsError.message}`,
-        adminPermissionsError && adminPermissionsError.code !== "42P01" && `admin_permissions: ${adminPermissionsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
@@ -3180,19 +3168,14 @@ export default function URTTAdminPanel() {
       const mappedCalendar = (calendarData || []).map(mapCalendarRaceFromDb);
       setAllCalendarRaces(mappedCalendar);
       setCalendarEvents((calendarEventsData || []).map(mapCalendarEventFromDb));
-      setCalendarFeedHits(calendarFeedHitsData || []);
       setSpecialEditions((specialEditionsData || []).map(mapSpecialEditionFromDb));
       setOffSeasonEntries((offSeasonEntriesData || []).map(mapOffSeasonEntryFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
       setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
       setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
-      const storedPlayerId = typeof window !== "undefined" ? window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY) : "";
-      setPlayerAccounts((playerAccountsData || []).map(mapPlayerProfileFromDb).map((profile) => idsEqual(profile.id, storedPlayerId) ? mergeStoredEasterEggsIntoProfile(profile) : profile));
       setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
       setGuessDriverAttempts((guessDriverAttemptsData || []).map(mapGuessDriverAttemptFromDb));
-      setFeedbackRequests((feedbackRequestsData || []).map(mapFeedbackRequestFromDb));
-      setAdminPermissionRows((adminPermissionsData || []).map(mapAdminPermissionRowFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
@@ -3205,6 +3188,38 @@ export default function URTTAdminPanel() {
       setIsLoadingData(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (view !== "admin" || isLoadingData) return undefined;
+    let isCurrent = true;
+    async function loadAdminOnlyData() {
+      const [accountsResult, permissionsResult, feedbackResult, calendarHitsResult] = await Promise.all([
+        supabase.from("player_accounts").select("*").order("created_at", { ascending: false }),
+        supabase.from("admin_permissions").select("*").order("user_email", { ascending: true }),
+        supabase.from("feedback_requests").select("*").order("created_at", { ascending: false }),
+        supabase.from("calendar_feed_hits").select("visitor_hash, user_agent, created_at").gte("created_at", new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()).order("created_at", { ascending: false }),
+      ]);
+      if (!isCurrent) return;
+      if (!accountsResult.error) {
+        const storedPlayerId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY) || "";
+        setPlayerAccounts((accountsResult.data || []).map(mapPlayerProfileFromDb).map((profile) => idsEqual(profile.id, storedPlayerId) ? mergeStoredEasterEggsIntoProfile(profile) : profile));
+      }
+      if (!permissionsResult.error) setAdminPermissionRows((permissionsResult.data || []).map(mapAdminPermissionRowFromDb));
+      if (!feedbackResult.error) setFeedbackRequests((feedbackResult.data || []).map(mapFeedbackRequestFromDb));
+      if (!calendarHitsResult.error) setCalendarFeedHits(calendarHitsResult.data || []);
+      const errors = [accountsResult, permissionsResult, feedbackResult, calendarHitsResult]
+        .filter((result) => result.error && result.error.code !== "42P01")
+        .map((result) => result.error.message);
+      if (errors.length) setSupabaseErrors((current) => Array.from(new Set([...current, ...errors])));
+    }
+    loadAdminOnlyData().catch((error) => {
+      if (isCurrent) {
+        console.error("Erreur chargement données admin:", error);
+        setSupabaseErrors((current) => [...current, error.message || "Impossible de charger les données d’administration."]);
+      }
+    });
+    return () => { isCurrent = false; };
+  }, [view, isLoadingData]);
 
   const racesBySelectedCategory = useMemo(() => createSeasonMapFromCalendar(allCalendarRaces, selectedCategoryId), [allCalendarRaces, selectedCategoryId]);
   const availableSeasonOptions = useMemo(() => getSeasonOptionsForCategory(allCalendarRaces, selectedCategoryId, seasonOptions), [allCalendarRaces, selectedCategoryId, seasonOptions]);
