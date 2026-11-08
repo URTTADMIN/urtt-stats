@@ -1,5 +1,5 @@
 -- Restrict permanent deletion of player accounts to the URTT owner.
--- Existing foreign keys cascade guess-driver history and anonymize predictions/feedback.
+-- Existing feedback is anonymized when an account is deleted.
 grant delete on table public.player_accounts to authenticated;
 
 drop policy if exists "Owner can delete player accounts" on public.player_accounts;

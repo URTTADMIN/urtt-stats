@@ -17,7 +17,6 @@ const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
-const GUESS_DRIVER_ATTEMPTS_STORAGE_KEY = "urtt-guess-driver-attempts";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
 const PUBLIC_PAGE_STORAGE_KEY = "urtt-public-page";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
@@ -67,9 +66,7 @@ const ADMIN_PAGE_OPTIONS = [
   { id: "offseason-lemans", icon: "🔷", label: "2,4h du Mans" },
   { id: "offseason-indy", icon: "🟡", label: "Indy 300" },
   { id: "development", icon: "📈", label: "Développement" },
-  { id: "games", icon: "🎮", label: "Jeux" },
   { id: "channel-points", icon: "💠", label: "Points Twitch" },
-  { id: "guess-attempts", icon: "🧩", label: "Essais défi" },
   { id: "player-accounts", icon: "👤", label: "Comptes" },
   { id: "feedback-requests", icon: "📝", label: "Demandes" },
   { id: "easter-egg-admin", icon: "📖", label: "Easter eggs" },
@@ -83,7 +80,7 @@ const ADMIN_PAGE_GROUPS = [
   { id: "management", label: "Gestion P & C", icon: "🏎️", pages: ["titles", "drivers", "teams", "development"] },
   { id: "calendar", label: "Gestion Calendrier", icon: "📅", pages: ["races", "planning", "editions", "offseason-lemans", "offseason-indy", "results"] },
   { id: "stats", label: "Statistique", icon: "📊", pages: ["race-awards", "championship-stats"] },
-  { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["card-generation", "games", "channel-points", "guess-attempts", "easter-egg-admin"] },
+  { id: "fun", label: "Hors URTT / Fun", icon: "🎮", pages: ["card-generation", "channel-points", "easter-egg-admin"] },
   { id: "administration", label: "Administration", icon: "🔐", pages: ["player-accounts", "feedback-requests", "permissions", "settings", "kolti"] },
 ];
 const ALL_ADMIN_PAGE_IDS = ADMIN_PAGE_OPTIONS.map((page) => page.id);
@@ -98,8 +95,6 @@ const PUBLIC_PAGE_OPTIONS = [
   { id: "lemans24", label: "2,4h du Mans" },
   { id: "indy300", label: "Indy 300" },
   { id: "development", label: "Développement" },
-  { id: "predictions", label: "Pronos" },
-  { id: "guess-driver", label: "Défi pilote" },
   { id: "easter-eggs", label: "Livre secret" },
   { id: "tgc-packs", label: "Packs" },
   { id: "tgc-collection", label: "Collection" },
@@ -111,7 +106,7 @@ const PUBLIC_NAV_GROUPS = [
   { id: "offseason", label: "Hors-Saison", pages: ["lemans24", "indy300"] },
   { id: "tgc", label: "URTT TCG", pages: ["tgc-packs", "tgc-collection", "tgc-pokedex"] },
   { id: "other", label: "Autre championnat", pages: ["other-championships"] },
-  { id: "community", label: "Communautaire", pages: ["predictions", "guess-driver", "easter-eggs"] },
+  { id: "community", label: "Communautaire", pages: ["easter-eggs"] },
 ];
 const EASTER_EGG_BOOK = [
   { id: "kolti-s7", title: "Célébration annulée", hint: "Saison 7 · Classements · Kolti", unlockedText: "Kolti S7 : les confettis commencent, puis la célébration remonte et disparaît." },
@@ -157,8 +152,6 @@ function getPublicPageIcon(pageId) {
     lemans24: "◇",
     indy300: "◉",
     development: "↗",
-    predictions: "◇",
-    "guess-driver": "?",
     "easter-eggs": "□",
     "tgc-packs": "◈",
     "tgc-collection": "▣",
@@ -581,30 +574,6 @@ function writeStoredEasterEggIds(playerId = "", eggIds = []) {
   const normalizedEggIds = normalizeEasterEggIds(eggIds);
   window.localStorage.setItem(EASTER_EGG_STORAGE_KEY, JSON.stringify(normalizedEggIds));
   if (playerId) window.localStorage.setItem(getEasterEggStorageKey(playerId), JSON.stringify(normalizedEggIds));
-}
-
-function getGuessDriverAttemptsStorageKey(playerId = "", categoryId = "", challengeDay = "") {
-  return `${GUESS_DRIVER_ATTEMPTS_STORAGE_KEY}:${playerId || "guest"}:${normalizeCategoryId(categoryId)}:${challengeDay}`;
-}
-
-function readStoredGuessDriverAttempts(playerId = "", categoryId = "", challengeDay = "") {
-  if (typeof window === "undefined" || !playerId || !challengeDay) return [];
-  try {
-    return normalizeIdList(JSON.parse(window.localStorage.getItem(getGuessDriverAttemptsStorageKey(playerId, categoryId, challengeDay)) || "[]"));
-  } catch {
-    return [];
-  }
-}
-
-function writeStoredGuessDriverAttempts(playerId = "", categoryId = "", challengeDay = "", attempts = []) {
-  if (typeof window === "undefined" || !playerId || !challengeDay) return;
-  const storageKey = getGuessDriverAttemptsStorageKey(playerId, categoryId, challengeDay);
-  const normalizedAttempts = normalizeIdList(attempts);
-  if (normalizedAttempts.length) {
-    window.localStorage.setItem(storageKey, JSON.stringify(normalizedAttempts));
-  } else {
-    window.localStorage.removeItem(storageKey);
-  }
 }
 
 function getSeasonOptions() {
@@ -1389,44 +1358,6 @@ function mapRaceResultFromDb(result, entries = []) {
       })),
   };
 }
-function mapRacePredictionFromDb(prediction) {
-  const storedOrder = Array.isArray(prediction.predicted_order) ? prediction.predicted_order : [];
-  return {
-    id: prediction.id,
-    userId: prediction.user_id || "",
-    playerId: prediction.player_id || "",
-    pseudo: prediction.pseudo || "",
-    raceId: prediction.race_id,
-    seasonId: normalizeSeasonId(prediction.season_id),
-    categoryId: normalizeCategoryId(prediction.category_id),
-    winnerDriverId: prediction.winner_driver_id || "",
-    poleDriverId: prediction.pole_driver_id || "",
-    fastestDriverId: prediction.fastest_driver_id || "",
-    podiumFirstDriverId: prediction.podium_first_driver_id || "",
-    podiumSecondDriverId: prediction.podium_second_driver_id || "",
-    podiumThirdDriverId: prediction.podium_third_driver_id || "",
-    predictedOrder: storedOrder.map((driverId) => String(driverId || "")).filter(Boolean),
-    createdAt: prediction.created_at || "",
-  };
-}
-function mapRacePredictionToDb(prediction) {
-  const predictedOrder = Array.isArray(prediction.predictedOrder) ? prediction.predictedOrder.filter(Boolean).map((driverId) => Number(driverId)) : [];
-  return {
-    user_id: prediction.userId || null,
-    player_id: prediction.playerId ? Number(prediction.playerId) : null,
-    pseudo: String(prediction.pseudo || "").trim(),
-    race_id: Number(prediction.raceId),
-    season_id: normalizeSeasonId(prediction.seasonId),
-    category_id: normalizeCategoryId(prediction.categoryId),
-    winner_driver_id: prediction.winnerDriverId ? Number(prediction.winnerDriverId) : null,
-    pole_driver_id: prediction.poleDriverId ? Number(prediction.poleDriverId) : null,
-    fastest_driver_id: prediction.fastestDriverId ? Number(prediction.fastestDriverId) : null,
-    podium_first_driver_id: prediction.podiumFirstDriverId ? Number(prediction.podiumFirstDriverId) : null,
-    podium_second_driver_id: prediction.podiumSecondDriverId ? Number(prediction.podiumSecondDriverId) : null,
-    podium_third_driver_id: prediction.podiumThirdDriverId ? Number(prediction.podiumThirdDriverId) : null,
-    predicted_order: predictedOrder,
-  };
-}
 function mapPlayerProfileFromDb(profile) {
   return {
     id: profile.id || profile.user_id || "",
@@ -1447,40 +1378,6 @@ function mergeStoredEasterEggsIntoProfile(profile) {
   ]);
   return { ...profile, unlockedEasterEggs };
 }
-function mapGuessDriverResultFromDb(result) {
-  const attempts = Number(result.attempts || 0);
-  const savedScore = Number(result.score || 0);
-  const computedScore = result.won ? getGuessDriverScore(attempts) : 0;
-  return {
-    id: result.id,
-    userId: result.user_id || "",
-    playerId: result.player_id || "",
-    pseudo: result.pseudo || "",
-    discordName: result.discord_name || "",
-    categoryId: normalizeCategoryId(result.category_id),
-    challengeDay: result.challenge_day || "",
-    driverId: result.driver_id || "",
-    attempts,
-    score: Math.max(savedScore, computedScore),
-    won: Boolean(result.won),
-    createdAt: result.created_at || "",
-  };
-}
-function mapGuessDriverAttemptFromDb(attempt) {
-  return {
-    id: attempt.id,
-    playerId: attempt.player_id || "",
-    pseudo: attempt.pseudo || "",
-    discordName: attempt.discord_name || "",
-    categoryId: normalizeCategoryId(attempt.category_id),
-    challengeDay: attempt.challenge_day || "",
-    targetDriverId: attempt.target_driver_id || "",
-    guessedDriverId: attempt.guessed_driver_id || "",
-    attemptNumber: Number(attempt.attempt_number || 0),
-    correct: Boolean(attempt.correct),
-    createdAt: attempt.created_at || "",
-  };
-}
 function mapFeedbackRequestFromDb(request) {
   return {
     id: request.id,
@@ -1496,138 +1393,6 @@ function mapFeedbackRequestFromDb(request) {
     resolvedAt: request.resolved_at || "",
     resolvedBy: request.resolved_by || "",
   };
-}
-function mapPredictionControlFromDb(control) {
-  return {
-    id: control.id,
-    raceId: control.race_id,
-    closed: Boolean(control.closed),
-    updatedAt: control.updated_at || "",
-  };
-}
-function isPredictionClosedForRace(raceResults = [], controls = [], raceId) {
-  return Boolean(getRaceResultForRace(raceResults, raceId)) || controls.some((control) => String(control.raceId) === String(raceId) && control.closed);
-}
-function getRaceResultForRace(raceResults = [], raceId) {
-  return raceResults.find((result) => String(result.raceId) === String(raceId));
-}
-function scoreRacePrediction(prediction, raceResults = []) {
-  const result = getRaceResultForRace(raceResults, prediction.raceId);
-  if (!result) return { scored: false, score: 0, details: "En attente du résultat" };
-  const sortedEntries = [...result.entries].sort((a, b) => Number(a.position) - Number(b.position));
-  const winner = sortedEntries.find((entry) => Number(entry.position) === 1);
-  const poleIds = sortedEntries.filter((entry) => entry.pole).map((entry) => String(entry.driverId));
-  const fastestIds = sortedEntries.filter((entry) => entry.fastestLap).map((entry) => String(entry.driverId));
-  const podiumIds = sortedEntries.slice(0, 3).map((entry) => String(entry.driverId));
-  const predictedOrder = Array.isArray(prediction.predictedOrder) && prediction.predictedOrder.length
-    ? prediction.predictedOrder.map((id) => String(id || "")).filter(Boolean)
-    : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId].map((id) => String(id || "")).filter(Boolean);
-  const predictedPodium = predictedOrder.slice(0, 3);
-  let score = 0;
-  const parts = [];
-  if (idsEqual(prediction.winnerDriverId, winner?.driverId)) { score += 10; parts.push("Vainqueur +10"); }
-  if (poleIds.includes(String(prediction.poleDriverId))) { score += 5; parts.push("Pole +5"); }
-  if (fastestIds.includes(String(prediction.fastestDriverId))) { score += 5; parts.push("MT +5"); }
-  const podiumHits = predictedPodium.filter((driverId) => podiumIds.includes(driverId)).length;
-  if (podiumHits) { score += podiumHits * 3; parts.push(`Podium +${podiumHits * 3}`); }
-  if (predictedPodium.length === 3 && predictedPodium.every((driverId, index) => podiumIds[index] === driverId)) {
-    score += 10;
-    parts.push("Podium exact +10");
-  }
-  const exactPositions = predictedOrder.reduce((count, driverId, index) => sortedEntries[index] && idsEqual(sortedEntries[index].driverId, driverId) ? count + 1 : count, 0);
-  if (exactPositions) { score += exactPositions * 2; parts.push(`Positions exactes +${exactPositions * 2}`); }
-  return { scored: true, score, details: parts.length ? parts.join(" · ") : "0 point" };
-}
-function getPredictionLeaderboard(predictions = [], raceResults = []) {
-  const map = new Map();
-  predictions.forEach((prediction) => {
-    const key = prediction.pseudo.trim().toLowerCase();
-    if (!key) return;
-    const scored = scoreRacePrediction(prediction, raceResults);
-    const current = map.get(key) || { pseudo: prediction.pseudo, score: 0, entries: 0 };
-    map.set(key, { ...current, pseudo: current.pseudo || prediction.pseudo, score: current.score + scored.score, entries: current.entries + 1 });
-  });
-  return Array.from(map.values()).sort((a, b) => b.score - a.score || a.pseudo.localeCompare(b.pseudo, "fr"));
-}
-const GUESS_DRIVER_RECENT_DAYS = 7;
-function getStableChallengeHash(seed = "") {
-  return Array.from(seed).reduce((hash, char) => {
-    const nextHash = hash ^ char.charCodeAt(0);
-    return Math.imul(nextHash, 16777619) >>> 0;
-  }, 2166136261);
-}
-function pickChallengeDriver(drivers = [], dayKey = "", seasonId = "", categoryId = "") {
-  if (!drivers.length) return null;
-  const seed = `${dayKey}-${normalizeSeasonId(seasonId)}-${normalizeCategoryId(categoryId)}`;
-  return drivers[getStableChallengeHash(seed) % drivers.length];
-}
-function getDailyDriverChallenge(drivers = [], seasonId = "", categoryId = "") {
-  if (!drivers.length) return null;
-  const dayKey = getDailyChallengeDay();
-  const recentLimit = Math.min(GUESS_DRIVER_RECENT_DAYS, Math.max(0, drivers.length - 1));
-  const recentDriverIds = new Set();
-  let previousDay = dayKey;
-
-  for (let index = 0; index < recentLimit; index += 1) {
-    previousDay = getPreviousChallengeDay(previousDay);
-    const previousDriver = pickChallengeDriver(drivers, previousDay, seasonId, categoryId);
-    if (previousDriver) recentDriverIds.add(String(previousDriver.id));
-  }
-
-  const candidates = drivers.filter((driver) => !recentDriverIds.has(String(driver.id)));
-  return pickChallengeDriver(candidates.length ? candidates : drivers, dayKey, seasonId, categoryId);
-}
-function getDailyChallengeDay(date = new Date()) {
-  return date.toISOString().slice(0, 10);
-}
-function getPreviousChallengeDay(day) {
-  const date = new Date(`${day}T12:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
-  return getDailyChallengeDay(date);
-}
-function getGuessDriverScore(attempts = 0) {
-  const attemptCount = Math.max(1, Number(attempts) || 1);
-  return Math.max(1, 11 - attemptCount);
-}
-function getGuessDriverStreak(results = [], userId = "", categoryId = "") {
-  if (!userId) return 0;
-  const wonDays = new Set(results
-    .filter((result) => (String(result.playerId || "") === String(userId) || String(result.userId || "") === String(userId)) && result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
-    .map((result) => result.challengeDay)
-    .filter(Boolean));
-  let day = getDailyChallengeDay();
-  let streak = 0;
-  while (wonDays.has(day)) {
-    streak += 1;
-    day = getPreviousChallengeDay(day);
-  }
-  return streak;
-}
-function getGuessDriverLeaderboard(results = [], categoryId = "") {
-  const map = new Map();
-  results
-    .filter((result) => result.won && normalizeCategoryId(result.categoryId) === normalizeCategoryId(categoryId))
-    .forEach((result) => {
-      const key = result.playerId ? `player-${result.playerId}` : result.pseudo.trim().toLowerCase();
-      if (!key) return;
-      const score = Math.max(Number(result.score || 0), getGuessDriverScore(result.attempts));
-      const current = map.get(key) || { pseudo: result.pseudo, discordName: result.discordName, score: 0, wins: 0, bestAttempts: Number(result.attempts) || 0 };
-      map.set(key, {
-        ...current,
-        pseudo: current.pseudo || result.pseudo,
-        discordName: current.discordName || result.discordName,
-        score: current.score + score,
-        wins: current.wins + 1,
-        bestAttempts: current.bestAttempts ? Math.min(current.bestAttempts, Number(result.attempts) || current.bestAttempts) : Number(result.attempts) || 0,
-      });
-    });
-  return Array.from(map.values()).sort((a, b) => b.score - a.score || b.wins - a.wins || a.bestAttempts - b.bestAttempts || a.pseudo.localeCompare(b.pseudo, "fr"));
-}
-function compareGuessValue(guessValue, targetValue) {
-  const guessNumber = Number(guessValue) || 0;
-  const targetNumber = Number(targetValue) || 0;
-  if (guessNumber === targetNumber) return "correct";
-  return targetNumber > guessNumber ? "higher" : "lower";
 }
 function createSeasonMapFromCalendar(calendarRaces, selectedCategoryId = "F1") {
   const map = createEmptySeasonMap();
@@ -2933,12 +2698,8 @@ export default function URTTAdminPanel() {
   const [raceResults, setRaceResults] = useState([]);
   const [seasonTitles, setSeasonTitles] = useState([]);
   const [developmentEntries, setDevelopmentEntries] = useState([]);
-  const [racePredictions, setRacePredictions] = useState([]);
-  const [predictionControls, setPredictionControls] = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
   const [playerAccounts, setPlayerAccounts] = useState([]);
-  const [guessDriverResults, setGuessDriverResults] = useState([]);
-  const [guessDriverAttempts, setGuessDriverAttempts] = useState([]);
   const [feedbackRequests, setFeedbackRequests] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
@@ -2960,9 +2721,7 @@ export default function URTTAdminPanel() {
   const [search, setSearch] = useState("");
   const [adminGlobalSearch, setAdminGlobalSearch] = useState("");
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [isSavingPrediction, setIsSavingPrediction] = useState(false);
   const [isSavingPlayerAccount, setIsSavingPlayerAccount] = useState(false);
-  const [isSavingGuessResult, setIsSavingGuessResult] = useState(false);
   const [isSavingFeedbackRequest, setIsSavingFeedbackRequest] = useState(false);
   const [supabaseErrors, setSupabaseErrors] = useState([]);
   const [lastSyncAt, setLastSyncAt] = useState(null);
@@ -3105,10 +2864,6 @@ export default function URTTAdminPanel() {
         { data: offSeasonEntriesData, error: offSeasonEntriesError },
         { data: seasonTitlesData, error: seasonTitlesError },
         { data: developmentData, error: developmentError },
-        { data: racePredictionsData, error: racePredictionsError },
-        { data: predictionControlsData, error: predictionControlsError },
-        { data: guessDriverResultsData, error: guessDriverResultsError },
-        { data: guessDriverAttemptsData, error: guessDriverAttemptsError },
         { data: siteSettingsData, error: siteSettingsError },
         { data: resultsData, error: resultsError },
         { data: resultEntriesData, error: resultEntriesError },
@@ -3124,10 +2879,6 @@ export default function URTTAdminPanel() {
         supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
         supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
         supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-        supabase.from("race_predictions").select("*").order("created_at", { ascending: false }),
-        supabase.from("race_prediction_controls").select("*").order("race_id", { ascending: true }),
-        supabase.from("guess_driver_results").select("*").order("challenge_day", { ascending: false }),
-        supabase.from("guess_driver_attempts").select("*").order("created_at", { ascending: false }),
         supabase.from("site_settings").select("*"),
         supabase.from("race_results").select("*").order("id", { ascending: true }),
         fetchAllSupabaseRows("race_result_entries"),
@@ -3145,10 +2896,6 @@ export default function URTTAdminPanel() {
         offSeasonEntriesError && offSeasonEntriesError.code !== "42P01" && `off_season_championship_entries: ${offSeasonEntriesError.message}`,
         seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
         developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
-        racePredictionsError && racePredictionsError.code !== "42P01" && `race_predictions: ${racePredictionsError.message}`,
-        predictionControlsError && predictionControlsError.code !== "42P01" && `race_prediction_controls: ${predictionControlsError.message}`,
-        guessDriverResultsError && guessDriverResultsError.code !== "42P01" && `guess_driver_results: ${guessDriverResultsError.message}`,
-        guessDriverAttemptsError && guessDriverAttemptsError.code !== "42P01" && `guess_driver_attempts: ${guessDriverAttemptsError.message}`,
         siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
         resultsError && `race_results: ${resultsError.message}`,
         resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
@@ -3172,10 +2919,6 @@ export default function URTTAdminPanel() {
       setOffSeasonEntries((offSeasonEntriesData || []).map(mapOffSeasonEntryFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
-      setRacePredictions((racePredictionsData || []).map(mapRacePredictionFromDb));
-      setPredictionControls((predictionControlsData || []).map(mapPredictionControlFromDb));
-      setGuessDriverResults((guessDriverResultsData || []).map(mapGuessDriverResultFromDb));
-      setGuessDriverAttempts((guessDriverAttemptsData || []).map(mapGuessDriverAttemptFromDb));
       setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
@@ -4822,9 +4565,6 @@ export default function URTTAdminPanel() {
     }
 
     setPlayerAccounts((current) => current.filter((account) => !idsEqual(account.id, target.id)));
-    setRacePredictions((current) => current.map((prediction) => idsEqual(prediction.playerId, target.id) ? { ...prediction, playerId: "" } : prediction));
-    setGuessDriverResults((current) => current.filter((result) => !idsEqual(result.playerId, target.id)));
-    setGuessDriverAttempts((current) => current.filter((attempt) => !idsEqual(attempt.playerId, target.id)));
     setFeedbackRequests((current) => current.map((request) => idsEqual(request.playerId, target.id) ? { ...request, playerId: "" } : request));
 
     if (playerProfile?.id && idsEqual(playerProfile.id, target.id)) {
@@ -4836,184 +4576,11 @@ export default function URTTAdminPanel() {
       window.localStorage.removeItem(CARD_PACK_STOCK_STORAGE_KEY);
       window.localStorage.removeItem(`${CARD_PACK_STOCK_STORAGE_KEY}:${target.id}`);
       if (window.localStorage.getItem(CARD_COLLECTION_OWNER_STORAGE_KEY) === String(target.id)) window.localStorage.removeItem(CARD_COLLECTION_OWNER_STORAGE_KEY);
-      const guessAttemptsPrefix = GUESS_DRIVER_ATTEMPTS_STORAGE_KEY + ":" + target.id + ":";
-      Object.keys(window.localStorage).filter((key) => key.startsWith(guessAttemptsPrefix)).forEach((key) => window.localStorage.removeItem(key));
       setPlayerProfile(null);
     }
 
-    setPopup({ type: "success", title: "Compte supprimé", message: "Le compte " + (target.pseudo || target.id) + " a été supprimé. Ses pronostics et demandes restent anonymisés." });
+    setPopup({ type: "success", title: "Compte supprimé", message: "Le compte " + (target.pseudo || target.id) + " a été supprimé. " });
     return true;
-  }
-
-  async function saveRacePrediction(prediction) {
-    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour envoyer ton prono." };
-    if (!prediction.raceId) return { ok: false, message: "Choisis une course." };
-    const alreadySubmitted = racePredictions.some((existingPrediction) => String(existingPrediction.playerId) === String(playerProfile.id) && String(existingPrediction.raceId) === String(prediction.raceId));
-    if (alreadySubmitted) return { ok: false, message: "Tu as déjà envoyé un prono pour cette course." };
-    const selectedRace = allCalendarRaces.find((race) => String(race.id) === String(prediction.raceId));
-    const seasonDrivers = drivers.filter((driver) => (driver.participations?.[normalizeSeasonId(prediction.seasonId)] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(prediction.categoryId)));
-    const requiredPositionCount = Math.min(20, seasonDrivers.length || 20);
-    const predictedOrder = (prediction.predictedOrder || []).slice(0, requiredPositionCount).filter(Boolean);
-    if (!prediction.poleDriverId || !prediction.fastestDriverId || predictedOrder.length < requiredPositionCount) return { ok: false, message: `Remplis la pole, le MT et les ${requiredPositionCount} positions du prono.` };
-    if (new Set(predictedOrder.map(String)).size < predictedOrder.length) return { ok: false, message: "Un pilote ne peut pas être choisi deux fois dans le classement." };
-    if (isPredictionClosedForRace(raceResults, predictionControls, prediction.raceId)) return { ok: false, message: "Les pronos sont fermés pour cette course." };
-
-    setIsSavingPrediction(true);
-    const { data, error } = await supabase
-      .from("race_predictions")
-      .insert(mapRacePredictionToDb({ ...prediction, playerId: playerProfile.id, pseudo: playerProfile.pseudo, raceName: selectedRace?.name || "", predictedOrder }))
-      .select()
-      .single();
-    setIsSavingPrediction(false);
-
-    if (error) {
-      console.error("Erreur prono:", error);
-      const message = error.code === "42P01"
-        ? "La table race_predictions n'existe pas encore. Lance la commande SQL fournie par Codex."
-        : error.code === "23505"
-          ? "Tu as déjà envoyé un prono pour cette course."
-        : error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
-          ? "Supabase bloque l'envoi du prono. Vérifie les policies RLS de race_predictions."
-          : "Impossible d'envoyer le prono pour le moment.";
-      return { ok: false, message };
-    }
-
-    const savedPrediction = mapRacePredictionFromDb(data);
-    setRacePredictions((current) => [savedPrediction, ...current]);
-    return { ok: true, message: "Prono envoyé ! Il sera scoré quand le résultat sera validé." };
-  }
-
-  async function saveGuessDriverWin({ categoryId, challengeDay, driverId, attempts }) {
-    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ta série." };
-    const score = getGuessDriverScore(attempts);
-    setIsSavingGuessResult(true);
-    const { data, error } = await supabase
-      .from("guess_driver_results")
-      .upsert({
-        player_id: Number(playerProfile.id),
-        pseudo: playerProfile.pseudo,
-        discord_name: playerProfile.discordName || "",
-        category_id: normalizeCategoryId(categoryId),
-        challenge_day: challengeDay,
-        driver_id: Number(driverId),
-        attempts: Number(attempts || 0),
-        score,
-        won: true,
-      }, { onConflict: "player_id,category_id,challenge_day" })
-      .select()
-      .single();
-    setIsSavingGuessResult(false);
-
-    if (error) {
-      console.error("Erreur défi pilote:", error);
-      const message = error.code === "42P01"
-        ? "La table guess_driver_results n'existe pas encore. Lance la commande SQL fournie par Codex."
-        : "Impossible d'enregistrer le défi pilote.";
-      return { ok: false, message };
-    }
-
-    const savedResult = mapGuessDriverResultFromDb(data);
-    setGuessDriverResults((current) => {
-      const withoutSameDay = current.filter((result) => !(String(result.playerId) === String(savedResult.playerId) && result.categoryId === savedResult.categoryId && result.challengeDay === savedResult.challengeDay));
-      return [savedResult, ...withoutSameDay];
-    });
-    return { ok: true, message: `Défi enregistré : +${savedResult.score} pts.` };
-  }
-
-  async function saveGuessDriverAttempt({ categoryId, challengeDay, targetDriverId, guessedDriverId, attemptNumber, correct }) {
-    if (!playerProfile?.id || !playerProfile?.pseudo) return { ok: false, message: "Connecte-toi avec ton compte joueur pour enregistrer ton essai." };
-
-    const payload = {
-      player_id: Number(playerProfile.id),
-      pseudo: playerProfile.pseudo,
-      discord_name: playerProfile.discordName || "",
-      category_id: normalizeCategoryId(categoryId),
-      challenge_day: challengeDay,
-      target_driver_id: Number(targetDriverId),
-      guessed_driver_id: Number(guessedDriverId),
-      attempt_number: Number(attemptNumber || 1),
-      correct: Boolean(correct),
-    };
-
-    const { data, error } = await supabase
-      .from("guess_driver_attempts")
-      .upsert(payload, { onConflict: "player_id,category_id,challenge_day,guessed_driver_id" })
-      .select()
-      .single();
-
-    if (error) {
-      console.error("Erreur essai defi pilote:", error);
-      const details = formatSupabaseError(error);
-      const message = error.code === "42P01"
-        ? "La table guess_driver_attempts n'existe pas encore. Lance la commande SQL fournie par Codex."
-        : error.code === "42501" || error.message?.toLowerCase().includes("row-level security")
-          ? "Supabase bloque l'enregistrement des essais. Verifie les policies RLS de guess_driver_attempts."
-          : `Impossible d'enregistrer l'essai.${details ? ` Detail Supabase : ${details}` : ""}`;
-      return { ok: false, message };
-    }
-
-    const savedAttempt = mapGuessDriverAttemptFromDb(data);
-    setGuessDriverAttempts((current) => {
-      const withoutSameAttempt = current.filter((attempt) => !(String(attempt.playerId) === String(savedAttempt.playerId) && attempt.categoryId === savedAttempt.categoryId && attempt.challengeDay === savedAttempt.challengeDay && String(attempt.guessedDriverId) === String(savedAttempt.guessedDriverId)));
-      return [savedAttempt, ...withoutSameAttempt].sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-    });
-    return { ok: true, attempt: savedAttempt };
-  }
-
-  async function toggleRacePredictionClosed(raceId, closed) {
-    setIsSavingPrediction(true);
-    const { data, error } = await supabase
-      .from("race_prediction_controls")
-      .upsert({ race_id: Number(raceId), closed: Boolean(closed), updated_at: new Date().toISOString() }, { onConflict: "race_id" })
-      .select()
-      .single();
-    setIsSavingPrediction(false);
-
-    if (error) {
-      console.error("Erreur fermeture prono:", error);
-      setPopup({
-        type: "error",
-        title: "Erreur Supabase",
-        message: error.code === "42P01" ? "La table race_prediction_controls n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de modifier l'état des pronos.",
-      });
-      return;
-    }
-
-    const savedControl = mapPredictionControlFromDb(data);
-    setPredictionControls((current) => {
-      const withoutControl = current.filter((control) => String(control.raceId) !== String(savedControl.raceId));
-      return [...withoutControl, savedControl];
-    });
-  }
-
-  async function deleteRacePrediction(predictionId) {
-    if (!adminUser) {
-      setPopup({ type: "error", title: "Accès refusé", message: "Connecte-toi avec un compte admin avant de supprimer un prono." });
-      return;
-    }
-    if (!window.confirm("Supprimer ce prono ? Cette action est définitive.")) return;
-
-    setIsSavingPrediction(true);
-    const { error } = await supabase
-      .from("race_predictions")
-      .delete()
-      .eq("id", predictionId);
-    setIsSavingPrediction(false);
-
-    if (error) {
-      console.error("Erreur suppression prono:", error);
-      setPopup({
-        type: "error",
-        title: "Erreur Supabase",
-        message: error.message?.toLowerCase().includes("row-level security") || error.code === "42501"
-          ? "Supabase bloque la suppression du prono. Vérifie les policies RLS de race_predictions."
-          : "Impossible de supprimer ce prono.",
-      });
-      return;
-    }
-
-    setRacePredictions((current) => current.filter((prediction) => String(prediction.id) !== String(predictionId)));
-    setPopup({ type: "success", title: "Prono supprimé", message: "Le prono a bien été retiré." });
   }
 
   async function addSeason() {
@@ -5067,7 +4634,6 @@ export default function URTTAdminPanel() {
           seasonOnlyTeams={seasonOnlyTeams}
           cumulativeDrivers={cumulativeDrivers}
           cumulativeTeams={cumulativeTeams}
-          guessDrivers={computed.globalDriverStats}
           races={currentSeasonRaces}
           countdownRaces={allCalendarRaces}
           calendarEvents={calendarEvents}
@@ -5078,26 +4644,17 @@ export default function URTTAdminPanel() {
           raceResults={raceResults}
           seasonTitles={seasonTitles}
           developmentEntries={developmentEntries}
-          racePredictions={racePredictions}
-          predictionControls={predictionControls}
           siteSettings={siteSettings}
           allDrivers={drivers}
-          onSavePrediction={saveRacePrediction}
-          isSavingPrediction={isSavingPrediction}
           adminUser={adminUser}
           playerProfile={playerProfile}
           playerAccounts={playerAccounts}
-          guessDriverResults={guessDriverResults}
-          guessDriverAttempts={guessDriverAttempts}
           onPlayerLogin={loginPlayerAccount}
           onPlayerSignup={signUpPlayerAccount}
           onPlayerLogout={logoutPlayerAccount}
           onSyncEasterEggs={syncPlayerEasterEggs}
           onSavePlayerTcgState={savePlayerTcgState}
-          onSaveGuessDriverWin={saveGuessDriverWin}
-          onSaveGuessDriverAttempt={saveGuessDriverAttempt}
           isSavingPlayerAccount={isSavingPlayerAccount}
-          isSavingGuessResult={isSavingGuessResult}
           isAdminPreview={isAdminPreview && Boolean(adminUser)}
           onOpenAdmin={openAdminAccess}
           cardLabRequested={cardLabRequested}
@@ -5109,7 +4666,7 @@ export default function URTTAdminPanel() {
           cardLabSettings={cardLabSettings}
         />
       )}
-      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />} 
+      {view === "login" && <LoginScreen email={adminEmail} setEmail={setAdminEmail} password={adminPassword} setPassword={setAdminPassword} loginError={loginError} onLogin={handleAdminLogin} onBack={() => { setIsAdminPreview(false); setView("front"); }} />}
       {view === "admin" && (
         <AdminLayout
           active={visibleAdminPage}
@@ -5163,10 +4720,8 @@ export default function URTTAdminPanel() {
           {visibleAdminPage === "offseason-lemans" && <OffSeasonChampionshipAdmin eventType="LEMANS24" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} onTransferSeason={transferOffSeasonSeason} isSaving={isSavingOffSeasonEntry} />}
           {visibleAdminPage === "offseason-indy" && <OffSeasonChampionshipAdmin eventType="INDY300" entries={offSeasonEntries} drivers={drivers} teams={teams} selectedSeasonId={effectiveSelectedSeasonId} seasonOptions={seasonOptions} onSave={saveOffSeasonEntry} onDelete={deleteOffSeasonEntry} onTransferSeason={transferOffSeasonSeason} isSaving={isSavingOffSeasonEntry} />}
           {visibleAdminPage === "development" && <DevelopmentAdminPanel teams={teams} drivers={drivers} entries={developmentEntries} form={developmentForm} setForm={setDevelopmentForm} selectedCategoryId={effectiveDevelopmentCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onSave={saveDevelopmentEntry} onDelete={deleteDevelopmentEntry} isSaving={isSaving} />}
-          {visibleAdminPage === "games" && <GamesAdminPanel predictions={racePredictions} predictionControls={predictionControls} races={allCalendarRaces} drivers={drivers} raceResults={raceResults} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} onToggleClosed={toggleRacePredictionClosed} onDeletePrediction={deleteRacePrediction} isSaving={isSavingPrediction} />}
           {visibleAdminPage === "channel-points" && <TwitchPointsAdminPanel />}
-          {visibleAdminPage === "guess-attempts" && <GuessDriverAttemptsPanel attempts={guessDriverAttempts} results={guessDriverResults} accounts={playerAccounts} drivers={drivers} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} />}
-          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} predictions={racePredictions} guessResults={guessDriverResults} onGrantPacks={grantPlayerCardPacks} onGrantArekcoins={grantPlayerArekcoins} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onResetAllTcgData={resetAllPlayerTcgData} onDeleteAccount={deletePlayerAccount} />}
+          {visibleAdminPage === "player-accounts" && <PlayerAccountsPanel adminUser={adminUser} accounts={playerAccounts} onGrantPacks={grantPlayerCardPacks} onGrantArekcoins={grantPlayerArekcoins} onCleanupDemoCards={cleanupPlayerDemoCards} onResetPlayerCards={resetPlayerCards} onResetAllTcgData={resetAllPlayerTcgData} onDeleteAccount={deletePlayerAccount} />}
           {visibleAdminPage === "feedback-requests" && <FeedbackRequestsPanel requests={feedbackRequests} onValidate={validateFeedbackRequest} isSaving={isSavingFeedbackRequest} />}
           {visibleAdminPage === "easter-egg-admin" && <EasterEggAdminPanel accounts={playerAccounts} />}
           {visibleAdminPage === "results" && <ResultsManager drivers={drivers.filter((driver) => (driver.participations?.[effectiveSelectedSeasonId] || []).some((category) => normalizeCategoryId(category) === normalizeCategoryId(adminSelectedCategoryId)))} teams={teams} selectedCategoryId={adminSelectedCategoryId} setSelectedCategoryId={setSelectedCategoryId} categoryOptions={adminCategoryOptions} races={currentAdminSeasonRaces} selectedSeasonId={effectiveSelectedSeasonId} setSelectedSeasonId={setSelectedSeasonId} selectedRaceId={selectedRaceId} setSelectedRaceId={setSelectedRaceId} getResultEntry={getResultEntry} updateResultEntry={updateResultEntry} onValidate={validateRaceResults} isSavingResult={isSavingResult} />}
@@ -5186,7 +4741,7 @@ export default function URTTAdminPanel() {
           )}
           {visibleAdminPage === "settings" && <SettingsPanel seasons={seasonOptions} siteSettings={siteSettings} onUpdateSetting={updateSiteSetting} onAddSeason={addSeason} isSaving={isSaving} />}
           {visibleAdminPage === "kolti" && <div style={styles.section}><Card title="T'es NUL KOLTI" icon="😈"><p style={styles.mutedSmall}>T'es NUL KOLTI</p></Card></div>}
-          
+
         </AdminLayout>
       )}
       {popup && <Popup popup={popup} onClose={() => setPopup(null)} />}
@@ -5562,7 +5117,7 @@ const AREKU_MEDIA_LINKS = [
   { label: "Chaîne Twitch", detail: "Lives et événements en direct", url: "https://www.twitch.tv/AREKU_F1", color: "#9146ff" },
 ];
 
-function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, guessDrivers = [], races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], racePredictions = [], predictionControls = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], onSavePrediction, isSavingPrediction = false, adminUser = null, playerProfile = null, playerAccounts = [], guessDriverResults = [], guessDriverAttempts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSavePlayerTcgState, onSaveGuessDriverWin, onSaveGuessDriverAttempt, isSavingPlayerAccount = false, isSavingGuessResult = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabTeamStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
+function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonId, setSelectedSeasonId, seasonOptions = [], publicPage, setPublicPage, seasonOnlyDrivers, seasonOnlyTeams, cumulativeDrivers, cumulativeTeams, races, countdownRaces = [], calendarEvents = [], specialEditions = [], offSeasonEntries = [], raceLibrary = [], allRaces, raceResults, seasonTitles = [], developmentEntries = [], siteSettings = defaultSiteSettings, allDrivers, teams = [], adminUser = null, playerProfile = null, playerAccounts = [], onPlayerLogin, onPlayerSignup, onPlayerLogout, onSyncEasterEggs, onSavePlayerTcgState, isSavingPlayerAccount = false, isAdminPreview = false, onOpenAdmin, cardLabRequested = false, hasCardLabAccess = false, cardLabDrivers = [], cardLabStandingsBySeason = {}, cardLabStandingsByCategory = {}, cardLabTeamStandingsByCategory = {}, cardLabSettings = DEFAULT_CARD_LAB_SETTINGS }) {
   const [selectedGp, setSelectedGp] = useState(null);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [selectedDriverDetailsCategoryId, setSelectedDriverDetailsCategoryId] = useState(selectedCategoryId);
@@ -5575,8 +5130,6 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     if (typeof window === "undefined") return "dark";
     return window.localStorage.getItem(PUBLIC_THEME_STORAGE_KEY) === "light" ? "light" : "dark";
   });
-  const [guessDriverInProgress, setGuessDriverInProgress] = useState(false);
-  const [showGuessExitPrompt, setShowGuessExitPrompt] = useState(false);
   const [poleDnfAnimationKey, setPoleDnfAnimationKey] = useState(0);
   const [titleHeartbreakAnimation, setTitleHeartbreakAnimation] = useState(null);
   const [unlockedEasterEggs, setUnlockedEasterEggs] = useState(() => {
@@ -5587,7 +5140,6 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
     }
   });
   const championClicksRef = useRef([]);
-  const pendingPublicNavigationRef = useRef(null);
   const publicCategoryTheme = getPublicCategoryTheme(selectedCategoryId);
   const publicVisibility = normalizePublicPageSettings(siteSettings.publicPages, siteSettings.publicDevelopmentEnabled);
   const publicPages = PUBLIC_PAGE_OPTIONS
@@ -5625,41 +5177,13 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
   const activePublicPageOption = activePublicPage === "cards-lab" ? { id: "cards-lab", label: "Cartes" } : PUBLIC_PAGE_OPTIONS.find((page) => page.id === activePublicPage) || PUBLIC_PAGE_OPTIONS[0];
   const isTgcCardsPage = ["cards-lab", "tgc-packs", "tgc-collection", "tgc-pokedex"].includes(activePublicPage);
   const isLightTheme = publicTheme === "light";
-  
+
   const leaderDriver = seasonOnlyDrivers[0]?.name || "—";
   const leaderTeam = seasonOnlyTeams[0]?.name || "—";
   useEffect(() => {
-    if (!guessDriverInProgress) return undefined;
-    const warnBeforeLeave = (event) => {
-      event.preventDefault();
-      event.returnValue = "";
-      return "";
-    };
-    window.addEventListener("beforeunload", warnBeforeLeave);
-    return () => window.removeEventListener("beforeunload", warnBeforeLeave);
-  }, [guessDriverInProgress]);
-  useEffect(() => {
     if (typeof window !== "undefined") window.localStorage.setItem(PUBLIC_THEME_STORAGE_KEY, publicTheme);
   }, [publicTheme]);
-  const requestPublicNavigation = (callback) => {
-    if (activePublicPage === "guess-driver" && guessDriverInProgress) {
-      pendingPublicNavigationRef.current = callback;
-      setShowGuessExitPrompt(true);
-      return;
-    }
-    callback?.();
-  };
-  const confirmGuessDriverExit = () => {
-    const pendingNavigation = pendingPublicNavigationRef.current;
-    pendingPublicNavigationRef.current = null;
-    setShowGuessExitPrompt(false);
-    setGuessDriverInProgress(false);
-    pendingNavigation?.();
-  };
-  const cancelGuessDriverExit = () => {
-    pendingPublicNavigationRef.current = null;
-    setShowGuessExitPrompt(false);
-  };
+  const requestPublicNavigation = (callback) => callback?.();
   const unlockEasterEgg = (eggId) => {
     setUnlockedEasterEggs((current) => {
       const base = normalizeEasterEggIds([...current, ...profileEasterEggs]);
@@ -5784,30 +5308,11 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
         {activePublicPage === "lemans24" && <OffSeasonChampionshipPage eventType="LEMANS24" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
         {activePublicPage === "indy300" && <OffSeasonChampionshipPage eventType="INDY300" entries={offSeasonEntries} drivers={allDrivers} teams={teams} selectedSeasonId={selectedSeasonId} />}
         {activePublicPage === "development" && <DevelopmentPage teams={teams} drivers={allDrivers} entries={developmentEntries} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} isAdminPreview={isAdminPreview && publicVisibility.development === false} />}
-        {activePublicPage === "predictions" && <PredictionsPage races={races} drivers={allDrivers} teams={teams} currentRankingDrivers={seasonOnlyDrivers} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} raceResults={raceResults} predictions={racePredictions} predictionControls={predictionControls} playerProfile={playerProfile} onSubmit={onSavePrediction} isSaving={isSavingPrediction} />}
-        {activePublicPage === "guess-driver" && <GuessDriverPage key={`${selectedCategoryId}-${playerProfile?.id || "guest"}`} drivers={guessDrivers} teams={teams} selectedCategoryId={selectedCategoryId} profile={playerProfile} results={guessDriverResults} attemptsHistory={guessDriverAttempts} onSaveWin={onSaveGuessDriverWin} onSaveAttempt={onSaveGuessDriverAttempt} isSaving={isSavingGuessResult} onProgressChange={setGuessDriverInProgress} />}
         {activePublicPage === "easter-eggs" && <EasterEggBookPage unlockedIds={displayedEasterEggs} />}
         {activePublicPage === "other-championships" && <OtherChampionshipsPage />}
           </main>
         </div>
       </div>
-      {showGuessExitPrompt && (
-        <div style={styles.detailOverlay} onMouseDown={cancelGuessDriverExit}>
-          <div style={{ ...styles.feedbackModal, maxWidth: 520 }} onMouseDown={(event) => event.stopPropagation()}>
-            <div style={styles.gpDetailHeader}>
-              <div>
-                <p style={styles.kicker}>DEVINE LE PILOTE</p>
-                <h2 style={styles.gpDetailTitle}>Abandonner la tentative ?</h2>
-              </div>
-            </div>
-            <p style={styles.muted}>Si tu quittes cette page sans trouver le pilote, ta tentative sera considérée comme un abandon et tu ne marqueras aucun point.</p>
-            <div style={styles.actions}>
-              <button type="button" onClick={cancelGuessDriverExit} style={styles.secondaryButton}>Rester sur le jeu</button>
-              <button type="button" onClick={confirmGuessDriverExit} style={styles.dangerButton}>Quitter sans point</button>
-            </div>
-          </div>
-        </div>
-      )}
       {poleDnfAnimationKey > 0 && <PoleToDnfAnimation key={poleDnfAnimationKey} onDone={() => setPoleDnfAnimationKey(0)} />}
       {titleHeartbreakAnimation && <TitleHeartbreakAnimation key={titleHeartbreakAnimation.key} type={titleHeartbreakAnimation.type} onDone={() => setTitleHeartbreakAnimation(null)} />}
       <FeedbackWidget playerProfile={playerProfile} />
@@ -7575,576 +7080,6 @@ function StandingsPage({ selectedSeasonId, selectedCategoryId, leaderDriver, lea
   );
 }
 
-function PredictionsPage({ races = [], drivers = [], teams = [], currentRankingDrivers = [], selectedSeasonId, selectedCategoryId, raceResults = [], predictions = [], predictionControls = [], playerProfile = null, onSubmit, isSaving }) {
-  const categoryId = normalizeCategoryId(selectedCategoryId);
-  const seasonId = normalizeSeasonId(selectedSeasonId);
-  const eligibleDrivers = drivers
-    .filter((driver) => (driver.participations?.[seasonId] || []).some((category) => normalizeCategoryId(category) === categoryId))
-    .sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  const openRaces = races.filter((race) => !isPredictionClosedForRace(raceResults, predictionControls, race.id));
-  const [selectedRaceId, setSelectedRaceId] = useState(openRaces[0]?.id || races[0]?.id || "");
-  const [form, setForm] = useState({ poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
-  const [status, setStatus] = useState("");
-  const activeRaceId = races.some((race) => String(race.id) === String(selectedRaceId)) ? selectedRaceId : openRaces[0]?.id || races[0]?.id || "";
-  const selectedRace = races.find((race) => String(race.id) === String(activeRaceId));
-  const raceClosed = selectedRace ? isPredictionClosedForRace(raceResults, predictionControls, selectedRace.id) : true;
-  const visiblePredictions = predictions.filter((prediction) => normalizeSeasonId(prediction.seasonId) === seasonId && normalizeCategoryId(prediction.categoryId) === categoryId);
-  const racePredictions = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(activeRaceId));
-  const playerAlreadySubmitted = Boolean(playerProfile?.id) && racePredictions.some((prediction) => String(prediction.playerId) === String(playerProfile.id));
-  const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults).slice(0, 10);
-  const driverOptions = eligibleDrivers.length ? eligibleDrivers : drivers;
-  const defaultOrder = (currentRankingDrivers.length ? currentRankingDrivers : driverOptions).slice(0, 20).map((driver) => String(driver.id));
-  const formOrder = (form.predictedOrder || []).map(String).filter((driverId) => defaultOrder.includes(driverId));
-  const predictionOrder = formOrder.length === defaultOrder.length ? formOrder : defaultOrder;
-  const update = (key, value) => setForm((current) => ({ ...current, [key]: value }));
-  const setPredictionOrder = (nextOrder) => setForm((current) => ({ ...current, predictedOrder: nextOrder.map(String) }));
-  const movePredictionDriver = (fromIndex, toIndex) => setForm((current) => {
-    const currentOrder = (current.predictedOrder || []).map(String).filter((driverId) => defaultOrder.includes(driverId));
-    const nextOrder = [...(currentOrder.length === defaultOrder.length ? currentOrder : defaultOrder)];
-    if (toIndex < 0 || toIndex >= nextOrder.length) return current;
-    const [driverId] = nextOrder.splice(fromIndex, 1);
-    nextOrder.splice(toIndex, 0, driverId);
-    return { ...current, predictedOrder: nextOrder };
-  });
-  const submit = async (event) => {
-    event.preventDefault();
-    setStatus("");
-    const predictedOrder = predictionOrder.slice(0, 20);
-    const response = await onSubmit?.({
-      ...form,
-      predictedOrder,
-      winnerDriverId: predictedOrder[0] || "",
-      podiumFirstDriverId: predictedOrder[0] || "",
-      podiumSecondDriverId: predictedOrder[1] || "",
-      podiumThirdDriverId: predictedOrder[2] || "",
-      raceId: activeRaceId,
-      seasonId,
-      categoryId,
-    });
-    setStatus(response?.message || "");
-    if (response?.ok) setForm({ poleDriverId: "", fastestDriverId: "", predictedOrder: [] });
-  };
-
-  return (
-    <div style={styles.section}>
-      <Card title={`Pronos GP — ${selectedCategoryId} ${seasonName(selectedSeasonId)}`} icon="🎮">
-        <form onSubmit={submit} style={styles.stack}>
-          <div style={styles.resultsInfo}>
-            <label style={styles.label}><span style={styles.labelText}>Course</span><select value={activeRaceId} onChange={(event) => setSelectedRaceId(event.target.value)} style={styles.resultsSelect}>{races.map((race) => <option key={race.id} value={race.id}>{race.round}. {race.name}{isPredictionClosedForRace(raceResults, predictionControls, race.id) ? " · fermé" : ""}</option>)}</select></label>
-            <div style={styles.raceStat}><span style={styles.mutedSmall}>Joueur</span><strong>{playerProfile?.pseudo || "Connexion requise"}</strong></div>
-            <div style={styles.raceStat}><span style={styles.mutedSmall}>Statut</span><strong>{raceClosed ? "Pronos fermés" : "Pronos ouverts"}</strong></div>
-          </div>
-          {races.length === 0 ? <Empty text="Aucune course disponible pour cette saison." /> : (
-            <>
-              <div style={styles.formGrid}>
-                <PredictionSelect label="Poleman" value={form.poleDriverId} onChange={(value) => update("poleDriverId", value)} drivers={driverOptions} />
-                <PredictionSelect label="Meilleur tour" value={form.fastestDriverId} onChange={(value) => update("fastestDriverId", value)} drivers={driverOptions} />
-              </div>
-              <PredictionOrderPicker drivers={driverOptions.slice(0, 20)} teams={teams} seasonId={seasonId} order={predictionOrder} defaultOrder={defaultOrder} onMove={movePredictionDriver} onSetOrder={setPredictionOrder} />
-              <button type="submit" disabled={isSaving || raceClosed || !onSubmit || !playerProfile?.pseudo || playerAlreadySubmitted} style={styles.fullButton}>{isSaving ? "Envoi..." : raceClosed ? "Course fermée" : !playerProfile?.pseudo ? "Connecte-toi pour pronostiquer" : playerAlreadySubmitted ? "Prono déjà envoyé" : "Envoyer mon prono"}</button>
-              {status && <p style={styles.mutedSmall}>{status}</p>}
-            </>
-          )}
-        </form>
-      </Card>
-      <div style={styles.twoColumns}>
-        <Card title="Classement pronos" icon="🏆">
-          <PredictionLeaderboard leaderboard={leaderboard} />
-        </Card>
-        <Card title={selectedRace ? `Pronos envoyés — ${selectedRace.name}` : "Pronos envoyés"} icon="📋">
-          <PredictionSummary predictions={racePredictions} drivers={drivers} teams={teams} raceResults={raceResults} />
-        </Card>
-      </div>
-    </div>
-  );
-}
-
-function PredictionSelect({ label, value, onChange, drivers = [] }) {
-  return <label style={styles.label}><span style={styles.labelText}>{label}</span><select value={value} onChange={(event) => onChange(event.target.value)} style={styles.resultsSelect}><option value="">Choisir un pilote</option>{drivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}</select></label>;
-}
-
-function PredictionOrderPicker({ drivers = [], teams = [], seasonId, order = [], defaultOrder = [], onMove, onSetOrder }) {
-  const [dragIndex, setDragIndex] = useState(null);
-  const driverMap = new Map(drivers.map((driver) => [String(driver.id), driver]));
-  const orderedDriverIds = order.filter((driverId) => driverMap.has(String(driverId)));
-  const missingDriverIds = drivers.map((driver) => String(driver.id)).filter((driverId) => !orderedDriverIds.includes(driverId));
-  const fullOrder = [...orderedDriverIds, ...missingDriverIds].slice(0, 20);
-  const move = (fromIndex, toIndex) => {
-    if (toIndex < 0 || toIndex >= fullOrder.length) return;
-    onMove?.(fromIndex, toIndex);
-  };
-  const randomize = () => {
-    const shuffled = [...fullOrder];
-    for (let index = shuffled.length - 1; index > 0; index -= 1) {
-      const randomIndex = Math.floor(Math.random() * (index + 1));
-      [shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]];
-    }
-    onSetOrder?.(shuffled);
-  };
-  const reset = () => onSetOrder?.(defaultOrder.length ? defaultOrder : drivers.map((driver) => String(driver.id)).slice(0, 20));
-  const dropOn = (targetIndex) => {
-    if (dragIndex === null || dragIndex === targetIndex) return;
-    move(dragIndex, targetIndex);
-    setDragIndex(null);
-  };
-
-  return (
-    <div style={styles.predictionOrderBox}>
-      <div style={styles.predictionOrderHeader}>
-        <div>
-          <strong>Classement prédit</strong>
-          <p style={styles.mutedSmall}>Déplace les pilotes pour construire ton top 20.</p>
-        </div>
-        <div style={styles.actions}>
-          <button type="button" onClick={reset} style={styles.editButton}>Classement actuel</button>
-          <button type="button" onClick={randomize} style={styles.secondaryButton}>Mélanger</button>
-        </div>
-      </div>
-      <div style={styles.predictionOrderList}>
-        {fullOrder.map((driverId, index) => {
-          const driver = driverMap.get(String(driverId));
-          const team = driver ? getDriverSeasonTeam(driver, seasonId, teams) : null;
-          return (
-            <div
-              key={driverId}
-              draggable
-              onDragStart={() => setDragIndex(index)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={() => dropOn(index)}
-              onDragEnd={() => setDragIndex(null)}
-              style={{ ...styles.predictionOrderRow, ...(dragIndex === index ? styles.predictionOrderRowDragging : {}) }}
-            >
-              <span style={styles.predictionPosition}>P{index + 1}</span>
-              {driver ? <DriverIdentity driver={driver} teamColor={team?.color} teamLogo={team?.logo} /> : <strong>Pilote inconnu</strong>}
-              <div style={styles.predictionMoveButtons}>
-                <button type="button" onClick={() => move(index, index - 1)} disabled={index === 0} style={styles.editButton}>↑</button>
-                <button type="button" onClick={() => move(index, index + 1)} disabled={index === fullOrder.length - 1} style={styles.editButton}>↓</button>
-                <span style={styles.predictionDragHandle}>≡</span>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-function PredictionLeaderboard({ leaderboard }) {
-  if (!leaderboard.length) return <Empty text="Aucun score pour le moment." />;
-  return <div style={styles.stack}>{leaderboard.map((row, index) => <div key={row.pseudo} style={styles.itemBox}><div><strong>#{index + 1} {row.pseudo}</strong><p style={styles.mutedSmall}>{row.entries} prono{row.entries > 1 ? "s" : ""}</p></div><span style={styles.points}>{row.score}</span></div>)}</div>;
-}
-
-function PredictionSummary({ predictions = [], drivers = [], teams = [], raceResults = [] }) {
-  if (!predictions.length) return <Empty text="Aucun prono envoyé pour cette course." />;
-  return <div style={styles.stack}>{predictions.map((prediction) => {
-    const score = scoreRacePrediction(prediction, raceResults);
-    return (
-      <div key={prediction.id} style={styles.publicRaceCard}>
-        <div style={styles.publicRaceHeader}>
-          <div><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "Date inconnue"}</p></div>
-          <span style={score.scored ? styles.badgeGreen : styles.badgeDark}>{score.scored ? `${score.score} pts` : "En attente"}</span>
-        </div>
-        <div style={styles.raceStatsGrid}>
-          <RaceStat label="Vainqueur" value={driverName(drivers, prediction.winnerDriverId)} />
-          <RaceStat label="Poleman" value={driverName(drivers, prediction.poleDriverId)} />
-          <RaceStat label="Meilleur tour" value={driverName(drivers, prediction.fastestDriverId)} />
-          <RaceStat label="Podium" value={(prediction.predictedOrder?.length ? prediction.predictedOrder.slice(0, 3) : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).map((id) => driverName(drivers, id)).join(" · ")} />
-        </div>
-        <p style={styles.mutedSmall}>{score.details}</p>
-        <div style={styles.titleBadgeRow}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.winnerDriverId, prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).slice(0, 20).map((driverId, index) => {
-          const driver = drivers.find((item) => idsEqual(item.id, driverId));
-          const team = driver ? getDriverSeasonTeam(driver, prediction.seasonId, teams) : null;
-          return driver ? <span key={`${prediction.id}-${driverId}`} style={styles.titleBadge}>P{index + 1} · {team?.name ? `${team.name} · ` : ""}{driver.name}</span> : null;
-        })}</div>
-      </div>
-    );
-  })}</div>;
-}
-
-function GuessDriverPage({ drivers = [], teams = [], selectedCategoryId, profile = null, results = [], attemptsHistory = [], onSaveWin, onSaveAttempt, isSaving = false, onProgressChange }) {
-  const playableDrivers = [...drivers].sort((a, b) => a.name.localeCompare(b.name, "fr"));
-  const targetDriver = getDailyDriverChallenge(playableDrivers, "ALL", selectedCategoryId);
-  const challengeDay = getDailyChallengeDay();
-  const savedToday = results.some((result) => String(result.playerId) === String(profile?.id || "") && result.challengeDay === challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(selectedCategoryId) && result.won);
-  const attemptStorageKey = getGuessDriverAttemptsStorageKey(profile?.id || "", selectedCategoryId, challengeDay);
-  const serverAttempts = attemptsHistory
-    .filter((attempt) => String(attempt.playerId) === String(profile?.id || "") && attempt.challengeDay === challengeDay && normalizeCategoryId(attempt.categoryId) === normalizeCategoryId(selectedCategoryId))
-    .sort((a, b) => (Number(a.attemptNumber) || 0) - (Number(b.attemptNumber) || 0) || new Date(a.createdAt || 0) - new Date(b.createdAt || 0))
-    .map((attempt) => String(attempt.guessedDriverId))
-    .filter(Boolean);
-  const streak = getGuessDriverStreak(results, profile?.id || "", selectedCategoryId);
-  const leaderboard = getGuessDriverLeaderboard(results, selectedCategoryId).slice(0, 10);
-  const [guessId, setGuessId] = useState("");
-  const [attempts, setAttempts] = useState(() => normalizeIdList([...readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay), ...serverAttempts]));
-  const [message, setMessage] = useState("");
-  const guessedDrivers = attempts.map((driverId) => playableDrivers.find((driver) => idsEqual(driver.id, driverId))).filter(Boolean);
-  const won = targetDriver && (savedToday || attempts.some((driverId) => idsEqual(driverId, targetDriver.id)));
-  const remainingDrivers = playableDrivers.filter((driver) => !attempts.some((driverId) => idsEqual(driverId, driver.id)));
-  useEffect(() => {
-    const storedAttempts = readStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay);
-    const restoredAttempts = normalizeIdList([...storedAttempts, ...serverAttempts]);
-    setAttempts(restoredAttempts);
-    if (restoredAttempts.length) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, restoredAttempts);
-    setGuessId("");
-    setMessage(restoredAttempts.length ? "Tes essais du jour ont été restaurés." : "");
-  }, [attemptStorageKey, profile?.id, selectedCategoryId, challengeDay, serverAttempts.join(",")]);
-  useEffect(() => {
-    if (savedToday) writeStoredGuessDriverAttempts(profile?.id || "", selectedCategoryId, challengeDay, []);
-  }, [savedToday, profile?.id, selectedCategoryId, challengeDay]);
-  useEffect(() => {
-    onProgressChange?.(Boolean(profile?.id && attempts.length > 0 && !won));
-    return () => onProgressChange?.(false);
-  }, [attempts.length, won, profile?.id, onProgressChange]);
-
-  async function submitGuess(event) {
-    event.preventDefault();
-    setMessage("");
-    if (!profile?.id || !profile?.pseudo) {
-      setMessage("Connecte-toi avec ton compte joueur pour enregistrer ta série.");
-      return;
-    }
-    if (!guessId) {
-      setMessage("Choisis un pilote.");
-      return;
-    }
-    if (attempts.some((driverId) => idsEqual(driverId, guessId))) {
-      setMessage("Tu as déjà tenté ce pilote.");
-      return;
-    }
-    const nextAttempts = [...attempts, guessId];
-    const isCorrect = targetDriver && idsEqual(guessId, targetDriver.id);
-    const saveAttemptResponse = await onSaveAttempt?.({
-      categoryId: selectedCategoryId,
-      challengeDay,
-      targetDriverId: targetDriver?.id,
-      guessedDriverId: guessId,
-      attemptNumber: nextAttempts.length,
-      correct: isCorrect,
-    });
-    if (saveAttemptResponse && !saveAttemptResponse.ok) {
-      setMessage(saveAttemptResponse.message || "Impossible d'enregistrer l'essai.");
-      return;
-    }
-    writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, nextAttempts);
-    setAttempts(nextAttempts);
-    setGuessId("");
-    if (isCorrect && !savedToday) {
-      const response = await onSaveWin?.({ categoryId: selectedCategoryId, challengeDay, driverId: targetDriver.id, attempts: nextAttempts.length });
-      setMessage(response?.message || "");
-      if (response?.ok) writeStoredGuessDriverAttempts(profile.id, selectedCategoryId, challengeDay, []);
-    }
-  }
-
-  if (!targetDriver) {
-    return <Card title="Défi pilote" icon="❓"><Empty text="Aucun pilote disponible pour cette catégorie." /></Card>;
-  }
-
-  return (
-    <div style={styles.section}>
-      <Card title={`Défi pilote — ${selectedCategoryId}`} icon="❓">
-        <div style={styles.guessHero}>
-          <div>
-            <p style={styles.kicker}>PILOTE MYSTÈRE DU JOUR</p>
-            <h2 style={styles.gpDetailTitle}>{won ? targetDriver.name : "Qui est-ce ?"}</h2>
-            <p style={styles.mutedSmall}>Le pilote mystère est choisi parmi tous les pilotes {selectedCategoryId}, toutes saisons confondues. ↑ veut dire que le pilote mystère a une valeur plus haute, ↓ plus basse.</p>
-          </div>
-          <div style={styles.statsGrid}>
-            <Stat label="Essais" value={attempts.length} />
-            <Stat label="Pilotes possibles" value={playableDrivers.length} />
-            <Stat label="Série" value={streak} />
-            <Stat label="Points si trouvé" value={getGuessDriverScore(Math.max(1, attempts.length + 1))} />
-          </div>
-        </div>
-        <p style={styles.mutedSmall}>Barème : 10 pts au 1er essai, puis -1 pt par essai supplémentaire, minimum 1 pt.</p>
-        {!profile?.pseudo && <div style={styles.previewNotice}><strong>Compte requis</strong><span>Connecte-toi pour garder ta série et relier ton défi à ton pseudo Discord.</span></div>}
-        <form onSubmit={submitGuess} style={styles.resultsInfo}>
-          <label style={styles.label}>
-            <span style={styles.labelText}>Ton essai</span>
-            <select value={guessId} onChange={(event) => setGuessId(event.target.value)} disabled={won} style={styles.resultsSelect}>
-              <option value="">Choisir un pilote</option>
-              {remainingDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
-            </select>
-          </label>
-          <button type="submit" disabled={won || isSaving} style={styles.fullButton}>{isSaving ? "Sauvegarde..." : won ? "Trouvé" : "Valider l'essai"}</button>
-        </form>
-        {message && <p style={styles.mutedSmall}>{message}</p>}
-        {won && <div style={styles.previewNotice}><strong>Bravo !</strong><span>Tu as trouvé {targetDriver.name}{attempts.length ? ` en ${attempts.length} essai${attempts.length > 1 ? "s" : ""}` : ""}. Série actuelle : {streak}.</span></div>}
-      </Card>
-      <Card title="Indices" icon="📊">
-        <GuessDriverTable guesses={guessedDrivers} target={targetDriver} teams={teams} />
-      </Card>
-      <Card title={`Classement Défi pilote — ${selectedCategoryId}`} icon="🏆">
-        <GuessDriverLeaderboard leaderboard={leaderboard} />
-      </Card>
-    </div>
-  );
-}
-
-function GuessDriverLeaderboard({ leaderboard = [] }) {
-  if (!leaderboard.length) return <Empty text="Aucun score enregistré pour le moment." />;
-  return (
-    <div style={styles.stack}>
-      {leaderboard.map((row, index) => (
-        <div key={`${row.pseudo}-${index}`} style={styles.itemBox}>
-          <div>
-            <strong>#{index + 1} {row.pseudo}</strong>
-            <p style={styles.mutedSmall}>{row.wins} défi{row.wins > 1 ? "s" : ""} réussi{row.wins > 1 ? "s" : ""}{row.bestAttempts ? ` · meilleur : ${row.bestAttempts} essai${row.bestAttempts > 1 ? "s" : ""}` : ""}</p>
-          </div>
-          <span style={styles.points}>{row.score} pts</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function GuessDriverTable({ guesses = [], target, teams = [] }) {
-  if (!guesses.length) return <Empty text="Fais un premier essai pour afficher les indices." />;
-  const statColumns = [
-    { key: "seasons", label: "Saisons" },
-    { key: "driverTitles", label: "Titre P." },
-    { key: "teamTitles", label: "Titre C." },
-    { key: "points", label: "Points" },
-    { key: "wins", label: "V" },
-    { key: "podiums", label: "Pod." },
-    { key: "poles", label: "Poles" },
-    { key: "fastestLaps", label: "MT" },
-    { key: "hatTricks", label: "HT" },
-  ];
-
-  return (
-    <div style={styles.tableWrap}>
-      <table style={{ ...styles.table, minWidth: 1120 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pilote</th><th style={styles.th}>Écurie</th>{statColumns.map((column) => <th key={column.key} style={styles.th}>{column.label}</th>)}</tr></thead>
-        <tbody>{[...guesses].reverse().map((guess) => {
-          const team = teams.find((item) => idsEqual(item.id, guess.teamId)) || null;
-          const targetTeam = teams.find((item) => idsEqual(item.id, target.teamId)) || null;
-          return (
-            <tr key={guess.id} style={styles.tr}>
-              <td style={styles.td}><GuessCell correct={idsEqual(guess.id, target.id)}><DriverIdentity driver={guess} teamColor={team?.color} teamLogo={team?.logo} /></GuessCell></td>
-              <td style={styles.td}><GuessCell correct={idsEqual(team?.id, targetTeam?.id)}>{team?.name || "—"}</GuessCell></td>
-              {statColumns.map((column) => <td key={column.key} style={styles.td}><GuessStatCell value={guess[column.key]} state={compareGuessValue(guess[column.key], target[column.key])} /></td>)}
-            </tr>
-          );
-        })}</tbody>
-      </table>
-    </div>
-  );
-}
-
-function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, setSelectedDriverId, drivers = [], teams = [], raceResults = [], seasonTitles = [], allRaces = [], seasonOptions = getSeasonOptions(), onOpenDriver }) {
-  const query = normalizeResultText(search);
-  const matches = query
-    ? drivers.filter((driver) => normalizeResultText(driver.name).includes(query)).slice(0, 8)
-    : [];
-  const selectedDriver = drivers.find((driver) => idsEqual(driver.id, selectedDriverId)) || (matches.length === 1 ? matches[0] : null);
-  const selectedTeam = selectedDriver ? teams.find((team) => idsEqual(team.id, selectedDriver.teamId)) : null;
-  const rows = selectedDriver ? CATEGORY_OPTIONS.map((category) => {
-    const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: category.id, seasonTitles });
-    const categorySeasons = getSeasonOptionsForCategory(allRaces, category.id, seasonOptions);
-    const latestSeasonId = getLatestSeasonId(categorySeasons.length ? categorySeasons : seasonOptions);
-    const driverRows = stats.cumulativeDriverStatsBySeason[latestSeasonId] || [];
-    const driverStats = driverRows.find((row) => idsEqual(row.id, selectedDriver.id));
-    return { category, latestSeasonId, rank: driverStats ? driverRows.findIndex((row) => idsEqual(row.id, selectedDriver.id)) + 1 : 0, stats: driverStats };
-  }).filter((row) => row.stats && ((Number(row.stats.points) || 0) > 0 || (Number(row.stats.seasons) || 0) > 0 || (Number(row.stats.driverTitles) || 0) > 0 || (Number(row.stats.teamTitles) || 0) > 0)) : [];
-  const categoryBreakdowns = selectedDriver ? CATEGORY_OPTIONS.map((category) => ({
-    category,
-    rows: getDriverSeasonBreakdown(selectedDriver, raceResults, teams, category.id, seasonTitles, drivers, allRaces),
-  })).filter((item) => item.rows.length > 0) : [];
-  const selectDriver = (driver) => {
-    setSelectedDriverId(driver.id);
-    setSearch(driver.name);
-  };
-
-  return (
-    <Card title="Recherche pilote toutes catégories" icon="🔎">
-      <div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => { setSearch(event.target.value); setSelectedDriverId(""); }} placeholder="Écris le nom d'un pilote..." style={styles.searchInput} /></div>
-      {matches.length > 1 && (
-        <div style={{ ...styles.titleBadgeRow, marginBottom: 14 }}>
-          {matches.map((driver) => (
-            <button key={driver.id} type="button" onClick={() => selectDriver(driver)} style={idsEqual(selectedDriver?.id, driver.id) ? styles.primaryButton : styles.secondaryButton}>{driver.name}</button>
-          ))}
-        </div>
-      )}
-      {!query && <p style={styles.mutedSmall}>Tape un nom pour afficher ses stats cumulées en F1, F2, F3 et FE.</p>}
-      {query && !selectedDriver && <Empty text="Aucun pilote trouvé avec ce nom." />}
-      {selectedDriver && (
-        <>
-          <div style={styles.itemBox}>
-            <DriverIdentity driver={selectedDriver} teamColor={selectedTeam?.color} teamLogo={selectedTeam?.logo} />
-            <button type="button" onClick={() => onOpenDriver?.(selectedDriver, "")} style={styles.editButton}>Fiche complète</button>
-          </div>
-          <div style={styles.tableWrap}>
-            <table style={{ ...styles.table, minWidth: 920 }}>
-              <thead>
-                <tr style={styles.tableHead}>
-                  <th style={styles.th}>Catégorie</th>
-                  <th style={styles.th}>Rang</th>
-                  <th style={styles.th}>Saisons</th>
-                  <th style={styles.th}>Titre P.</th>
-                  <th style={styles.th}>Titre C.</th>
-                  <th style={styles.th}>V</th>
-                  <th style={styles.th}>Pod.</th>
-                  <th style={styles.th}>Poles</th>
-                  <th style={styles.th}>MT</th>
-                  <th style={styles.th}>HT</th>
-                  <th style={styles.th}>Points</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ category, rank, latestSeasonId, stats }) => (
-                  <tr key={category.id} style={styles.tr}>
-                    <td style={styles.td}><span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span><p style={styles.mutedSmall}>Jusqu'à {seasonName(latestSeasonId)}</p></td>
-                    <td style={styles.td}>{rank ? `#${rank}` : "—"}</td>
-                    <td style={styles.td}>{stats.seasons || 0}</td>
-                    <td style={styles.td}>{stats.driverTitles || 0}</td>
-                    <td style={styles.td}>{stats.teamTitles || 0}</td>
-                    <td style={styles.td}>{stats.wins || 0}</td>
-                    <td style={styles.td}>{stats.podiums || 0}</td>
-                    <td style={styles.td}>{stats.poles || 0}</td>
-                    <td style={styles.td}>{stats.fastestLaps || 0}</td>
-                    <td style={styles.td}>{stats.hatTricks || 0}</td>
-                    <td style={{ ...styles.td, ...styles.points }}>{stats.points || 0}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          {rows.length === 0 && <Empty text="Ce pilote n'a pas encore de stats enregistrées dans les championnats." />}
-          {categoryBreakdowns.length > 0 && (
-            <div style={{ marginTop: 18 }}>
-              <h3 style={styles.panelTitle}>Détail saisons et courses</h3>
-              <div style={styles.stack}>
-                {categoryBreakdowns.map(({ category, rows: breakdownRows }) => (
-                  <div key={category.id} style={styles.itemBoxColumn}>
-                    <div style={styles.publicRaceHeader}>
-                      <div>
-                        <span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span>
-                        <p style={styles.mutedSmall}>{breakdownRows.length} saison{breakdownRows.length > 1 ? "s" : ""} avec stats enregistrées.</p>
-                      </div>
-                    </div>
-                    <SeasonBreakdownTable rows={breakdownRows} expandable />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </>
-      )}
-    </Card>
-  );
-}
-
-function GuessCell({ correct, children }) {
-  return <div style={{ ...styles.guessCell, ...(correct ? styles.guessCellCorrect : styles.guessCellWrong) }}>{children}</div>;
-}
-
-function GuessStatCell({ value, state }) {
-  const marker = state === "correct" ? "✓" : state === "higher" ? "↑" : "↓";
-  return <div style={{ ...styles.guessCell, ...(state === "correct" ? styles.guessCellCorrect : styles.guessCellWrong) }}><strong>{value || 0}</strong><span>{marker}</span></div>;
-}
-
-function SpecialEditionsPage({ editions = [], drivers = [] }) {
-  const sortedEditions = [...editions].sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
-  return (
-    <div style={styles.section}>
-      {SPECIAL_EVENT_OPTIONS.map((event) => {
-        const eventEditions = sortedEditions.filter((edition) => edition.eventType === event.id);
-        return (
-          <Card key={event.id} title={event.name} icon="🏁">
-            <div style={styles.stack}>
-              {eventEditions.map((edition) => (
-                <div key={edition.id} style={{ ...styles.publicRaceCard, borderColor: event.color }}>
-                  <div style={styles.publicRaceHeader}>
-                    <div>
-                      <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"}</p>
-                      <h3 style={styles.raceTitle}>{edition.editionLabel}{edition.name ? ` · ${edition.name}` : ""}</h3>
-                    </div>
-                    <span style={{ ...styles.categoryBadge, background: event.color, color: event.id === "INDY300" ? "#18181b" : "white" }}>{event.name}</span>
-                  </div>
-                  <div style={styles.raceStatsGrid}>
-                    <RaceStat label="Vainqueur" value={driverName(drivers, edition.winnerDriverId)} />
-                    <RaceStat label="Poleman" value={driverName(drivers, edition.poleDriverId)} />
-                    <RaceStat label="Podium" value={specialEditionPodium(edition, drivers)} />
-                  </div>
-                  {edition.notes && <p style={styles.mutedSmall}>{edition.notes}</p>}
-                </div>
-              ))}
-              {eventEditions.length === 0 && <Empty text={`Aucune édition ${event.name} enregistrée.`} />}
-            </div>
-          </Card>
-        );
-      })}
-    </div>
-  );
-}
-
-function OffSeasonChampionshipPage({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId }) {
-  const event = getSpecialEvent(eventType);
-  const rows = getOffSeasonRows(entries, eventType, selectedSeasonId, drivers, teams);
-  const pole = rows.find((row) => Number(row.qualifyingPosition) === 1);
-  const winner = rows.find((row) => Number(row.racePosition) === 1);
-  const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
-
-  return (
-    <div style={styles.section}>
-      <Card title={`${event.name} — ${seasonName(selectedSeasonId)}`} icon="🏁">
-        <div style={styles.statsGrid}>
-          <Stat label="Participants" value={rows.length} />
-          <Stat label="Pole" value={pole?.driver?.name || "—"} />
-          <Stat label="Vainqueur" value={winner?.driver?.name || "—"} />
-          <Stat label="Points distribués" value={totalPoints} />
-        </div>
-      </Card>
-      <Card title={`Classement ${event.name}`} icon="🏆">
-        <OffSeasonStandingsTable rows={rows} eventColor={event.color} />
-      </Card>
-    </div>
-  );
-}
-
-function OffSeasonStandingsTable({ rows = [], eventColor = "#7c3aed" }) {
-  if (!rows.length) return <Empty text="Aucun participant enregistré pour cette saison." />;
-  return (
-    <div style={styles.tableWrap}>
-      <table style={styles.table}>
-        <thead>
-          <tr style={styles.tableHead}>
-            <th style={styles.th}>#</th>
-            <th style={styles.th}>Pilote</th>
-            <th style={styles.th}>Écurie</th>
-            <th style={styles.th}>Qualif</th>
-            <th style={styles.th}>Course</th>
-            <th style={styles.th}>Gain/Perte</th>
-            <th style={styles.th}>Points</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const delta = getOffSeasonPositionDelta(row);
-            return (
-              <tr key={row.id || `${row.driverId}-${row.eventType}`} style={styles.tr}>
-                <td style={styles.td}><strong>#{index + 1}</strong></td>
-                <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} showRetired={false} /> : "—"}</td>
-                <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
-                <td style={styles.td}><span style={{ ...styles.badgeDark, background: eventColor, color: eventColor === "#ffff00" ? "#18181b" : "white" }}>P{row.qualifyingPosition || "—"}</span></td>
-                <td style={styles.td}>P{row.racePosition || "—"}</td>
-                <td style={styles.td}><PositionDeltaBadge delta={delta} /></td>
-                <td style={styles.td}><span style={styles.points}>{row.points}</span></td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PositionDeltaBadge({ delta = 0 }) {
-  if (delta > 0) return <span style={styles.positionDeltaUp}>↑ {delta}</span>;
-  if (delta < 0) return <span style={styles.positionDeltaDown}>↓ {Math.abs(delta)}</span>;
-  return <span style={styles.positionDeltaEqual}>=</span>;
-}
-
 function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId, seasonOptions = [], onSave, onDelete, onTransferSeason, isSaving }) {
   const event = getSpecialEvent(eventType);
   const [localSeasonId, setLocalSeasonId] = useState(selectedSeasonId);
@@ -9120,7 +8055,7 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
   );
 }
 
-function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guessResults = [], onGrantPacks, onGrantArekcoins, onCleanupDemoCards, onResetPlayerCards, onResetAllTcgData, onDeleteAccount }) {
+function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantArekcoins, onCleanupDemoCards, onResetPlayerCards, onResetAllTcgData, onDeleteAccount }) {
   const [packGiftAmount, setPackGiftAmount] = useState(1);
   const [arekcoinsGiftAmount, setArekcoinsGiftAmount] = useState(1000);
   const [arekcoinsGiftTargetId, setArekcoinsGiftTargetId] = useState("ALL");
@@ -9146,17 +8081,11 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
   };
 
   const rows = accounts.map((account) => {
-    const accountPredictions = predictions.filter((prediction) => idsEqual(prediction.playerId, account.id));
-    const accountGuessResults = guessResults.filter((result) => idsEqual(result.playerId, account.id));
     const cardPackStock = normalizeCardPackStock(account.cardPackStock);
     return {
       ...account,
       cardPackStock,
       cardCollection: normalizeCardCollection(account.cardCollection),
-      predictionsCount: accountPredictions.length,
-      guessCount: accountGuessResults.length,
-      guessWins: accountGuessResults.filter((result) => result.won).length,
-      guessScore: accountGuessResults.reduce((total, result) => total + Number(result.score || 0), 0),
     };
   });
   const selectedCardAccount = rows.find((account) => idsEqual(account.id, selectedCardAccountId)) || rows[0] || null;
@@ -9234,7 +8163,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
   };
   const deleteAccount = async (account) => {
     if (!onDeleteAccount || !account?.id || deletingAccountId) return;
-    const confirmed = window.confirm("Supprimer définitivement le compte " + (account.pseudo || account.id) + " ? Sa collection TCG, ses packs et son historique « Devine le pilote » seront supprimés. Ses pronostics et demandes seront conservés sans lien vers le compte.");
+    const confirmed = window.confirm("Supprimer définitivement le compte " + (account.pseudo || account.id) + " ? Sa collection TCG, ses packs seront supprimés. ");
     if (!confirmed) return;
     setDeletingAccountId(String(account.id));
     try {
@@ -9249,8 +8178,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
       <Card title="Comptes utilisateurs" icon="👤">
         <div style={styles.statsGrid}>
           <Stat label="Comptes" value={rows.length} />
-          <Stat label="Pronos envoyés" value={predictions.length} />
-          <Stat label="Devine le pilote" value={guessResults.length} />
           <Stat label="Connecté sur" value={adminUser?.email || "—"} />
         </div>
         <p style={styles.mutedSmall}>Cette page est réservée à {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rôles admin ne peuvent pas y accéder.</p>
@@ -9382,9 +8309,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                 <th style={styles.th}>AREKCOINS</th>
                 <th style={styles.th}>Créé le</th>
                 <th style={styles.th}>Dernière activité</th>
-                <th style={styles.th}>Pronos</th>
-                <th style={styles.th}>Devine</th>
-                <th style={styles.th}>Points</th>
                 <th style={styles.th}>Action</th>
               </tr>
             </thead>
@@ -9397,9 +8321,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
                   <td style={styles.td}><ArekcoinAmount amount={account.cardPackStock.arekcoins} /></td>
                   <td style={styles.td}>{formatAccountDate(account.createdAt)}</td>
                   <td style={styles.td}>{formatAccountDate(account.lastSeenAt)}</td>
-                  <td style={styles.td}>{account.predictionsCount}</td>
-                  <td style={styles.td}>{account.guessCount} essais · {account.guessWins} win</td>
-                  <td style={{ ...styles.td, ...styles.points }}>{account.guessScore}</td>
                   <td style={styles.td}>
                     <div style={styles.actions}>
                       <button type="button" onClick={() => grantPacks(account.id)} disabled={isGrantingPacks || !onGrantPacks} style={styles.secondaryButton}>+{safePackGiftAmount}</button>
@@ -9414,218 +8335,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], predictions = [], guess
         </div>
         {rows.length === 0 && <Empty text="Aucun compte utilisateur enregistré." />}
       </Card>
-    </div>
-  );
-}
-
-function GuessDriverAttemptsPanel({ attempts = [], results = [], accounts = [], drivers = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS }) {
-  const [selectedDay, setSelectedDay] = useState("");
-  const [search, setSearch] = useState("");
-  const categoryId = normalizeCategoryId(selectedCategoryId);
-  const days = Array.from(new Set([
-    ...attempts.map((attempt) => attempt.challengeDay),
-    ...results.map((result) => result.challengeDay),
-  ].filter(Boolean))).sort((a, b) => b.localeCompare(a));
-  const filteredAttempts = attempts
-    .filter((attempt) => normalizeCategoryId(attempt.categoryId) === categoryId)
-    .filter((attempt) => !selectedDay || attempt.challengeDay === selectedDay)
-    .filter((attempt) => {
-      const targetDriver = drivers.find((driver) => idsEqual(driver.id, attempt.targetDriverId));
-      const guessedDriver = drivers.find((driver) => idsEqual(driver.id, attempt.guessedDriverId));
-      const haystack = `${attempt.pseudo} ${attempt.discordName} ${targetDriver?.name || ""} ${guessedDriver?.name || ""}`.toLowerCase();
-      return haystack.includes(search.trim().toLowerCase());
-    })
-    .sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
-  const filteredHistoricalResults = results
-    .filter((result) => normalizeCategoryId(result.categoryId) === categoryId)
-    .filter((result) => !selectedDay || result.challengeDay === selectedDay)
-    .filter((result) => {
-      const targetDriver = drivers.find((driver) => idsEqual(driver.id, result.driverId));
-      const haystack = `${result.pseudo} ${result.discordName} ${targetDriver?.name || ""}`.toLowerCase();
-      return haystack.includes(search.trim().toLowerCase());
-    })
-    .sort((a, b) => b.challengeDay.localeCompare(a.challengeDay) || Number(b.score || 0) - Number(a.score || 0) || Number(a.attempts || 0) - Number(b.attempts || 0));
-  const successCount = filteredAttempts.filter((attempt) => attempt.correct).length;
-  const activePlayers = new Set(filteredAttempts.map((attempt) => String(attempt.playerId)).filter(Boolean)).size;
-  const groupedByPlayerDay = filteredAttempts.reduce((map, attempt) => {
-    const key = `${attempt.playerId}-${attempt.categoryId}-${attempt.challengeDay}`;
-    const current = map.get(key) || { attempts: 0, correct: false };
-    map.set(key, { attempts: current.attempts + 1, correct: current.correct || attempt.correct });
-    return map;
-  }, new Map());
-  const abandonedCount = Array.from(groupedByPlayerDay.values()).filter((entry) => !entry.correct).length;
-  const formatAttemptDate = (value) => {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "—";
-    return date.toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" });
-  };
-  const resultForAttempt = (attempt) => results.find((result) => String(result.playerId) === String(attempt.playerId) && result.challengeDay === attempt.challengeDay && normalizeCategoryId(result.categoryId) === normalizeCategoryId(attempt.categoryId));
-
-  return (
-    <div style={styles.section}>
-      <Card title="Historique des essais — Défi pilote" icon="🧩">
-        <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-          <label style={styles.label}><span style={styles.labelText}>Jour</span><select value={selectedDay} onChange={(event) => setSelectedDay(event.target.value)} style={styles.resultsSelect}><option value="">Tous les jours</option>{days.map((day) => <option key={day} value={day}>{day}</option>)}</select></label>
-          <label style={styles.label}><span style={styles.labelText}>Recherche</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Pseudo, Discord ou pilote..." style={styles.input} /></label>
-        </div>
-        <div style={styles.statsGrid}>
-          <Stat label="Essais affichés" value={filteredAttempts.length} />
-          <Stat label="Joueurs" value={activePlayers} />
-          <Stat label="Bonnes réponses" value={successCount} />
-          <Stat label="Sessions sans réussite" value={abandonedCount} />
-        </div>
-      </Card>
-      <Card title="Détail des essais" icon="📋">
-        <div style={styles.tableWrap}>
-          <table style={{ ...styles.table, minWidth: 1040 }}>
-            <thead>
-              <tr style={styles.tableHead}>
-                <th style={styles.th}>Date</th>
-                <th style={styles.th}>Joueur</th>
-                <th style={styles.th}>Cat.</th>
-                <th style={styles.th}>Défi</th>
-                <th style={styles.th}>Essai</th>
-                <th style={styles.th}>Pilote tenté</th>
-                <th style={styles.th}>Pilote mystère</th>
-                <th style={styles.th}>Résultat</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAttempts.map((attempt) => {
-                const targetDriver = drivers.find((driver) => idsEqual(driver.id, attempt.targetDriverId));
-                const guessedDriver = drivers.find((driver) => idsEqual(driver.id, attempt.guessedDriverId));
-                const account = accounts.find((item) => idsEqual(item.id, attempt.playerId));
-                const savedResult = resultForAttempt(attempt);
-                return (
-                  <tr key={attempt.id} style={styles.tr}>
-                    <td style={styles.td}>{formatAttemptDate(attempt.createdAt)}</td>
-                    <td style={styles.td}><strong>{attempt.pseudo || account?.pseudo || "—"}</strong><p style={styles.mutedSmall}>{attempt.discordName || account?.discordName || "Discord —"}</p></td>
-                    <td style={styles.td}><span style={styles.titleBadge}>{attempt.categoryId}</span></td>
-                    <td style={styles.td}>{attempt.challengeDay}</td>
-                    <td style={styles.td}>#{attempt.attemptNumber || "—"}</td>
-                    <td style={styles.td}>{guessedDriver ? <DriverIdentity driver={guessedDriver} showRetired={false} /> : "—"}</td>
-                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
-                    <td style={styles.td}><span style={attempt.correct ? styles.badgeGreen : styles.badgeDark}>{attempt.correct ? `Trouvé${savedResult?.score ? ` · ${savedResult.score} pts` : ""}` : "Raté"}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {filteredAttempts.length === 0 && <Empty text="Aucun essai enregistré pour ce filtre." />}
-      </Card>
-      <Card title="Resultats historiques" icon="⏱">
-        <p style={styles.mutedSmall}>Ces lignes viennent de guess_driver_results : elles montrent les defis reussis, le score et le nombre d'essais, mais pas les mauvais pilotes tentes avant la creation de l'historique detaille.</p>
-        <div style={styles.tableWrap}>
-          <table style={{ ...styles.table, minWidth: 880 }}>
-            <thead>
-              <tr style={styles.tableHead}>
-                <th style={styles.th}>Jour</th>
-                <th style={styles.th}>Joueur</th>
-                <th style={styles.th}>Cat.</th>
-                <th style={styles.th}>Pilote trouve</th>
-                <th style={styles.th}>Essais</th>
-                <th style={styles.th}>Points</th>
-                <th style={styles.th}>Type</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredHistoricalResults.map((result) => {
-                const targetDriver = drivers.find((driver) => idsEqual(driver.id, result.driverId));
-                const hasDetailedAttempts = attempts.some((attempt) => String(attempt.playerId) === String(result.playerId) && attempt.challengeDay === result.challengeDay && normalizeCategoryId(attempt.categoryId) === normalizeCategoryId(result.categoryId));
-                return (
-                  <tr key={result.id} style={styles.tr}>
-                    <td style={styles.td}>{result.challengeDay || "—"}</td>
-                    <td style={styles.td}><strong>{result.pseudo || "—"}</strong><p style={styles.mutedSmall}>{result.discordName || "Discord —"}</p></td>
-                    <td style={styles.td}><span style={styles.titleBadge}>{result.categoryId}</span></td>
-                    <td style={styles.td}>{targetDriver ? <DriverIdentity driver={targetDriver} showRetired={false} /> : "—"}</td>
-                    <td style={styles.td}>{result.attempts || "—"}</td>
-                    <td style={{ ...styles.td, ...styles.points }}>{result.score || 0}</td>
-                    <td style={styles.td}><span style={hasDetailedAttempts ? styles.badgeGreen : styles.badgeDark}>{hasDetailedAttempts ? "Avec details" : "Resume seul"}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {filteredHistoricalResults.length === 0 && <Empty text="Aucun resultat historique pour ce filtre." />}
-      </Card>
-    </div>
-  );
-}
-
-function GamesAdminPanel({ predictions = [], predictionControls = [], races = [], drivers = [], raceResults = [], selectedCategoryId, setSelectedCategoryId, categoryOptions = CATEGORY_OPTIONS, selectedSeasonId, setSelectedSeasonId, onToggleClosed, onDeletePrediction, isSaving }) {
-  const categoryId = normalizeCategoryId(selectedCategoryId);
-  const seasonId = normalizeSeasonId(selectedSeasonId);
-  const seasonRaces = races.filter((race) => normalizeCategoryId(race.categoryId) === categoryId && normalizeSeasonId(race.seasonId) === seasonId).sort((a, b) => Number(a.round) - Number(b.round));
-  const visiblePredictions = predictions.filter((prediction) => normalizeCategoryId(prediction.categoryId) === categoryId && normalizeSeasonId(prediction.seasonId) === seasonId);
-  const leaderboard = getPredictionLeaderboard(visiblePredictions, raceResults);
-  const raceCounts = seasonRaces.map((race) => ({ race, count: visiblePredictions.filter((prediction) => String(prediction.raceId) === String(race.id)).length })).sort((a, b) => b.count - a.count);
-  const topRace = raceCounts[0];
-
-  return (
-    <div style={styles.section}>
-      <Card title="Jeux — Pronos GP" icon="🎮">
-        <div style={styles.resultsInfo}>
-          <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
-          <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
-        </div>
-        <div style={styles.statsGrid}>
-          <Stat label="Pronos" value={visiblePredictions.length} />
-          <Stat label="Joueurs" value={new Set(visiblePredictions.map((prediction) => prediction.pseudo.trim().toLowerCase()).filter(Boolean)).size} />
-          <Stat label="Courses" value={seasonRaces.length} />
-          <Stat label="Course la plus jouée" value={topRace?.count ? `${topRace.race.name} (${topRace.count})` : "—"} />
-        </div>
-      </Card>
-      <div style={styles.twoColumns}>
-        <Card title="Classement joueurs" icon="🏆">
-          <PredictionLeaderboard leaderboard={leaderboard} />
-        </Card>
-        <Card title="Pronos par course" icon="📋">
-          <div style={styles.stack}>
-            {seasonRaces.map((race) => {
-              const count = visiblePredictions.filter((prediction) => String(prediction.raceId) === String(race.id)).length;
-              const resultClosed = Boolean(getRaceResultForRace(raceResults, race.id));
-              const manuallyClosed = predictionControls.some((control) => String(control.raceId) === String(race.id) && control.closed);
-              const closed = resultClosed || manuallyClosed;
-              return <div key={race.id} style={styles.itemBox}><div><strong>R{race.round} · {race.name}</strong><p style={styles.mutedSmall}>{resultClosed ? "Résultat validé" : manuallyClosed ? "Fermé manuellement" : "Ouvert"} · {formatRaceDate(race.startAt)}</p></div><div style={styles.actions}><span style={closed ? styles.badgeGreen : styles.badgeDark}>{count} prono{count > 1 ? "s" : ""}</span><button type="button" disabled={isSaving || resultClosed} onClick={() => onToggleClosed?.(race.id, !manuallyClosed)} style={manuallyClosed ? styles.editButton : styles.dangerButton}>{manuallyClosed ? "Rouvrir" : "Fermer"}</button></div></div>;
-            })}
-            {seasonRaces.length === 0 && <Empty text="Aucune course dans cette saison." />}
-          </div>
-        </Card>
-      </div>
-      <Card title="Toutes les participations" icon="🧾">
-        <PredictionAdminTable predictions={visiblePredictions} races={seasonRaces} drivers={drivers} raceResults={raceResults} onDelete={onDeletePrediction} isSaving={isSaving} />
-      </Card>
-    </div>
-  );
-}
-
-function PredictionAdminTable({ predictions = [], races = [], drivers = [], raceResults = [], onDelete, isSaving }) {
-  if (!predictions.length) return <Empty text="Aucun prono enregistré sur cette sélection." />;
-  return (
-    <div style={styles.tableWrap}>
-      <table style={{ ...styles.table, minWidth: 980 }}>
-        <thead><tr style={styles.tableHead}><th style={styles.th}>Pseudo</th><th style={styles.th}>Course</th><th style={styles.th}>P1</th><th style={styles.th}>Pole</th><th style={styles.th}>MT</th><th style={styles.th}>Classement prédit</th><th style={styles.th}>Score</th><th style={styles.th}>Action</th></tr></thead>
-        <tbody>{predictions.map((prediction) => {
-          const race = races.find((item) => String(item.id) === String(prediction.raceId));
-          const score = scoreRacePrediction(prediction, raceResults);
-          return (
-            <tr key={prediction.id} style={styles.tr}>
-              <td style={styles.td}><strong>{prediction.pseudo}</strong><p style={styles.mutedSmall}>{prediction.createdAt ? new Date(prediction.createdAt).toLocaleString("fr-FR") : "—"}</p></td>
-              <td style={styles.td}>{race ? `R${race.round} · ${race.name}` : prediction.raceId}</td>
-              <td style={styles.td}>{driverName(drivers, prediction.predictedOrder?.[0] || prediction.winnerDriverId)}</td>
-              <td style={styles.td}>{driverName(drivers, prediction.poleDriverId)}</td>
-              <td style={styles.td}>{driverName(drivers, prediction.fastestDriverId)}</td>
-              <td style={styles.td}>{(prediction.predictedOrder?.length ? prediction.predictedOrder : [prediction.podiumFirstDriverId, prediction.podiumSecondDriverId, prediction.podiumThirdDriverId]).filter(Boolean).map((id, index) => `P${index + 1} ${driverName(drivers, id)}`).join(" · ")}</td>
-              <td style={{ ...styles.td, ...styles.points }}>{score.scored ? score.score : "—"}</td>
-              <td style={styles.td}><button type="button" onClick={() => onDelete?.(prediction.id)} disabled={isSaving || !onDelete} style={styles.dangerButton}>Supprimer</button></td>
-            </tr>
-          );
-        })}</tbody>
-      </table>
     </div>
   );
 }
@@ -11021,7 +9730,7 @@ const styles = {
   sessionBadge: { background: "rgba(24, 24, 27, .92)", border: "1px solid #3f3f46", color: "#e4e4e7", borderRadius: 999, padding: "9px 12px", fontSize: 12, fontWeight: 800, whiteSpace: "nowrap" },
   publicMain: { width: "100%", padding: "24px 28px 48px", display: "grid", gap: 22 },
   publicTitle: { margin: "8px 0", fontSize: 48, lineHeight: 1, fontWeight: 950 },
-  
+
   publicSubtitle: { color: "#d4d4d8", fontSize: 18, margin: 0, maxWidth: 680 },
   publicNav: { width: "100%", padding: "0 28px 18px", display: "flex", gap: 10, flexWrap: "wrap" },
   publicNavButton: { background: "#18181b", border: "1px solid #27272a", color: "#d4d4d8", padding: "12px 16px", borderRadius: 999, fontWeight: 900, cursor: "pointer" },
@@ -11282,18 +9991,6 @@ const styles = {
   resultsInfo: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, alignItems: "end", background: "#27272a", borderRadius: 18, padding: 16 },
   resultsSelect: { background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 14, padding: 14, outline: "none", fontWeight: 700 },
   quickResultBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 12 },
-  predictionOrderBox: { background: "#202024", border: "1px solid #3f3f46", borderRadius: 18, padding: 16, display: "grid", gap: 14 },
-  predictionOrderHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" },
-  predictionOrderList: { display: "grid", gap: 8 },
-  predictionOrderRow: { background: "#18181b", border: "1px solid #2f2f36", borderRadius: 14, padding: "10px 12px", display: "grid", gridTemplateColumns: "54px minmax(0, 1fr) auto", alignItems: "center", gap: 10, cursor: "grab" },
-  predictionOrderRowDragging: { opacity: .55, borderColor: "#a855f7", boxShadow: "0 0 18px rgba(168,85,247,.28)" },
-  predictionPosition: { color: "#f87171", fontWeight: 950, fontSize: 16 },
-  predictionMoveButtons: { display: "flex", alignItems: "center", gap: 6 },
-  predictionDragHandle: { color: "#a1a1aa", fontSize: 20, fontWeight: 950, padding: "0 4px" },
-  guessHero: { display: "grid", gridTemplateColumns: "minmax(0, 1.2fr) minmax(280px, .8fr)", gap: 18, alignItems: "center", marginBottom: 16 },
-  guessCell: { minHeight: 52, borderRadius: 14, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, fontWeight: 950 },
-  guessCellCorrect: { background: "rgba(34,197,94,.18)", border: "1px solid rgba(34,197,94,.55)", color: "#bbf7d0" },
-  guessCellWrong: { background: "rgba(127,29,29,.22)", border: "1px solid rgba(248,113,113,.45)", color: "#fecaca" },
   positionGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 180px), 1fr))", gap: 10, marginTop: 10 },
   positionPick: { display: "grid", gridTemplateColumns: "44px minmax(0, 1fr)", alignItems: "center", gap: 8, color: "#f4f4f5", fontWeight: 900 },
   positionInput: { width: 90, background: "#09090b", border: "1px solid #3f3f46", color: "white", borderRadius: 12, padding: 10, outline: "none" },
