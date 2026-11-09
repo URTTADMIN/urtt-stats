@@ -2686,6 +2686,10 @@ export default function URTTAdminPanel() {
   const [feedbackRequests, setFeedbackRequests] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
   const [siteSettings, setSiteSettings] = useState(defaultSiteSettings);
+  const siteSettingsRef = useRef(defaultSiteSettings);
+  const persistedSiteSettingsRef = useRef(defaultSiteSettings);
+  const siteSettingSaveQueuesRef = useRef({});
+  const siteSettingSaveTokensRef = useRef({});
   const [liveRaceDrafts, setLiveRaceDrafts] = useState({});
   const [driverForm, setDriverForm] = useState(emptyDriver);
   const [editingDriverId, setEditingDriverId] = useState(null);
@@ -2867,8 +2871,15 @@ export default function URTTAdminPanel() {
           errors: results.map((result, index) => result.error ? { table: keys[index].replace(/Data$/, ""), code: result.error.code, message: result.error.message } : null).filter(Boolean),
         };
       } else {
-        const response = await fetch("/api/public-data", { headers: { Accept: "application/json" } });
+        const [response, settingsResult] = await Promise.all([
+          fetch("/api/public-data", { headers: { Accept: "application/json" } }),
+          supabase.from("site_settings").select("*"),
+        ]);
         publicData = await response.json();
+        publicData.siteSettingsData = settingsResult.data || [];
+        if (settingsResult.error) {
+          publicData.errors = [...(publicData.errors || []), { table: "site_settings", code: settingsResult.error.code, message: settingsResult.error.message }];
+        }
         if (!response.ok) throw new Error(publicData.errors?.map((error) => `${error.table}: ${error.message}`).join(" · ") || publicData.error || "Impossible de charger les données publiques.");
       }
 
@@ -2899,7 +2910,10 @@ export default function URTTAdminPanel() {
       setOffSeasonEntries((offSeasonEntriesData || []).map(mapOffSeasonEntryFromDb));
       setSeasonTitles((seasonTitlesData || []).map(mapSeasonTitleFromDb));
       setDevelopmentEntries((developmentData || []).map(mapDevelopmentFromDb));
-      setSiteSettings(mapSiteSettingsFromDb(siteSettingsData || []));
+      const loadedSiteSettings = mapSiteSettingsFromDb(siteSettingsData || []);
+      siteSettingsRef.current = loadedSiteSettings;
+      persistedSiteSettingsRef.current = loadedSiteSettings;
+      setSiteSettings(loadedSiteSettings);
       setRaceResults((resultsData || []).map((result) => mapRaceResultFromDb(result, resultEntriesData || [])));
       setLastSyncAt(new Date());
       setIsLoadingData(false);
@@ -3801,18 +3815,30 @@ export default function URTTAdminPanel() {
       return;
     }
 
-    const previousValue = siteSettings[key];
-    setSiteSettings((current) => ({ ...current, [key]: value }));
-    const { error } = await supabase
-      .from("site_settings")
-      .upsert({ key, value }, { onConflict: "key" });
+    const nextSettings = { ...siteSettingsRef.current, [key]: value };
+    siteSettingsRef.current = nextSettings;
+    setSiteSettings(nextSettings);
+    const token = (siteSettingSaveTokensRef.current[key] || 0) + 1;
+    siteSettingSaveTokensRef.current[key] = token;
+    const previousSave = siteSettingSaveQueuesRef.current[key] || Promise.resolve();
+    const pendingSave = previousSave
+      .catch(() => undefined)
+      .then(() => supabase.from("site_settings").upsert({ key, value }, { onConflict: "key" }));
+    siteSettingSaveQueuesRef.current[key] = pendingSave;
+    const { error } = await pendingSave;
 
     if (error) {
       console.error("Erreur reglage site:", error);
-      setSiteSettings((current) => ({ ...current, [key]: previousValue }));
+      if (siteSettingSaveTokensRef.current[key] === token) {
+        const rolledBackSettings = { ...siteSettingsRef.current, [key]: persistedSiteSettingsRef.current[key] };
+        siteSettingsRef.current = rolledBackSettings;
+        setSiteSettings(rolledBackSettings);
+      }
       setPopup({ type: "error", title: "Erreur Supabase", message: error.code === "42P01" ? "La table site_settings n'existe pas encore. Lance la commande SQL fournie par Codex." : `Impossible de sauvegarder le reglage: ${error.message}` });
       return;
     }
+
+    persistedSiteSettingsRef.current = { ...persistedSiteSettingsRef.current, [key]: value };
 
     setPopup({ type: "success", title: "Reglage sauvegarde", message: "Les reglages du site ont ete mis a jour." });
   }

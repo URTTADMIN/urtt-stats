@@ -40,7 +40,6 @@ export default async function handler(_request, response) {
     supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
     supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
     supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-    supabase.from("site_settings").select("*"),
     supabase.from("race_results").select("*").order("id", { ascending: true }),
     fetchAllRows(supabase, "race_result_entries"),
   ]);
@@ -48,7 +47,7 @@ export default async function handler(_request, response) {
   const keys = [
     "teamsData", "driversData", "participationsData", "raceLibraryData", "seasonsData",
     "calendarData", "calendarEventsData", "specialEditionsData", "offSeasonEntriesData",
-    "seasonTitlesData", "developmentData", "siteSettingsData", "resultsData", "resultEntriesData",
+    "seasonTitlesData", "developmentData", "resultsData", "resultEntriesData",
   ];
   const data = Object.fromEntries(keys.map((key, index) => [key, results[index].data || []]));
   const errors = results
