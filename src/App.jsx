@@ -460,14 +460,7 @@ function isObsoleteTcgDemoCard(card = {}) {
   return OBSOLETE_TCG_DEMO_CARD_IDS.some((id) => haystack.includes(id));
 }
 
-function splitObsoleteTcgDemoCards(cards = []) {
-  return normalizeCardCollection(cards).reduce((result, card) => {
-    result[isObsoleteTcgDemoCard(card) ? "removed" : "kept"].push(card);
-    return result;
-  }, { kept: [], removed: [] });
-}
-
-function mergeCardCollections(primary = [], fallback = []) {
+function mergeLegacyCardCollections(primary = [], fallback = []) {
   const seen = new Set();
   return [...normalizeCardCollection(primary), ...normalizeCardCollection(fallback)].filter((card) => {
     const key = String(card?.ownedId || card?.id || `${card?.cardId || ""}-${card?.obtainedAtMs || ""}`);
@@ -475,6 +468,13 @@ function mergeCardCollections(primary = [], fallback = []) {
     seen.add(key);
     return true;
   });
+}
+
+function splitObsoleteTcgDemoCards(cards = []) {
+  return normalizeCardCollection(cards).reduce((result, card) => {
+    result[isObsoleteTcgDemoCard(card) ? "removed" : "kept"].push(card);
+    return result;
+  }, { kept: [], removed: [] });
 }
 
 function getNextCardPackInMs(stock, now = Date.now()) {
@@ -4294,14 +4294,16 @@ export default function URTTAdminPanel() {
     if (!targetId) return { ok: false, message: "Compte joueur introuvable." };
     const normalizedCards = normalizeCardCollection(cards);
     const normalizedStock = { ...normalizeCardPackStock(stock), stockSyncedAt: Math.max(Number(stock?.stockSyncedAt) || 0, Date.now()) };
-    const { error } = await supabase
+    const { data: updatedAccount, error } = await supabase
       .from("player_accounts")
       .update({ card_collection: normalizedCards, card_pack_stock: normalizedStock, last_seen_at: new Date().toISOString() })
-      .eq("id", targetId);
+      .eq("id", targetId)
+      .select("id")
+      .maybeSingle();
 
-    if (error) {
+    if (error || !updatedAccount) {
       console.error("Erreur sauvegarde TCG joueur:", error);
-      return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore." : "Impossible de sauvegarder les données TCG." };
+      return { ok: false, message: error?.code === "42P01" ? "La table player_accounts n'existe pas encore." : error ? "Impossible de sauvegarder les données TCG." : "Supabase n’a confirmé aucune sauvegarde. Vérifie ta connexion et réessaie." };
     }
 
     setPlayerAccounts((current) => current.map((account) => idsEqual(account.id, targetId) ? { ...account, cardCollection: normalizedCards, cardPackStock: normalizedStock } : account));
@@ -5867,10 +5869,16 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const accountCards = normalizeCardCollection(playerProfile?.cardCollection);
     const localCards = readStoredCardCollection(playerCardAccountId);
     const localStock = readStoredCardPackStock(playerCardAccountId);
+    const accountStock = playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : null;
+    const localStockIsNewer = Boolean(accountStock && Number(localStock.stockSyncedAt) > Number(accountStock.stockSyncedAt));
     const nextStock = playerCardAccountId
       ? getFreshestCardPackStock(playerProfile?.cardPackStock, localStock)
       : localStock;
-    const mergedCards = playerCardAccountId ? mergeCardCollections(accountCards, localCards) : localCards;
+    const mergedCards = playerCardAccountId
+      ? accountStock
+        ? localStockIsNewer ? localCards : accountCards
+        : mergeLegacyCardCollections(accountCards, localCards)
+      : localCards;
     const nextCards = playerCardAccountId
       ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(mergedCards) ? [] : mergedCards
       : localCards;
@@ -5879,7 +5887,12 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (playerCardAccountId) {
       writeStoredCardCollection(nextCards, playerCardAccountId);
       writeStoredCardPackStock(nextStock, playerCardAccountId);
-      if (!playerProfile?.cardPackStock || JSON.stringify(nextCards) !== JSON.stringify(accountCards)) savePlayerCards(nextCards, nextStock);
+      if (!accountStock || localStockIsNewer || JSON.stringify(nextCards) !== JSON.stringify(accountCards)) {
+        savePlayerCards(nextCards, nextStock).then((result) => {
+          if (!result?.ok) setCardSyncStatus(result?.message || "La synchronisation TCG a échoué. Réessaie quand la connexion sera rétablie.");
+          else setCardSyncStatus("");
+        });
+      }
     }
   }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
@@ -7139,6 +7152,214 @@ function OffSeasonChampionshipAdmin({ eventType, entries = [], drivers = [], tea
     </div>
   );
 }
+
+function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, setSelectedDriverId, drivers = [], teams = [], raceResults = [], seasonTitles = [], allRaces = [], seasonOptions = getSeasonOptions(), onOpenDriver }) {
+  const query = normalizeResultText(search);
+  const matches = query
+    ? drivers.filter((driver) => normalizeResultText(driver.name).includes(query)).slice(0, 8)
+    : [];
+  const selectedDriver = drivers.find((driver) => idsEqual(driver.id, selectedDriverId)) || (matches.length === 1 ? matches[0] : null);
+  const selectedTeam = selectedDriver ? teams.find((team) => idsEqual(team.id, selectedDriver.teamId)) : null;
+  const rows = selectedDriver ? CATEGORY_OPTIONS.map((category) => {
+    const stats = computeStats({ drivers, teams, raceResults, selectedCategoryId: category.id, seasonTitles });
+    const categorySeasons = getSeasonOptionsForCategory(allRaces, category.id, seasonOptions);
+    const latestSeasonId = getLatestSeasonId(categorySeasons.length ? categorySeasons : seasonOptions);
+    const driverRows = stats.cumulativeDriverStatsBySeason[latestSeasonId] || [];
+    const driverStats = driverRows.find((row) => idsEqual(row.id, selectedDriver.id));
+    return { category, latestSeasonId, rank: driverStats ? driverRows.findIndex((row) => idsEqual(row.id, selectedDriver.id)) + 1 : 0, stats: driverStats };
+  }).filter((row) => row.stats && ((Number(row.stats.points) || 0) > 0 || (Number(row.stats.seasons) || 0) > 0 || (Number(row.stats.driverTitles) || 0) > 0 || (Number(row.stats.teamTitles) || 0) > 0)) : [];
+  const categoryBreakdowns = selectedDriver ? CATEGORY_OPTIONS.map((category) => ({
+    category,
+    rows: getDriverSeasonBreakdown(selectedDriver, raceResults, teams, category.id, seasonTitles, drivers, allRaces),
+  })).filter((item) => item.rows.length > 0) : [];
+  const selectDriver = (driver) => {
+    setSelectedDriverId(driver.id);
+    setSearch(driver.name);
+  };
+
+  return (
+    <Card title="Recherche pilote toutes catégories" icon="🔎">
+      <div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => { setSearch(event.target.value); setSelectedDriverId(""); }} placeholder="Écris le nom d'un pilote..." style={styles.searchInput} /></div>
+      {matches.length > 1 && (
+        <div style={{ ...styles.titleBadgeRow, marginBottom: 14 }}>
+          {matches.map((driver) => (
+            <button key={driver.id} type="button" onClick={() => selectDriver(driver)} style={idsEqual(selectedDriver?.id, driver.id) ? styles.primaryButton : styles.secondaryButton}>{driver.name}</button>
+          ))}
+        </div>
+      )}
+      {!query && <p style={styles.mutedSmall}>Tape un nom pour afficher ses stats cumulées en F1, F2, F3 et FE.</p>}
+      {query && !selectedDriver && <Empty text="Aucun pilote trouvé avec ce nom." />}
+      {selectedDriver && (
+        <>
+          <div style={styles.itemBox}>
+            <DriverIdentity driver={selectedDriver} teamColor={selectedTeam?.color} teamLogo={selectedTeam?.logo} />
+            <button type="button" onClick={() => onOpenDriver?.(selectedDriver, "")} style={styles.editButton}>Fiche complète</button>
+          </div>
+          <div style={styles.tableWrap}>
+            <table style={{ ...styles.table, minWidth: 920 }}>
+              <thead>
+                <tr style={styles.tableHead}>
+                  <th style={styles.th}>Catégorie</th>
+                  <th style={styles.th}>Rang</th>
+                  <th style={styles.th}>Saisons</th>
+                  <th style={styles.th}>Titre P.</th>
+                  <th style={styles.th}>Titre C.</th>
+                  <th style={styles.th}>V</th>
+                  <th style={styles.th}>Pod.</th>
+                  <th style={styles.th}>Poles</th>
+                  <th style={styles.th}>MT</th>
+                  <th style={styles.th}>HT</th>
+                  <th style={styles.th}>Points</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ category, rank, latestSeasonId, stats }) => (
+                  <tr key={category.id} style={styles.tr}>
+                    <td style={styles.td}><span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span><p style={styles.mutedSmall}>Jusqu'à {seasonName(latestSeasonId)}</p></td>
+                    <td style={styles.td}>{rank ? `#${rank}` : "—"}</td>
+                    <td style={styles.td}>{stats.seasons || 0}</td>
+                    <td style={styles.td}>{stats.driverTitles || 0}</td>
+                    <td style={styles.td}>{stats.teamTitles || 0}</td>
+                    <td style={styles.td}>{stats.wins || 0}</td>
+                    <td style={styles.td}>{stats.podiums || 0}</td>
+                    <td style={styles.td}>{stats.poles || 0}</td>
+                    <td style={styles.td}>{stats.fastestLaps || 0}</td>
+                    <td style={styles.td}>{stats.hatTricks || 0}</td>
+                    <td style={{ ...styles.td, ...styles.points }}>{stats.points || 0}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {rows.length === 0 && <Empty text="Ce pilote n'a pas encore de stats enregistrées dans les championnats." />}
+          {categoryBreakdowns.length > 0 && (
+            <div style={{ marginTop: 18 }}>
+              <h3 style={styles.panelTitle}>Détail saisons et courses</h3>
+              <div style={styles.stack}>
+                {categoryBreakdowns.map(({ category, rows: breakdownRows }) => (
+                  <div key={category.id} style={styles.itemBoxColumn}>
+                    <div style={styles.publicRaceHeader}>
+                      <div>
+                        <span style={{ ...styles.categoryBadge, background: category.color }}>{category.name}</span>
+                        <p style={styles.mutedSmall}>{breakdownRows.length} saison{breakdownRows.length > 1 ? "s" : ""} avec stats enregistrées.</p>
+                      </div>
+                    </div>
+                    <SeasonBreakdownTable rows={breakdownRows} expandable />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+
+function SpecialEditionsPage({ editions = [], drivers = [] }) {
+  const sortedEditions = [...editions].sort((a, b) => a.eventType.localeCompare(b.eventType) || Number(a.sortOrder) - Number(b.sortOrder));
+  return (
+    <div style={styles.section}>
+      {SPECIAL_EVENT_OPTIONS.map((event) => {
+        const eventEditions = sortedEditions.filter((edition) => edition.eventType === event.id);
+        return (
+          <Card key={event.id} title={event.name} icon="🏁">
+            <div style={styles.stack}>
+              {eventEditions.map((edition) => (
+                <div key={edition.id} style={{ ...styles.publicRaceCard, borderColor: event.color }}>
+                  <div style={styles.publicRaceHeader}>
+                    <div>
+                      <p style={styles.mutedSmall}>{edition.date ? new Date(edition.date).toLocaleDateString("fr-FR") : "Date non définie"}</p>
+                      <h3 style={styles.raceTitle}>{edition.editionLabel}{edition.name ? ` · ${edition.name}` : ""}</h3>
+                    </div>
+                    <span style={{ ...styles.categoryBadge, background: event.color, color: event.id === "INDY300" ? "#18181b" : "white" }}>{event.name}</span>
+                  </div>
+                  <div style={styles.raceStatsGrid}>
+                    <RaceStat label="Vainqueur" value={driverName(drivers, edition.winnerDriverId)} />
+                    <RaceStat label="Poleman" value={driverName(drivers, edition.poleDriverId)} />
+                    <RaceStat label="Podium" value={specialEditionPodium(edition, drivers)} />
+                  </div>
+                  {edition.notes && <p style={styles.mutedSmall}>{edition.notes}</p>}
+                </div>
+              ))}
+              {eventEditions.length === 0 && <Empty text={`Aucune édition ${event.name} enregistrée.`} />}
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+
+function OffSeasonChampionshipPage({ eventType, entries = [], drivers = [], teams = [], selectedSeasonId }) {
+  const event = getSpecialEvent(eventType);
+  const rows = getOffSeasonRows(entries, eventType, selectedSeasonId, drivers, teams);
+  const pole = rows.find((row) => Number(row.qualifyingPosition) === 1);
+  const winner = rows.find((row) => Number(row.racePosition) === 1);
+  const totalPoints = rows.reduce((sum, row) => sum + row.points, 0);
+
+  return (
+    <div style={styles.section}>
+      <Card title={`${event.name} — ${seasonName(selectedSeasonId)}`} icon="🏁">
+        <div style={styles.statsGrid}>
+          <Stat label="Participants" value={rows.length} />
+          <Stat label="Pole" value={pole?.driver?.name || "—"} />
+          <Stat label="Vainqueur" value={winner?.driver?.name || "—"} />
+          <Stat label="Points distribués" value={totalPoints} />
+        </div>
+      </Card>
+      <Card title={`Classement ${event.name}`} icon="🏆">
+        <OffSeasonStandingsTable rows={rows} eventColor={event.color} />
+      </Card>
+    </div>
+  );
+}
+
+function OffSeasonStandingsTable({ rows = [], eventColor = "#7c3aed" }) {
+  if (!rows.length) return <Empty text="Aucun participant enregistré pour cette saison." />;
+  return (
+    <div style={styles.tableWrap}>
+      <table style={styles.table}>
+        <thead>
+          <tr style={styles.tableHead}>
+            <th style={styles.th}>#</th>
+            <th style={styles.th}>Pilote</th>
+            <th style={styles.th}>Écurie</th>
+            <th style={styles.th}>Qualif</th>
+            <th style={styles.th}>Course</th>
+            <th style={styles.th}>Gain/Perte</th>
+            <th style={styles.th}>Points</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => {
+            const delta = getOffSeasonPositionDelta(row);
+            return (
+              <tr key={row.id || `${row.driverId}-${row.eventType}`} style={styles.tr}>
+                <td style={styles.td}><strong>#{index + 1}</strong></td>
+                <td style={styles.td}>{row.driver ? <DriverIdentity driver={row.driver} teamColor={row.team?.color} teamLogo={row.team?.logo} showRetired={false} /> : "—"}</td>
+                <td style={styles.td}>{row.team ? <TeamIdentity team={row.team} /> : "—"}</td>
+                <td style={styles.td}><span style={{ ...styles.badgeDark, background: eventColor, color: eventColor === "#ffff00" ? "#18181b" : "white" }}>P{row.qualifyingPosition || "—"}</span></td>
+                <td style={styles.td}>P{row.racePosition || "—"}</td>
+                <td style={styles.td}><PositionDeltaBadge delta={delta} /></td>
+                <td style={styles.td}><span style={styles.points}>{row.points}</span></td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function PositionDeltaBadge({ delta = 0 }) {
+  if (delta > 0) return <span style={styles.positionDeltaUp}>↑ {delta}</span>;
+  if (delta < 0) return <span style={styles.positionDeltaDown}>↓ {Math.abs(delta)}</span>;
+  return <span style={styles.positionDeltaEqual}>=</span>;
+}
+
 
 function DevelopmentPage({ teams, drivers = [], entries = [], selectedSeasonId, selectedCategoryId, isAdminPreview = false }) {
   const selectedEntries = getDevelopmentEntriesForSelection(entries, selectedSeasonId, selectedCategoryId);
