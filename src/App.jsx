@@ -665,23 +665,6 @@ function createEmptyPermissionForm() {
   return { userEmail: "", role: "admin", allowedCategories: [...ALL_CATEGORY_IDS], allowedPages: ALL_ADMIN_PAGE_IDS.filter((pageId) => pageId !== "permissions") };
 }
 
-async function fetchAllSupabaseRows(tableName, orderBy = "id") {
-  const pageSize = 1000;
-  const rows = [];
-
-  for (let from = 0; ; from += pageSize) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select("*")
-      .order(orderBy, { ascending: true })
-      .range(from, from + pageSize - 1);
-
-    if (error) return { data: rows, error };
-    rows.push(...(data || []));
-    if (!data || data.length < pageSize) return { data: rows, error: null };
-  }
-}
-
 const emptyDriver = { name: "", teamId: "", number: 1, color: "#dc2626", avatar: "", retired: false, driverTitles: 0, teamTitles: 0, participations: {}, teamHistory: {}, tripleCrown: { monaco: false, indy500: false, lemans: false } };
 const emptyTeam = { name: "", color: "#dc2626", logo: "", driverTitles: 0, driverTitlesF1: 0, driverTitlesF2: 0, driverTitlesF3: 0, driverTitlesFE: 0, teamTitles: 0, teamTitlesF1: 0, teamTitlesF2: 0, teamTitlesF3: 0, teamTitlesFE: 0, tripleCrowns: 0 };
 const emptyRace = { name: "", country: "" };
@@ -2852,54 +2835,51 @@ export default function URTTAdminPanel() {
     async function loadInitialDataFromSupabase() {
       setIsLoadingData(true);
       setSupabaseErrors([]);
-      const [
-        { data: teamsData, error: teamsError },
-        { data: driversData, error: driversError },
-        { data: participationsData, error: participationsError },
-        { data: raceLibraryData, error: raceLibraryError },
-        { data: seasonsData, error: seasonsError },
-        { data: calendarData, error: calendarError },
-        { data: calendarEventsData, error: calendarEventsError },
-        { data: specialEditionsData, error: specialEditionsError },
-        { data: offSeasonEntriesData, error: offSeasonEntriesError },
-        { data: seasonTitlesData, error: seasonTitlesError },
-        { data: developmentData, error: developmentError },
-        { data: siteSettingsData, error: siteSettingsError },
-        { data: resultsData, error: resultsError },
-        { data: resultEntriesData, error: resultEntriesError },
-      ] = await Promise.all([
-        supabase.from("teams").select("*").order("id", { ascending: true }),
-        supabase.from("drivers").select("*").order("id", { ascending: true }),
-        supabase.from("driver_participations").select("*").order("id", { ascending: true }),
-        supabase.from("race_library").select("*").order("id", { ascending: true }),
-        supabase.from("seasons").select("*").order("sort_order", { ascending: true }),
-        supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-        supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
-        supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
-        supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
-        supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
-        supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-        supabase.from("site_settings").select("*"),
-        supabase.from("race_results").select("*").order("id", { ascending: true }),
-        fetchAllSupabaseRows("race_result_entries"),
-      ]);
+      let publicData;
+      if (import.meta.env.DEV) {
+        const results = await Promise.all([
+          supabase.from("teams").select("*").order("id", { ascending: true }),
+          supabase.from("drivers").select("*").order("id", { ascending: true }),
+          supabase.from("driver_participations").select("*").order("id", { ascending: true }),
+          supabase.from("race_library").select("*").order("id", { ascending: true }),
+          supabase.from("seasons").select("*").order("sort_order", { ascending: true }),
+          supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
+          supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
+          supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
+          supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
+          supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
+          supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
+          supabase.from("site_settings").select("*"),
+          supabase.from("race_results").select("*").order("id", { ascending: true }),
+          (async () => {
+            const rows = [];
+            for (let from = 0; ; from += 1000) {
+              const page = await supabase.from("race_result_entries").select("*").order("id", { ascending: true }).range(from, from + 999);
+              if (page.error) return { data: rows, error: page.error };
+              rows.push(...(page.data || []));
+              if (!page.data || page.data.length < 1000) return { data: rows, error: null };
+            }
+          })(),
+        ]);
+        const keys = ["teamsData", "driversData", "participationsData", "raceLibraryData", "seasonsData", "calendarData", "calendarEventsData", "specialEditionsData", "offSeasonEntriesData", "seasonTitlesData", "developmentData", "siteSettingsData", "resultsData", "resultEntriesData"];
+        publicData = {
+          ...Object.fromEntries(keys.map((key, index) => [key, results[index].data || []])),
+          errors: results.map((result, index) => result.error ? { table: keys[index].replace(/Data$/, ""), code: result.error.code, message: result.error.message } : null).filter(Boolean),
+        };
+      } else {
+        const response = await fetch("/api/public-data", { headers: { Accept: "application/json" } });
+        publicData = await response.json();
+        if (!response.ok) throw new Error(publicData.errors?.map((error) => `${error.table}: ${error.message}`).join(" · ") || publicData.error || "Impossible de charger les données publiques.");
+      }
 
-      const loadErrors = [
-        teamsError && `teams: ${teamsError.message}`,
-        driversError && `drivers: ${driversError.message}`,
-        participationsError && `driver_participations: ${participationsError.message}`,
-        raceLibraryError && `race_library: ${raceLibraryError.message}`,
-        seasonsError && seasonsError.code !== "42P01" && `seasons: ${seasonsError.message}`,
-        calendarError && `season_calendar: ${calendarError.message}`,
-        calendarEventsError && calendarEventsError.code !== "42P01" && `calendar_events: ${calendarEventsError.message}`,
-        specialEditionsError && specialEditionsError.code !== "42P01" && `special_event_editions: ${specialEditionsError.message}`,
-        offSeasonEntriesError && offSeasonEntriesError.code !== "42P01" && `off_season_championship_entries: ${offSeasonEntriesError.message}`,
-        seasonTitlesError && seasonTitlesError.code !== "42P01" && `season_titles: ${seasonTitlesError.message}`,
-        developmentError && developmentError.code !== "42P01" && `team_development: ${developmentError.message}`,
-        siteSettingsError && siteSettingsError.code !== "42P01" && `site_settings: ${siteSettingsError.message}`,
-        resultsError && `race_results: ${resultsError.message}`,
-        resultEntriesError && `race_result_entries: ${resultEntriesError.message}`,
-      ].filter(Boolean);
+      const {
+        teamsData, driversData, participationsData, raceLibraryData, seasonsData, calendarData,
+        calendarEventsData, specialEditionsData, offSeasonEntriesData, seasonTitlesData,
+        developmentData, siteSettingsData, resultsData, resultEntriesData,
+      } = publicData;
+      const loadErrors = (publicData.errors || [])
+        .filter((error) => error.code !== "42P01")
+        .map((error) => `${error.table}: ${error.message}`);
 
       if (loadErrors.length) {
         console.error("Erreurs chargement Supabase:", loadErrors);
