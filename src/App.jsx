@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { supabase } from "./supabaseClient";
 import { useRef } from "react";
+import { Analytics } from "@vercel/analytics/react";
 
 const POINTS_SYSTEM = [30, 25, 22, 20, 18, 16, 14, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1];
 const F2_SEASONS_3_AND_4_POINTS_SYSTEM = [20, 18, 17, 16, 15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
@@ -4752,6 +4753,7 @@ export default function URTTAdminPanel() {
         </AdminLayout>
       )}
       {popup && <Popup popup={popup} onClose={() => setPopup(null)} />}
+      <Analytics />
     </>
   );
 }
