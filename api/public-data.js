@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 const PAGE_SIZE = 1000;
-const CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=300";
+const CACHE_CONTROL = "public, s-maxage=600, stale-while-revalidate=600";
 
 async function fetchAllRows(supabase, tableName, orderBy = "id") {
   const rows = [];
@@ -9,7 +9,7 @@ async function fetchAllRows(supabase, tableName, orderBy = "id") {
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from(tableName)
-      .select("*")
+      .select("result_id,driver_id,position,pole,fastest_lap")
       .order(orderBy, { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
 
@@ -29,18 +29,18 @@ export default async function handler(_request, response) {
 
   const supabase = createClient(supabaseUrl, supabaseAnonKey);
   const results = await Promise.all([
-    supabase.from("teams").select("*").order("id", { ascending: true }),
-    supabase.from("drivers").select("*").order("id", { ascending: true }),
-    supabase.from("driver_participations").select("*").order("id", { ascending: true }),
-    supabase.from("race_library").select("*").order("id", { ascending: true }),
-    supabase.from("seasons").select("*").order("sort_order", { ascending: true }),
-    supabase.from("season_calendar").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-    supabase.from("calendar_events").select("*").order("start_at", { ascending: true }),
-    supabase.from("special_event_editions").select("*").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
-    supabase.from("off_season_championship_entries").select("*").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
-    supabase.from("season_titles").select("*").order("season_id", { ascending: true }),
-    supabase.from("team_development").select("*").order("season_id", { ascending: true }).order("round", { ascending: true }),
-    supabase.from("race_results").select("*").order("id", { ascending: true }),
+    supabase.from("teams").select("id,name,color,logo,driver_titles,driver_titles_f1,driver_titles_f2,driver_titles_f3,driver_titles_fe,team_titles,team_titles_f1,team_titles_f2,team_titles_f3,team_titles_fe,triple_crowns").order("id", { ascending: true }),
+    supabase.from("drivers").select("id,name,default_team_id,number,color,avatar,retired,driver_titles,team_titles,triple_crown").order("id", { ascending: true }),
+    supabase.from("driver_participations").select("driver_id,season_id,category_id,team_id").order("driver_id", { ascending: true }),
+    supabase.from("race_library").select("id,name,country").order("id", { ascending: true }),
+    supabase.from("seasons").select("id,name,sort_order").order("sort_order", { ascending: true }),
+    supabase.from("season_calendar").select("id,race_library_id,round,name,season_id,category_id,start_at").order("season_id", { ascending: true }).order("round", { ascending: true }),
+    supabase.from("calendar_events").select("id,title,description,start_at,end_at").order("start_at", { ascending: true }),
+    supabase.from("special_event_editions").select("id,event_type,edition_label,name,date,winner_driver_id,pole_driver_id,podium_first_driver_id,podium_second_driver_id,podium_third_driver_id,podium,notes,sort_order").order("event_type", { ascending: true }).order("sort_order", { ascending: true }),
+    supabase.from("off_season_championship_entries").select("id,event_type,season_id,driver_id,team_id,qualifying_position,race_position").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
+    supabase.from("season_titles").select("id,season_id,category_id,driver_id,team_id,constructor_driver_ids").order("season_id", { ascending: true }),
+    supabase.from("team_development").select("id,team_id,season_id,category_id,round,speed,acceleration,grip,turbo,turbo_enabled,level,driver_one,driver_two").order("season_id", { ascending: true }).order("round", { ascending: true }),
+    supabase.from("race_results").select("id,race_id,season_id,category_id,race_name").order("id", { ascending: true }),
     fetchAllRows(supabase, "race_result_entries"),
   ]);
 
