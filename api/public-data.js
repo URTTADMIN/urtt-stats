@@ -1,23 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 
-const PAGE_SIZE = 1000;
 const CACHE_CONTROL = "public, s-maxage=600, stale-while-revalidate=600";
-
-async function fetchAllRows(supabase, tableName, orderBy = "id") {
-  const rows = [];
-
-  for (let from = 0; ; from += PAGE_SIZE) {
-    const { data, error } = await supabase
-      .from(tableName)
-      .select("result_id,driver_id,position,pole,fastest_lap")
-      .order(orderBy, { ascending: true })
-      .range(from, from + PAGE_SIZE - 1);
-
-    if (error) return { data: rows, error };
-    rows.push(...(data || []));
-    if (!data || data.length < PAGE_SIZE) return { data: rows, error: null };
-  }
-}
 
 export default async function handler(_request, response) {
   const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
@@ -40,14 +23,12 @@ export default async function handler(_request, response) {
     supabase.from("off_season_championship_entries").select("id,event_type,season_id,driver_id,team_id,qualifying_position,race_position").order("season_id", { ascending: true }).order("event_type", { ascending: true }).order("race_position", { ascending: true }),
     supabase.from("season_titles").select("id,season_id,category_id,driver_id,team_id,constructor_driver_ids").order("season_id", { ascending: true }),
     supabase.from("team_development").select("id,team_id,season_id,category_id,round,speed,acceleration,grip,turbo,turbo_enabled,level,driver_one,driver_two").order("season_id", { ascending: true }).order("round", { ascending: true }),
-    supabase.from("race_results").select("id,race_id,season_id,category_id,race_name").order("id", { ascending: true }),
-    fetchAllRows(supabase, "race_result_entries"),
   ]);
 
   const keys = [
     "teamsData", "driversData", "participationsData", "raceLibraryData", "seasonsData",
     "calendarData", "calendarEventsData", "specialEditionsData", "offSeasonEntriesData",
-    "seasonTitlesData", "developmentData", "resultsData", "resultEntriesData",
+    "seasonTitlesData", "developmentData",
   ];
   const data = Object.fromEntries(keys.map((key, index) => [key, results[index].data || []]));
   const errors = results

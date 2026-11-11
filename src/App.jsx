@@ -15,6 +15,26 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
+
+async function invalidateRaceResultsCache() {
+  if (import.meta.env.DEV) return true;
+
+  const { data, error } = await supabase.auth.getSession();
+  const accessToken = data?.session?.access_token;
+  if (error || !accessToken) return false;
+
+  try {
+    const response = await fetch("/api/invalidate-race-results", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    return response.ok;
+  } catch (cacheError) {
+    console.error("Impossible de rafraichir le cache des resultats:", cacheError);
+    return false;
+  }
+}
+
 const PLAYER_SESSION_STORAGE_KEY = "urtt-player-session-id";
 const EASTER_EGG_STORAGE_KEY = "urtt-unlocked-easter-eggs";
 const PUBLIC_THEME_STORAGE_KEY = "urtt-public-theme";
@@ -2870,16 +2890,25 @@ export default function URTTAdminPanel() {
           errors: results.map((result, index) => result.error ? { table: keys[index].replace(/Data$/, ""), code: result.error.code, message: result.error.message } : null).filter(Boolean),
         };
       } else {
-        const [response, settingsResult] = await Promise.all([
+        const [publicResponse, raceResultsResponse, settingsResult] = await Promise.all([
           fetch("/api/public-data", { headers: { Accept: "application/json" } }),
+          fetch("/api/race-results", { headers: { Accept: "application/json" } }),
           supabase.from("site_settings").select("*"),
         ]);
-        publicData = await response.json();
+        const [publicPayload, raceResultsPayload] = await Promise.all([publicResponse.json(), raceResultsResponse.json()]);
+        publicData = {
+          ...publicPayload,
+          resultsData: raceResultsPayload.resultsData || [],
+          resultEntriesData: raceResultsPayload.resultEntriesData || [],
+          errors: [...(publicPayload.errors || []), ...(raceResultsPayload.errors || [])],
+        };
         publicData.siteSettingsData = settingsResult.data || [];
         if (settingsResult.error) {
           publicData.errors = [...(publicData.errors || []), { table: "site_settings", code: settingsResult.error.code, message: settingsResult.error.message }];
         }
-        if (!response.ok) throw new Error(publicData.errors?.map((error) => `${error.table}: ${error.message}`).join(" · ") || publicData.error || "Impossible de charger les données publiques.");
+        if (!publicResponse.ok || !raceResultsResponse.ok) {
+          throw new Error(publicData.errors?.map((error) => `${error.table}: ${error.message}`).join(" · ") || publicData.error || "Impossible de charger les données publiques.");
+        }
       }
 
       const {
@@ -3434,7 +3463,12 @@ export default function URTTAdminPanel() {
     setAllCalendarRaces((current) => current.filter((item) => !idsEqual(item.libraryRaceId, raceId)));
     setRaceResults((current) => current.filter((result) => !linkedCalendarIds.some((calendarId) => idsEqual(calendarId, result.raceId))));
     if (linkedCalendarIds.some((calendarId) => idsEqual(calendarId, selectedRaceId))) setSelectedRaceId("");
-    setPopup({ type: "success", title: "GP supprime", message: `${race.name} a ete retire de la bibliotheque.` });
+    const cacheInvalidated = linkedResultIds.length ? await invalidateRaceResultsCache() : true;
+    setPopup({
+      type: "success",
+      title: "GP supprime",
+      message: `${race.name} a ete retire de la bibliotheque.${cacheInvalidated ? " Le cache des resultats a ete actualise." : " Le cache des resultats n'a pas pu etre actualise automatiquement."}`,
+    });
   }
 
   async function moveRace(raceId, direction) {
@@ -4219,7 +4253,12 @@ export default function URTTAdminPanel() {
 
     setRaceResults((current) => current.some((result) => String(result.raceId) === String(selectedRaceId)) ? current.map((result) => String(result.raceId) === String(selectedRaceId) ? payload : result) : [...current, payload]);
     setLiveRaceDrafts((current) => ({ ...current, [selectedRaceId]: [] }));
-    setPopup({ type: "success", title: "Course validée", message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.` });
+    const cacheInvalidated = await invalidateRaceResultsCache();
+    setPopup({
+      type: "success",
+      title: "Course validée",
+      message: `${selectedRace?.name || "La course"} a bien été enregistrée dans Supabase.${cacheInvalidated ? " Le cache des resultats a ete actualise." : " Le cache des resultats n'a pas pu etre actualise automatiquement."}`,
+    });
   }
 
   async function savePlayerProfile(profile) {
