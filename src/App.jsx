@@ -15,6 +15,11 @@ const CATEGORY_OPTIONS = [
 ];
 const ALL_CATEGORY_IDS = CATEGORY_OPTIONS.map((category) => category.id);
 const ADMIN_PERMISSIONS_OWNER_EMAIL = "kolti@urtt.fr";
+const PLAYER_PROFILE_COLUMNS = "id,pseudo,discord_name,card_pack_stock,created_at,last_seen_at";
+
+function getPlayerProfileColumns(includeCollection = false) {
+  return includeCollection ? `${PLAYER_PROFILE_COLUMNS},card_collection` : PLAYER_PROFILE_COLUMNS;
+}
 
 async function invalidateRaceResultsCache() {
   if (import.meta.env.DEV) return true;
@@ -2701,6 +2706,7 @@ export default function URTTAdminPanel() {
   const [seasonTitles, setSeasonTitles] = useState([]);
   const [developmentEntries, setDevelopmentEntries] = useState([]);
   const [playerProfile, setPlayerProfile] = useState(null);
+  const playerProfileLoadStateRef = useRef({ metadataId: "", collectionId: "" });
   const [playerAccounts, setPlayerAccounts] = useState([]);
   const [feedbackRequests, setFeedbackRequests] = useState([]);
   const [adminPermissionRows, setAdminPermissionRows] = useState([]);
@@ -2794,15 +2800,26 @@ export default function URTTAdminPanel() {
   }, []);
 
   useEffect(() => {
+    const storedPlayerId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY);
+    if (!storedPlayerId) {
+      playerProfileLoadStateRef.current = { metadataId: "", collectionId: "" };
+      return undefined;
+    }
+
+    const needsCollection = ["tgc-packs", "tgc-collection", "tgc-pokedex"].includes(publicPage)
+      || new URLSearchParams(window.location.search).get("lab") === "cards";
+    const loadedState = playerProfileLoadStateRef.current;
+    if (needsCollection ? loadedState.collectionId === storedPlayerId : loadedState.metadataId === storedPlayerId) return undefined;
+
+    let isCurrent = true;
     async function loadPlayerProfile() {
-      const storedPlayerId = window.localStorage.getItem(PLAYER_SESSION_STORAGE_KEY);
-      if (!storedPlayerId) return;
       const { data, error } = await supabase
         .from("player_accounts")
-        .select("*")
+        .select(getPlayerProfileColumns(needsCollection))
         .eq("id", storedPlayerId)
         .maybeSingle();
 
+      if (!isCurrent) return;
       if (error) {
         if (error.code !== "42P01") console.error("Erreur profil joueur:", error);
         return;
@@ -2810,13 +2827,19 @@ export default function URTTAdminPanel() {
 
       if (!data) {
         window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
+        playerProfileLoadStateRef.current = { metadataId: "", collectionId: "" };
         setPlayerProfile(null);
         return;
       }
 
       const loadedProfile = mapPlayerProfileFromDb(data);
+      if (!needsCollection) loadedProfile.cardCollection = readStoredCardCollection(loadedProfile.id);
       const mergedProfile = mergeStoredEasterEggsIntoProfile(loadedProfile);
       const unlockedEasterEggs = mergedProfile.unlockedEasterEggs;
+      playerProfileLoadStateRef.current = {
+        metadataId: storedPlayerId,
+        collectionId: needsCollection ? storedPlayerId : loadedState.collectionId,
+      };
       writeStoredEasterEggIds(mergedProfile.id, unlockedEasterEggs);
       setPlayerProfile(mergedProfile);
       if (unlockedEasterEggs.length > loadedProfile.unlockedEasterEggs.length) {
@@ -2827,7 +2850,8 @@ export default function URTTAdminPanel() {
     }
 
     loadPlayerProfile();
-  }, []);
+    return () => { isCurrent = false; };
+  }, [publicPage]);
 
   useEffect(() => {
     async function loadAdminPermissions() {
@@ -4270,10 +4294,12 @@ export default function URTTAdminPanel() {
     if (accessCode.length < 4) return { ok: false, message: "Choisis un code secret d'au moins 4 caractères." };
 
     setIsSavingPlayerAccount(true);
+    const includeCollection = ["tgc-packs", "tgc-collection", "tgc-pokedex"].includes(publicPage)
+      || new URLSearchParams(window.location.search).get("lab") === "cards";
     const { data, error } = await supabase
       .from("player_accounts")
       .insert({ pseudo, discord_name: discordName, access_code: accessCode, last_seen_at: new Date().toISOString() })
-      .select()
+      .select(getPlayerProfileColumns(includeCollection))
       .single();
     setIsSavingPlayerAccount(false);
 
@@ -4291,6 +4317,7 @@ export default function URTTAdminPanel() {
     const savedProfile = mergeStoredEasterEggsIntoProfile(dbProfile);
     const unlockedEasterEggs = savedProfile.unlockedEasterEggs;
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
+    playerProfileLoadStateRef.current = { metadataId: savedProfile.id, collectionId: includeCollection ? savedProfile.id : "" };
     writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     setPlayerProfile(savedProfile);
     return { ok: true, message: "Compte joueur prêt." };
@@ -4305,9 +4332,11 @@ export default function URTTAdminPanel() {
     const safeAccessCode = String(accessCode || "").trim();
     if (!safePseudo || !safeAccessCode) return { ok: false, message: "Entre ton pseudo et ton code secret." };
     setIsSavingPlayerAccount(true);
+    const includeCollection = ["tgc-packs", "tgc-collection", "tgc-pokedex"].includes(publicPage)
+      || new URLSearchParams(window.location.search).get("lab") === "cards";
     const { data, error } = await supabase
       .from("player_accounts")
-      .select("*")
+      .select(getPlayerProfileColumns(includeCollection))
       .eq("pseudo", safePseudo)
       .eq("access_code", safeAccessCode)
       .maybeSingle();
@@ -4315,9 +4344,11 @@ export default function URTTAdminPanel() {
     if (error) return { ok: false, message: error.code === "42P01" ? "La table player_accounts n'existe pas encore. Lance la commande SQL fournie par Codex." : "Impossible de connecter le compte joueur." };
     if (!data) return { ok: false, message: "Pseudo ou code secret incorrect." };
     const dbProfile = mapPlayerProfileFromDb(data);
+    if (!includeCollection) dbProfile.cardCollection = readStoredCardCollection(dbProfile.id);
     const savedProfile = mergeStoredEasterEggsIntoProfile(dbProfile);
     const unlockedEasterEggs = savedProfile.unlockedEasterEggs;
     window.localStorage.setItem(PLAYER_SESSION_STORAGE_KEY, String(savedProfile.id));
+    playerProfileLoadStateRef.current = { metadataId: savedProfile.id, collectionId: includeCollection ? savedProfile.id : "" };
     writeStoredEasterEggIds(savedProfile.id, unlockedEasterEggs);
     if (unlockedEasterEggs.length > dbProfile.unlockedEasterEggs.length) {
       supabase.from("player_accounts").update({ unlocked_easter_eggs: unlockedEasterEggs }).eq("id", savedProfile.id).then(({ error: syncError }) => {
@@ -4331,6 +4362,7 @@ export default function URTTAdminPanel() {
   async function logoutPlayerAccount() {
     if (playerProfile?.id) window.localStorage.setItem(CARD_COLLECTION_OWNER_STORAGE_KEY, String(playerProfile.id));
     window.localStorage.removeItem(PLAYER_SESSION_STORAGE_KEY);
+    playerProfileLoadStateRef.current = { metadataId: "", collectionId: "" };
     setPlayerProfile(null);
   }
 
