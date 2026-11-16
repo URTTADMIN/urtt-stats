@@ -265,10 +265,14 @@ async function migrate() {
     return;
   }
 
-  const bucketResponse = await fetch(`${BASE_URL}/storage/v1/bucket/${BUCKET}`, { headers: makeHeaders(SERVICE_ROLE_KEY) });
-  if (!bucketResponse.ok) {
-    const detail = (await bucketResponse.text()).slice(0, 500);
-    throw new Error(`Le bucket ${BUCKET} n’est pas accessible (HTTP ${bucketResponse.status}). Vérifie le projet et la clé secrète. ${detail}`);
+  const bucketsResponse = await fetch(`${BASE_URL}/storage/v1/bucket`, { headers: makeHeaders(SERVICE_ROLE_KEY) });
+  if (!bucketsResponse.ok) {
+    const detail = (await bucketsResponse.text()).slice(0, 500);
+    throw new Error(`Impossible de lire la liste Storage (HTTP ${bucketsResponse.status}). Vérifie le projet et la clé secrète. ${detail}`);
+  }
+  const buckets = await bucketsResponse.json();
+  if (!Array.isArray(buckets) || !buckets.some((bucket) => bucket.id === BUCKET)) {
+    throw new Error(`L’API Storage ne voit pas le bucket ${BUCKET}, même si la table storage.buckets le contient.`);
   }
 
   const fullSettingsResponse = await request("/rest/v1/site_settings?select=*", {}, SERVICE_ROLE_KEY);
