@@ -156,7 +156,18 @@ async function restoreFromBackup(backupPath) {
 async function verifyPublicObject(item) {
   const response = await fetch(item.imageUrl, { cache: "no-store" });
   if (response.status === 404) return false;
-  if (!response.ok) throw new Error(`L’objet ${item.objectPath} n’est pas lisible publiquement (HTTP ${response.status}).`);
+  if (!response.ok) {
+    const detail = (await response.text()).slice(0, 500);
+    let errorInfo = {};
+    try {
+      errorInfo = JSON.parse(detail);
+    } catch {
+      // Keep the HTTP status and response body below for unexpected errors.
+    }
+    // Supabase Storage can wrap a missing-object 404 in an HTTP 400 response.
+    if (errorInfo.code === "NoSuchKey" || Number(errorInfo.statusCode) === 404 || errorInfo.error === "not_found") return false;
+    throw new Error(`L’objet ${item.objectPath} n’est pas lisible publiquement (HTTP ${response.status}) : ${detail}`);
+  }
   const content = Buffer.from(await response.arrayBuffer());
   const hash = createHash("sha256").update(content).digest("hex");
   if (hash !== item.contentHash) {
