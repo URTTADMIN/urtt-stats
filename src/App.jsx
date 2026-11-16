@@ -1335,6 +1335,23 @@ function normalizeSpecialCards(value) {
     })
     .filter(Boolean);
 }
+async function compressSpecialCardImage(file, maxSide = 256) {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d", { alpha: true });
+  if (!context) {
+    bitmap.close?.();
+    throw new Error("Impossible de préparer l’image dans ce navigateur.");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
+  if (!blob || blob.type !== "image/webp") throw new Error("Ce navigateur ne sait pas convertir l’image en WebP.");
+  return blob;
+}
 function mapSiteSettingsFromDb(rows = []) {
   const rawSettings = rows.reduce((settings, row) => ({ ...settings, [row.key]: row.value }), { ...defaultSiteSettings });
   const hasPublicPagesSetting = rows.some((row) => row.key === "publicPages");
@@ -9647,6 +9664,8 @@ function SeasonCardsAdminPanel({
   const cardSeasonId = cardSettings.seasonId;
   const [specialCardForm, setSpecialCardForm] = useState(EMPTY_SPECIAL_CARD_FORM);
   const [editingSpecialCardId, setEditingSpecialCardId] = useState("");
+  const [isUploadingSpecialCardImage, setIsUploadingSpecialCardImage] = useState(false);
+  const [specialCardImageError, setSpecialCardImageError] = useState("");
   const [allowedDraft, setAllowedDraft] = useState(() => cardSettings.allowedPseudos.join("\n"));
   useEffect(() => {
     setAllowedDraft(cardSettings.allowedPseudos.join("\n"));
@@ -9755,6 +9774,12 @@ function SeasonCardsAdminPanel({
     saveCardSettings({ allowedPseudos: allowedDraft });
   };
   const saveSpecialCard = () => {
+    const existingCard = specialCards.find((card) => card.id === editingSpecialCardId);
+    const unchangedLegacyImage = existingCard?.image === specialCardForm.image && /^data:image\//i.test(String(specialCardForm.image || ""));
+    if (/^data:image\//i.test(String(specialCardForm.image || "")) && !unchangedLegacyImage) {
+      setSpecialCardImageError("Importe une image depuis ton appareil pour la convertir et l’envoyer dans le stockage.");
+      return;
+    }
     const normalizedCard = normalizeSpecialCards([{ ...specialCardForm, id: editingSpecialCardId || getSpecialCardId(specialCardForm.name) }])[0];
     if (!normalizedCard || !onUpdateSetting) return;
     const nextCards = editingSpecialCardId
@@ -9778,9 +9803,29 @@ function SeasonCardsAdminPanel({
   };
   const handleSpecialCardImage = (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setSpecialCardForm((current) => ({ ...current, image: String(reader.result || "") }));
-    reader.readAsDataURL(file);
+    setIsUploadingSpecialCardImage(true);
+    setSpecialCardImageError("");
+    void (async () => {
+      try {
+        const image = await compressSpecialCardImage(file);
+        const cardId = editingSpecialCardId || getSpecialCardId(specialCardForm.name || file.name);
+        const uniqueId = window.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+        const objectPath = `special-cards/${cardId}-${uniqueId}.webp`;
+        const { error } = await supabase.storage.from("special-card-images").upload(objectPath, image, {
+          cacheControl: "31536000",
+          contentType: "image/webp",
+          upsert: false,
+        });
+        if (error) throw error;
+        const { data } = supabase.storage.from("special-card-images").getPublicUrl(objectPath);
+        if (!data?.publicUrl) throw new Error("Supabase n’a pas renvoyé l’URL publique de l’image.");
+        setSpecialCardForm((current) => ({ ...current, image: data.publicUrl }));
+      } catch (error) {
+        setSpecialCardImageError(error?.message || "L’image n’a pas pu être téléversée.");
+      } finally {
+        setIsUploadingSpecialCardImage(false);
+      }
+    })();
   };
   const exportSeasonCsv = () => {
     const escapeCsv = (value) => `"${String(value ?? "").replaceAll('"', '""')}"`;
@@ -9847,14 +9892,16 @@ function SeasonCardsAdminPanel({
           </div>
           <div style={styles.resultsInfo}>
             <label style={styles.label}>
-              <span style={styles.labelText}>Image</span>
-              <input type="file" accept="image/*" onChange={(event) => handleSpecialCardImage(event.target.files?.[0])} style={styles.input} />
+              <span style={styles.labelText}>Image (WebP, 256 px max)</span>
+              <input type="file" accept="image/*" onChange={(event) => handleSpecialCardImage(event.target.files?.[0])} disabled={isUploadingSpecialCardImage || isSaving} style={styles.input} />
             </label>
             <label style={styles.label}>
-              <span style={styles.labelText}>Image URL / data</span>
-              <input value={specialCardForm.image} onChange={(event) => setSpecialCardForm((current) => ({ ...current, image: event.target.value }))} placeholder="/mon-image.png ou image importée" style={styles.input} />
+              <span style={styles.labelText}>URL d’image (les anciennes cartes Base64 restent affichées)</span>
+              <input value={specialCardForm.image} onChange={(event) => { setSpecialCardImageError(""); setSpecialCardForm((current) => ({ ...current, image: event.target.value })); }} placeholder="URL publique de l’image" style={styles.input} />
             </label>
-            <button type="button" onClick={saveSpecialCard} disabled={isSaving || !specialCardForm.name.trim() || !specialCardForm.image.trim() || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : editingSpecialCardId ? "Enregistrer les modifications" : "Créer la carte spéciale"}</button>
+            {isUploadingSpecialCardImage && <p style={styles.mutedSmall}>Compression et téléversement de l’image…</p>}
+            {specialCardImageError && <p style={{ ...styles.mutedSmall, color: "#f87171" }}>{specialCardImageError}</p>}
+            <button type="button" onClick={saveSpecialCard} disabled={isSaving || isUploadingSpecialCardImage || !specialCardForm.name.trim() || !specialCardForm.image.trim() || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : isUploadingSpecialCardImage ? "Import de l’image…" : editingSpecialCardId ? "Enregistrer les modifications" : "Créer la carte spéciale"}</button>
             {editingSpecialCardId && <button type="button" onClick={cancelSpecialCardEdit} disabled={isSaving} style={styles.secondaryButton}>Annuler</button>}
           </div>
           {specialCardPreview && <SeasonCardGenerationGrid cards={[specialCardPreview]} compact />}
