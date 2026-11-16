@@ -16,7 +16,11 @@ const SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
 
 function makeHeaders(key) {
-  return { apikey: key, Authorization: `Bearer ${key}` };
+  const headers = { apikey: key };
+  // New Supabase sb_publishable_ / sb_secret_ keys are opaque API keys, not JWTs.
+  // Keep Authorization only for legacy anon/service_role JWT keys.
+  if (!String(key || "").startsWith("sb_")) headers.Authorization = `Bearer ${key}`;
+  return headers;
 }
 
 async function request(path, options = {}, key = APPLY ? SERVICE_ROLE_KEY : PUBLISHABLE_KEY) {
@@ -262,7 +266,10 @@ async function migrate() {
   }
 
   const bucketResponse = await fetch(`${BASE_URL}/storage/v1/bucket/${BUCKET}`, { headers: makeHeaders(SERVICE_ROLE_KEY) });
-  if (!bucketResponse.ok) throw new Error(`Le bucket ${BUCKET} n’existe pas ou n’est pas accessible. Applique d’abord le SQL fourni.`);
+  if (!bucketResponse.ok) {
+    const detail = (await bucketResponse.text()).slice(0, 500);
+    throw new Error(`Le bucket ${BUCKET} n’est pas accessible (HTTP ${bucketResponse.status}). Vérifie le projet et la clé secrète. ${detail}`);
+  }
 
   const fullSettingsResponse = await request("/rest/v1/site_settings?select=*", {}, SERVICE_ROLE_KEY);
   const fullSettings = await fullSettingsResponse.json();
