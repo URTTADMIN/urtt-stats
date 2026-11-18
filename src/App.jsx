@@ -6262,7 +6262,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div>
           <p style={styles.kicker}>ÉDITION TEST · F1 / FE / HORS-SAISON</p>
           <h1 style={styles.cardLabTitle}>Collection URTT TCG</h1>
-          <p style={styles.muted}>Retrouve les cartes que tu as obtenues en ouvrant des packs.</p>
         </div>
         <div style={styles.actions}>
           <CardPackPurchaseControls visible={Boolean(playerCardAccountId)} balance={Number(packStock.arekcoins) || 0} isPurchasing={isPurchasingPack} isOpening={isOpeningPack} status={packPurchaseStatus} onOpenShop={openPackShop} />
@@ -6275,7 +6274,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div>
             <p style={styles.kicker}>COLLECTION · F1 · FE · 2,4H · INDY</p>
             <h2 style={styles.cardLabStageTitle}>Tes cartes obtenues</h2>
-            <p style={styles.muted}>Ici apparaissent uniquement les cartes que tu as obtenues en ouvrant des packs sur ce navigateur.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {CARD_COLLECTION_VISIBLE_RARITIES.map((rarity) => (
@@ -6370,7 +6368,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div>
           <p style={styles.kicker}>CATALOGUE · BASE COMPLÈTE</p>
           <h1 style={styles.cardLabTitle}>Catalogue URTT TCG</h1>
-          <p style={styles.muted}>Toutes les cartes existantes sont listées ici. Les cartes obtenues sont visibles, les autres restent cachées.</p>
         </div>
         <div style={styles.cardCollectionSummary}>
           <span style={styles.cardCollectionSummaryBadge}>{pokedexOwnedCount}/{pokedexCards.length} obtenues</span>
@@ -6381,7 +6378,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div>
             <p style={styles.kicker}>Saisons · Championnats · Raretés</p>
             <h2 style={styles.cardLabStageTitle}>Toutes les cartes</h2>
-            <p style={styles.muted}>Filtre par saison, championnat, type ou rareté pour voir ce qu'il te manque.</p>
           </div>
           <div style={styles.cardCollectionSummary}>
             {CARD_COLLECTION_VISIBLE_RARITIES.map((rarity) => (
@@ -6558,7 +6554,6 @@ function TcgReminderControl({ compact = false }) {
       <button type="button" onClick={toggleReminder} disabled={!supported || (!subscription && !publicKey) || isSaving} title={reminderActive ? "Rappel activé sur cet appareil · tous les jours à 20 h" : "Activer le rappel quotidien à 20 h"} style={{ ...styles.secondaryButton, minHeight: compact ? 38 : 36, padding: compact ? "7px 9px" : "7px 12px", borderColor: reminderActive ? "rgba(34,197,94,.55)" : "rgba(204,0,255,.5)", color: reminderActive ? "#86efac" : "#f0abfc", opacity: !supported || (!subscription && !publicKey) || isSaving ? .6 : 1 }}>
         {isSaving ? "Enregistrement…" : subscription ? (compact ? "✓ 20 h" : "Désactiver le rappel de 20 h") : (compact ? "🔔 20 h" : "🔔 Rappel quotidien à 20 h")}
       </button>
-      {!compact && <span style={styles.mutedSmall}>Notification push · heure de Paris</span>}
       {reminderActive && !compact && <span role="status" style={{ padding: "5px 10px", borderRadius: 999, border: "1px solid rgba(34,197,94,.45)", background: "rgba(34,197,94,.12)", color: "#86efac", fontSize: 12, fontWeight: 800 }}>✓ Rappel activé sur cet appareil · tous les jours à 20 h</span>}
       {!supported && !needsHomeScreenInstall && <span style={styles.mutedSmall}>Les notifications push ne sont pas disponibles dans ce navigateur.</span>}
       {supported && configLoaded && !publicKey && <span style={styles.mutedSmall}>Le rappel doit encore être configuré par le site.</span>}
@@ -6595,7 +6590,7 @@ function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, st
     <div className="urtt-mobile-dialog-overlay" style={styles.cardPackModalOverlay} onMouseDown={onClose}>
       <div className="urtt-mobile-dialog" style={{ ...styles.cardPackModal, width: "min(760px, 100%)" }} onMouseDown={(event) => event.stopPropagation()}>
         <div style={styles.cardPackModalHeader}>
-          <div><p style={styles.kicker}>BOUTIQUE URTT TCG</p><h2 style={styles.cardPackModalTitle}>Choisis ton pack</h2><p style={styles.mutedSmall}>Sélectionne une édition avant de confirmer l’achat.</p></div>
+          <div><p style={styles.kicker}>BOUTIQUE URTT TCG</p><h2 style={styles.cardPackModalTitle}>Choisis ton pack</h2></div>
           <button type="button" onClick={onClose} style={styles.secondaryButton}>Fermer</button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 220px), 1fr))", gap: 12 }}>
@@ -6609,7 +6604,7 @@ function CardPackShopModal({ options = [], balance = 0, isPurchasing = false, st
           })}
         </div>
         <div style={styles.cardPackModalFooter}>
-          <div style={{ display: "grid", gap: 4 }}><span style={styles.mutedSmall}>Ton solde : <ArekcoinAmount amount={balance} /></span>{selected && !canAfford && <span style={styles.errorText}>Solde insuffisant pour ce pack.</span>}{status && <span role="status" style={styles.mutedSmall}>{status}</span>}<span style={styles.mutedSmall}>De nouveaux packs pourront être ajoutés à cette boutique.</span></div>
+          <div style={{ display: "grid", gap: 4 }}><span style={styles.mutedSmall}>Ton solde : <ArekcoinAmount amount={balance} /></span>{selected && !canAfford && <span style={styles.errorText}>Solde insuffisant pour ce pack.</span>}{status && <span role="status" style={styles.mutedSmall}>{status}</span>}</div>
           <button type="button" onClick={() => selected && onConfirm(selected)} disabled={!canAfford || isPurchasing} style={styles.primaryButton}>{isPurchasing ? "Achat en cours..." : selected ? `Acheter · ${selected.price} AREKCOINS` : "Choisis un pack"}</button>
         </div>
       </div>
@@ -6930,7 +6925,6 @@ function EasterEggBookPage({ unlockedIds = [] }) {
           <Stat label="Carrés cachés" value={EASTER_EGG_BOOK.length - unlockedCount} />
           <Stat label="Mode" value="Collection" />
         </div>
-        <p style={styles.mutedSmall}>Chaque carré se débloque quand tu déclenches l'easter egg correspondant sur le site.</p>
       </Card>
       <div style={styles.easterEggGrid}>
         {EASTER_EGG_BOOK.map((egg, index) => {
@@ -7073,7 +7067,6 @@ function WorldCircuitsPage({ races, raceLibrary, selectedSeasonId, selectedCateg
       <style>{popupStyles}</style>
       <div style={styles.worldHero}>
         <h2 style={styles.worldTitle}>{seasonName(selectedSeasonId)} - Circuits du monde</h2>
-        <p style={styles.worldSubtitle}>Clique sur un pays pour voir les circuits disponibles en {selectedCategoryId}.</p>
       </div>
       <div style={styles.worldMapShell}>
         <div ref={(node) => { mapRef.current = node; }} className="urtt-map" style={styles.worldLeafletMap} />
@@ -7118,7 +7111,6 @@ function HomePage({ countdownRaces = [], calendarEvents = [], selectedSeasonId, 
         <div>
           <span style={{ ...styles.publicEyebrow, color: publicCategoryTheme.accentText }}>Championnat URTT</span>
           <h1 style={styles.publicDashboardTitle}>Vue d'ensemble</h1>
-          <p style={styles.publicDashboardSubtitle}>Résultats, classements et prochaines courses au même endroit.</p>
         </div>
       </div>
       <section className="urtt-public-spotlight" style={{ ...styles.publicSpotlight, background: publicCategoryTheme.spotlight }}>
@@ -7310,7 +7302,6 @@ function PublicDriverMultiCategorySearch({ search, setSearch, selectedDriverId, 
           ))}
         </div>
       )}
-      {!query && <p style={styles.mutedSmall}>Tape un nom pour afficher ses stats cumulées en F1, F2, F3 et FE.</p>}
       {query && !selectedDriver && <Empty text="Aucun pilote trouvé avec ce nom." />}
       {selectedDriver && (
         <>
@@ -7721,7 +7712,6 @@ function ChampionshipStatsAdminPanel({ drivers = [], teams = [], raceResults = [
           <Stat label="Résultats validés" value={totalResults} />
           <Stat label="Points cumulés" value={totalPoints} />
         </div>
-        <p style={styles.mutedSmall}>Les tableaux reprennent les mêmes stats que la page publique, mais regroupées ici pour F1, F2, F3 et FE.</p>
       </Card>
       {championshipRows.map(({ category, latestSeasonId, driverStats, resultCount, totalPoints: categoryPoints }) => (
         <Card key={category.id} title={`${category.name} — Stats pilotes jusqu'à ${seasonName(latestSeasonId)}`} icon="👥">
@@ -7760,7 +7750,7 @@ function AdminSearch({ search, setSearch, drivers, teams, onEditDriver, onEditTe
   });
   const matchedTeams = teams.filter((team) => `${team.name}`.toLowerCase().includes(query));
 
-  return <div style={styles.section}><Card title="Recherche admin" icon="🔎"><div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pilote, numéro ou une écurie..." style={styles.searchInput} /></div><p style={styles.mutedSmall}>Tape un nom ou un numéro pour retrouver rapidement une fiche à modifier.</p></Card><div style={styles.twoColumns}><Card title={`Pilotes trouvés (${matchedDrivers.length})`} icon="👥"><div style={styles.stack}>{matchedDrivers.map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><button onClick={() => onEditDriver(driver)} style={styles.editButton}>Modifier</button></div>)}{matchedDrivers.length === 0 && <Empty text="Aucun pilote trouvé." />}</div></Card><Card title={`Écuries trouvées (${matchedTeams.length})`} icon="🏎️"><div style={styles.stack}>{matchedTeams.map((team) => <div key={team.id} style={styles.itemBox}><TeamIdentity team={team} /><button onClick={() => onEditTeam(team)} style={styles.editButton}>Modifier</button></div>)}{matchedTeams.length === 0 && <Empty text="Aucune écurie trouvée." />}</div></Card></div></div>;
+  return <div style={styles.section}><Card title="Recherche admin" icon="🔎"><div style={styles.searchBox}>🔎 <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Rechercher un pilote, numéro ou une écurie..." style={styles.searchInput} /></div></Card><div style={styles.twoColumns}><Card title={`Pilotes trouvés (${matchedDrivers.length})`} icon="👥"><div style={styles.stack}>{matchedDrivers.map((driver) => <div key={driver.id} style={styles.itemBox}><DriverIdentity driver={driver} /><button onClick={() => onEditDriver(driver)} style={styles.editButton}>Modifier</button></div>)}{matchedDrivers.length === 0 && <Empty text="Aucun pilote trouvé." />}</div></Card><Card title={`Écuries trouvées (${matchedTeams.length})`} icon="🏎️"><div style={styles.stack}>{matchedTeams.map((team) => <div key={team.id} style={styles.itemBox}><TeamIdentity team={team} /><button onClick={() => onEditTeam(team)} style={styles.editButton}>Modifier</button></div>)}{matchedTeams.length === 0 && <Empty text="Aucune écurie trouvée." />}</div></Card></div></div>;
 }
 
 function AdminDrivers({ drivers, teams, selectedSeasonId, categoryOptions = CATEGORY_OPTIONS, form, setForm, editingId, isSaving, onSave, onEdit, onDelete, onCancel, search, setSearch }) {
@@ -8208,7 +8198,6 @@ function RaceAwardsPanel({ drivers = [], teams = [], raceResults = [], racesBySe
           <label style={styles.label}><span style={styles.labelText}>Catégorie</span><select value={selectedCategoryId} onChange={(event) => setSelectedCategoryId(event.target.value)} style={styles.resultsSelect}>{categoryOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
           <label style={styles.label}><span style={styles.labelText}>Saison</span><select value={selectedSeasonId} onChange={(event) => setSelectedSeasonId(event.target.value)} style={styles.resultsSelect}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select></label>
         </div>
-        <p style={styles.mutedSmall}>Vue rapide des polemen et des meilleurs tours pour chaque course validée de la saison.</p>
       </Card>
       <div style={styles.twoColumns}>
         <RaceAwardTable title={`Poles — ${seasonName(selectedSeasonId)}`} icon="⚡" rows={buildAwardRows("pole")} empty="Aucune pole enregistrée pour cette saison." />
@@ -8270,7 +8259,6 @@ function EasterEggAdminPanel({ accounts = [] }) {
           <Stat label="Déblocages" value={totalUnlocks} />
           <Stat label="Livres complets" value={completedBooks} />
         </div>
-        <p style={styles.mutedSmall}>Cette page affiche les easter eggs sauvegardés sur chaque compte utilisateur.</p>
       </Card>
       <Card title="Détail par compte" icon="👥">
         <div style={styles.tableWrap}>
@@ -8361,7 +8349,6 @@ function FeedbackRequestsPanel({ requests = [], onValidate, isSaving }) {
           <Stat label="Bugs" value={bugCount} />
           <Stat label="Validées" value={validatedRequests.length} />
         </div>
-        <p style={styles.mutedSmall}>Les demandes sont aussi envoyées sur Discord. Cette page sert au suivi et à la validation côté admin.</p>
       </Card>
       <Card title="Demandes en cours" icon="⏳">
         <div style={styles.feedbackRequestGrid}>
@@ -8504,7 +8491,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
           <Stat label="Comptes" value={rows.length} />
           <Stat label="Connecté sur" value={adminUser?.email || "—"} />
         </div>
-        <p style={styles.mutedSmall}>Cette page est réservée à {ADMIN_PERMISSIONS_OWNER_EMAIL}. Les autres rôles admin ne peuvent pas y accéder.</p>
+        
       </Card>
       <Card title="Donner des packs TCG" icon="🎁">
         <div style={styles.resultsInfo}>
@@ -8523,7 +8510,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
             {isGrantingPacks ? "Ajout..." : packGiftTargetId === "ALL" ? "Donner à tout le monde" : "Donner au joueur"}
           </button>
         </div>
-        <p style={styles.mutedSmall}>Les packs offerts s’ajoutent séparément au cycle quotidien : ils ne sont pas limités à {CARD_PACK_MAX_STOCK} et n’empêchent pas la régénération des packs journaliers.</p>
+        
       </Card>
       <Card title="Donner des AREKCOINS" icon="🪙">
         <div style={styles.resultsInfo}>
@@ -8542,7 +8529,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
             {isGrantingArekcoins ? "Ajout..." : arekcoinsGiftTargetId === "ALL" ? "Donner à tout le monde" : "Donner au joueur"}
           </button>
         </div>
-        <p style={styles.mutedSmall}>Le montant est crédité au solde AREKCOINS du compte sélectionné.</p>
       </Card>
       <Card title="Cartes test détectées" icon="🧹">
         <div style={styles.resultsInfo}>
@@ -8552,7 +8538,6 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
             {isCleaningDemoCards ? "Nettoyage..." : "Retirer à tout le monde"}
           </button>
         </div>
-        <p style={styles.mutedSmall}>Anciennes cartes locales de test : Alain, Augustin, Kolti, Lorden, Noah, Etienne, Cahouet, Maxelier.</p>
         {demoCardRows.length > 0 ? (
           <div style={styles.tableWrap}>
             <table style={{ ...styles.table, minWidth: 820 }}>
@@ -8718,7 +8703,6 @@ function TwitchPointsAdminPanel() {
           <Stat label="Points perdus" value={formatTwitchPoints(summary.channelPointsLost)} />
           <Stat label="Gains visibles" value={formatTwitchPoints(summary.visibleChannelPointsWon)} />
         </div>
-        <p style={styles.mutedSmall}>Twitch expose les points misés par outcome et les gains des top predictors. Les pertes sont calculées avec les points misés sur les outcomes perdants.</p>
       </Card>
       <div style={styles.twoColumns}>
         <Card title="Top predictors visibles" icon="🏆">
@@ -9180,7 +9164,7 @@ function DriverSeasonRaceDetails({ races = [] }) {
 }
 function ParticipationEditor({ form, setForm, teams = [], selectedSeasonId = "S1", categoryOptions = CATEGORY_OPTIONS }) {
   const [seasonId, setSeasonId] = useState(selectedSeasonId || "S1");
-  return <div style={styles.teamPreview}><span style={styles.labelText}>Participations par saison</span><select value={seasonId} onChange={(event) => setSeasonId(event.target.value)} style={styles.input}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select><label style={styles.label}><span style={styles.labelText}>Écurie cette saison</span><select value={form.teamHistory?.[seasonId] || form.teamId || ""} onChange={(event) => setForm(updateDriverSeasonTeam(form, seasonId, event.target.value))} style={styles.input}><option value="">Sans écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label><div style={styles.categoryCheckboxGrid}>{categoryOptions.map((category) => <label key={category.id} style={{ ...styles.checkboxPill, borderColor: getCategoryColor(category.id) }}><input type="checkbox" checked={(form.participations?.[seasonId] || []).includes(category.id)} onChange={() => setForm(toggleParticipation(form, seasonId, category.id))} /> {category.name}</label>)}</div><p style={styles.mutedSmall}>Exemple : un pilote peut faire F2 en S1, puis F1 en S2, ou même plusieurs catégories la même saison.</p></div>;
+  return <div style={styles.teamPreview}><span style={styles.labelText}>Participations par saison</span><select value={seasonId} onChange={(event) => setSeasonId(event.target.value)} style={styles.input}>{getSeasonOptions().map((season) => <option key={season.id} value={season.id}>{season.name}</option>)}</select><label style={styles.label}><span style={styles.labelText}>Écurie cette saison</span><select value={form.teamHistory?.[seasonId] || form.teamId || ""} onChange={(event) => setForm(updateDriverSeasonTeam(form, seasonId, event.target.value))} style={styles.input}><option value="">Sans écurie</option>{teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}</select></label><div style={styles.categoryCheckboxGrid}>{categoryOptions.map((category) => <label key={category.id} style={{ ...styles.checkboxPill, borderColor: getCategoryColor(category.id) }}><input type="checkbox" checked={(form.participations?.[seasonId] || []).includes(category.id)} onChange={() => setForm(toggleParticipation(form, seasonId, category.id))} /> {category.name}</label>)}</div></div>;
 }
 
 function MiniCountList({ counts, empty }) {
@@ -9355,7 +9339,6 @@ function CalendarFeedLinks() {
     <div style={styles.calendarFeedBox}>
       <div>
         <strong>S'abonner au calendrier URTT</strong>
-        <p style={styles.mutedSmall}>Les nouvelles courses planifiees se mettent a jour automatiquement.</p>
       </div>
       <div style={styles.calendarLinks}>
         <a href={links.googleUrl} target="_blank" rel="noreferrer" style={styles.calendarLink}>Google Calendar</a>
@@ -9416,7 +9399,7 @@ function TripleCrown({ crown }) {
     </div>
   );
 }
-function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button><p style={styles.hint}>Comptes à créer dans Supabase Auth.</p></form></div>; }
+function LoginScreen({ email, setEmail, password, setPassword, loginError, onLogin, onBack }) { return <div style={styles.loginPage}><form onSubmit={onLogin} style={styles.loginCard}><div style={styles.logo}>UR</div><p style={styles.kicker}>ACCÈS PRIVÉ</p><h1 style={styles.loginTitle}>Connexion admin</h1><input type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="Email admin" style={styles.input} /><input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Mot de passe" style={styles.input} />{loginError && <p style={styles.errorText}>{loginError}</p>}<button type="submit" style={styles.fullButton}>Se connecter</button><button type="button" onClick={onBack} style={styles.linkButton}>Retour public</button></form></div>; }
 function TitlesPanel({
   drivers,
   teams,
@@ -9465,10 +9448,6 @@ function TitlesPanel({
     <div style={{ display: "grid", gap: 24 }}>
       <div className="urtt-card">
         <h2 className="urtt-card-title">Gestion des titres</h2>
-
-        <p style={{ color: "#a1a1aa", marginTop: 6 }}>
-          Ajoute manuellement un titre pilote et constructeur.
-        </p>
 
         <div
           className="urtt-form-grid"
@@ -9527,10 +9506,6 @@ function TitlesPanel({
 
       <div className="urtt-card">
         <h2 className="urtt-card-title">Titre par saison</h2>
-        <p style={{ color: "#a1a1aa", marginTop: 6 }}>
-          Associe une saison a un champion pilote et une ecurie championne pour afficher les trophees dans la fiche pilote.
-        </p>
-
         <div className="urtt-form-grid" style={{ marginTop: 24 }}>
           <div>
             <label className="urtt-label">Catégorie</label>
@@ -9550,7 +9525,6 @@ function TitlesPanel({
         <div className="urtt-form-grid" style={{ marginTop: 20 }}>
           <div className="urtt-card" style={{ padding: 16 }}>
             <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Titre pilote</h3>
-            <p style={styles.mutedSmall}>Un seul pilote peut recevoir le titre pilote.</p>
             <select className="urtt-input" value={effectiveTitleDriverId} onChange={(e) => setTitleDriverId(e.target.value)} style={{ marginTop: 12 }}>
               <option value="">Aucun champion pilote</option>
               {seasonCategoryDrivers.map((driver) => <option key={driver.id} value={driver.id}>{driver.name}</option>)}
@@ -9559,7 +9533,6 @@ function TitlesPanel({
 
           <div className="urtt-card" style={{ padding: 16 }}>
             <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Titre constructeur</h3>
-            <p style={styles.mutedSmall}>{isConstructorOptional ? "Optionnel en F2/F3. Laisse vide si aucun titre constructeur n'est attribue." : "Choisis l'ecurie championne, puis les pilotes qui recoivent le titre constructeur."}</p>
             <select className="urtt-input" value={effectiveTitleTeamId} onChange={(e) => { setTitleTeamId(e.target.value); setConstructorTitleDriverIds?.([]); }} style={{ marginTop: 12 }}>
               <option value="">Aucune ecurie championne</option>
               {teams.map((team) => <option key={team.id} value={team.id}>{team.name}</option>)}
@@ -9569,7 +9542,6 @@ function TitlesPanel({
 
         <div className="urtt-card" style={{ padding: 16, marginTop: 20 }}>
           <h3 className="urtt-card-title" style={{ fontSize: 16 }}>Pilotes titres constructeur</h3>
-          <p style={styles.mutedSmall}>{isConstructorOptional ? "Optionnel. Si tu choisis une ecurie, coche autant de pilotes que necessaire." : "Coche les pilotes concernes par le titre constructeur."}</p>
           <div style={{ ...styles.categoryCheckboxGrid, marginTop: 12 }}>
             {constructorCandidateDrivers.map((driver) => (
               <label key={driver.id} style={styles.checkboxPill}>
@@ -9577,7 +9549,6 @@ function TitlesPanel({
                 {driver.name}
               </label>
             ))}
-            {constructorCandidateDrivers.length === 0 && <p style={styles.mutedSmall}>Choisis une ecurie championne ou inscris des pilotes sur cette saison/categorie.</p>}
           </div>
           <button type="button" onClick={() => setConstructorTitleDriverIds?.([])} disabled={selectedConstructorDriverIds.length === 0} style={{ ...styles.secondaryButton, marginTop: 12 }}>Vider les pilotes constructeur</button>
         </div>
@@ -9860,7 +9831,6 @@ function SeasonCardsAdminPanel({
       <Card title="Cartes du catalogue par pilote" icon="📊">
         <div style={styles.stack}>
           <div style={{ ...styles.resultsInfo, alignItems: "center" }}>
-            <p style={styles.mutedSmall}>L’aperçu détaille les cartes pilotes par rareté. L’export CSV contient une ligne par carte, avec le pilote ou l’écurie, la saison, l’épreuve et la rareté.</p>
             <button type="button" onClick={exportSeasonCsv} disabled={!seasonExport.driversRows.length && !seasonExport.teamsRows.length} style={styles.secondaryButton}>Exporter le détail en CSV</button>
           </div>
           <div style={{ overflowX: "auto", maxHeight: 560, overflowY: "auto", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12 }}>
@@ -9931,7 +9901,6 @@ function SeasonCardsAdminPanel({
               </div>
             </div>
           )}
-          <p style={styles.mutedSmall}>Ces cartes rejoignent les cartes spéciales disponibles dans les packs.</p>
           <div style={styles.separator} />
           <div style={styles.resultsInfo}>
             <label style={styles.label}>
@@ -9946,7 +9915,6 @@ function SeasonCardsAdminPanel({
             </label>
             <button type="button" onClick={saveAllowedPseudos} disabled={isSaving || !onUpdateSetting} style={styles.primaryButton}>{isSaving ? "Sauvegarde..." : "Sauvegarder les testeurs"}</button>
           </div>
-          <p style={styles.mutedSmall}>La page cachée <strong>?lab=cards</strong> reste réservée aux admins, au local et aux pseudos listés ici.</p>
         </div>
       </Card>
       <Card title="Génération des cartes saison" icon="🃏">
@@ -9968,9 +9936,6 @@ function SeasonCardsAdminPanel({
             <button type="button" onClick={validateGeneration} disabled={!previewCards.length} style={styles.primaryButton}>Valider la génération</button>
             {validatedEdition && <button type="button" onClick={removeGeneration} style={styles.dangerButton}>Retirer validation</button>}
           </div>
-          <p style={styles.muted}>
-            Barème édition saison : #1 Légendaire · #2-#3 Ultra rare · #4-#5 Super rare · #6-#10 Rare · #11-#15 Peu commune · #16-#20 Commune.
-          </p>
           <div style={validatedEdition ? styles.badgeGreen : styles.badgeDark}>
             {validatedEdition ? `Génération validée le ${formatRaceDate(validatedEdition.generatedAt)}` : "Aucune génération validée pour cette saison."}
           </div>
