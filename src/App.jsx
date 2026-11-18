@@ -47,6 +47,7 @@ const PUBLIC_PAGE_STORAGE_KEY = "urtt-public-page";
 const CARD_GENERATION_STORAGE_KEY = "urtt-season-card-generations";
 const CARD_COLLECTION_STORAGE_KEY = "urtt-card-collection-v4";
 const CARD_COLLECTION_OWNER_STORAGE_KEY = "urtt-card-collection-owner-v1";
+const CARD_COLLECTION_RECOVERY_STORAGE_KEY = "urtt-card-collection-recovery-v1";
 const CARD_PACK_STOCK_STORAGE_KEY = "urtt-card-pack-stock-v4";
 const CARD_TEST_SEASON_ID = "S1";
 const CARD_COLLECTION_CATEGORY_ID = "F1";
@@ -248,6 +249,7 @@ function getEmptyCardPackStock(now = Date.now()) {
     arekcoins: 0,
     purchasedPacks: 0,
     purchasedLegendaryPacks: 0,
+    giftedPacks: 0,
     marketListings: [],
     marketSales: [],
   };
@@ -319,6 +321,7 @@ function getCardWalletFields(source = {}) {
     arekcoins: Math.max(0, Math.floor(Number(source?.arekcoins) || 0)),
     purchasedPacks: Math.max(0, Math.floor(Number(source?.purchasedPacks) || 0)),
     purchasedLegendaryPacks: Math.max(0, Math.floor(Number(source?.purchasedLegendaryPacks) || 0)),
+    giftedPacks: Math.max(0, Math.floor(Number(source?.giftedPacks) || 0)),
     marketListings: normalizeCardMarketListings(source?.marketListings),
     marketSales: normalizeCardMarketSales(source?.marketSales),
   };
@@ -363,7 +366,10 @@ function normalizeCardPackStock(source, now = Date.now()) {
 }
 
 function getAvailableCardPackCount(stock = {}) {
-  return Math.max(0, Math.floor(Number(stock?.packs) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedPacks) || 0)) + Math.max(0, Math.floor(Number(stock?.purchasedLegendaryPacks) || 0));
+  return Math.max(0, Math.floor(Number(stock?.packs) || 0))
+    + Math.max(0, Math.floor(Number(stock?.purchasedPacks) || 0))
+    + Math.max(0, Math.floor(Number(stock?.purchasedLegendaryPacks) || 0))
+    + Math.max(0, Math.floor(Number(stock?.giftedPacks) || 0));
 }
 
 function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
@@ -371,7 +377,7 @@ function addCardPacksToStock(stock, amount = 0, now = Date.now()) {
   const safeAmount = Math.max(0, Math.floor(Number(amount) || 0));
   return {
     ...normalized,
-    packs: Math.min(CARD_PACK_MAX_STOCK, normalized.packs + safeAmount),
+    giftedPacks: Math.min(Number.MAX_SAFE_INTEGER, normalized.giftedPacks + safeAmount),
     stockSyncedAt: now,
   };
 }
@@ -4429,7 +4435,7 @@ export default function URTTAdminPanel() {
       setPopup({ type: "error", title: "Accès refusé", message: `Seul ${ADMIN_PERMISSIONS_OWNER_EMAIL} peut donner des packs.` });
       return false;
     }
-    const safeAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(amount) || 1)));
+    const safeAmount = Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(amount) || 1)));
     const targets = global ? playerAccounts : playerAccounts.filter((account) => idsEqual(account.id, playerId));
     if (!targets.length) {
       setPopup({ type: "error", title: "Aucun compte", message: "Aucun compte joueur trouvé pour recevoir des packs." });
@@ -5983,15 +5989,23 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const localCards = readStoredCardCollection(playerCardAccountId);
     const localStock = readStoredCardPackStock(playerCardAccountId);
     const accountStock = playerProfile?.cardPackStock ? normalizeCardPackStock(playerProfile.cardPackStock) : null;
-    const localStockIsNewer = Boolean(accountStock && Number(localStock.stockSyncedAt) > Number(accountStock.stockSyncedAt));
-    const nextStock = playerCardAccountId
-      ? getFreshestCardPackStock(playerProfile?.cardPackStock, localStock)
-      : localStock;
-    const mergedCards = playerCardAccountId
-      ? accountStock
-        ? localStockIsNewer ? localCards : accountCards
-        : mergeLegacyCardCollections(accountCards, localCards)
-      : localCards;
+    const nextStock = playerCardAccountId ? accountStock || localStock : localStock;
+    const collectionsDiffer = Boolean(playerCardAccountId)
+      && JSON.stringify(localCards) !== JSON.stringify(accountCards);
+    if (collectionsDiffer) {
+      try {
+        window.localStorage.setItem(`${CARD_COLLECTION_RECOVERY_STORAGE_KEY}:${playerCardAccountId}`, JSON.stringify({
+          savedAt: new Date().toISOString(),
+          accountId: playerCardAccountId,
+          cards: localCards,
+        }));
+        setCardSyncStatus("La copie locale de cet appareil diffère de la collection du compte. Elle a été conservée sur cet appareil ; aucune fusion ni écriture automatique n’a été faite.");
+      } catch (error) {
+        console.warn("La copie locale différente n'a pas pu être conservée:", error);
+        setCardSyncStatus("La copie locale diffère de la collection du compte, mais n’a pas pu être sauvegardée. Évite toute action TCG sur cet appareil et contacte l’administrateur.");
+      }
+    }
+    const mergedCards = playerCardAccountId ? accountCards : localCards;
     const nextCards = playerCardAccountId
       ? nextStock.cardCollectionResetAt > getLatestCardObtainedAt(mergedCards) ? [] : mergedCards
       : localCards;
@@ -6000,12 +6014,6 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     if (playerCardAccountId) {
       writeStoredCardCollection(nextCards, playerCardAccountId);
       writeStoredCardPackStock(nextStock, playerCardAccountId);
-      if (!accountStock || localStockIsNewer || JSON.stringify(nextCards) !== JSON.stringify(accountCards)) {
-        savePlayerCards(nextCards, nextStock).then((result) => {
-          if (!result?.ok) setCardSyncStatus(result?.message || "La synchronisation TCG a échoué. Réessaie quand la connexion sera rétablie.");
-          else setCardSyncStatus("");
-        });
-      }
     }
   }, [playerCardAccountId, JSON.stringify(playerProfile?.cardPackStock || null), JSON.stringify(playerProfile?.cardCollection || [])]);
   useEffect(() => {
@@ -6058,11 +6066,13 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
       return;
     }
     const usesFreePack = !usesLegendaryPack && refreshedStock.packs > 0;
+    const usesGiftedPack = !usesLegendaryPack && !usesFreePack && refreshedStock.giftedPacks > 0;
     const dropsLegendaryPack = !usesLegendaryPack && Math.random() < CARD_PACK_LEGENDARY_DROP_CHANCE;
     const nextStock = {
       ...refreshedStock,
       packs: usesFreePack ? refreshedStock.packs - 1 : refreshedStock.packs,
-      purchasedPacks: usesLegendaryPack || usesFreePack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
+      giftedPacks: usesGiftedPack ? Math.max(0, refreshedStock.giftedPacks - 1) : refreshedStock.giftedPacks,
+      purchasedPacks: usesLegendaryPack || usesFreePack || usesGiftedPack ? refreshedStock.purchasedPacks : Math.max(0, refreshedStock.purchasedPacks - 1),
       purchasedLegendaryPacks: Math.max(0, refreshedStock.purchasedLegendaryPacks + (dropsLegendaryPack ? 1 : 0) - (usesLegendaryPack ? 1 : 0)),
       updatedAt: refreshedStock.updatedAt,
       generatedToday: refreshedStock.generatedToday,
@@ -8435,7 +8445,7 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
     .map((account) => ({ account, cleanup: splitObsoleteTcgDemoCards(account.cardCollection) }))
     .filter(({ cleanup }) => cleanup.removed.length > 0);
   const demoCardTotal = demoCardRows.reduce((total, row) => total + row.cleanup.removed.length, 0);
-  const safePackGiftAmount = Math.max(1, Math.min(CARD_PACK_MAX_STOCK, Math.floor(Number(packGiftAmount) || 1)));
+  const safePackGiftAmount = Math.max(1, Math.min(Number.MAX_SAFE_INTEGER, Math.floor(Number(packGiftAmount) || 1)));
   const safeArekcoinsGiftAmount = Math.max(1, Math.min(1000000000, Math.floor(Number(arekcoinsGiftAmount) || 0)));
   const grantArekcoins = async () => {
     if (!onGrantArekcoins || !Number.isFinite(Number(arekcoinsGiftAmount)) || Number(arekcoinsGiftAmount) < 1) return;
@@ -8500,20 +8510,20 @@ function PlayerAccountsPanel({ adminUser, accounts = [], onGrantPacks, onGrantAr
         <div style={styles.resultsInfo}>
           <label style={styles.label}>
             <span style={styles.labelText}>Nombre de packs</span>
-            <input type="number" min="1" max={CARD_PACK_MAX_STOCK} value={packGiftAmount} onChange={(event) => setPackGiftAmount(event.target.value)} style={styles.input} />
+            <input type="number" min="1" step="1" value={packGiftAmount} onChange={(event) => setPackGiftAmount(event.target.value)} style={styles.input} />
           </label>
           <label style={styles.label}>
             <span style={styles.labelText}>Cible</span>
             <select value={packGiftTargetId} onChange={(event) => setPackGiftTargetId(event.target.value)} style={styles.resultsSelect}>
               <option value="ALL">Tous les comptes ({rows.length})</option>
-              {rows.map((account) => <option key={account.id} value={account.id}>{account.pseudo || `Compte ${account.id}`} ({account.cardPackStock.packs}/{CARD_PACK_MAX_STOCK})</option>)}
+              {rows.map((account) => <option key={account.id} value={account.id}>{account.pseudo || `Compte ${account.id}`} ({account.cardPackStock.packs}/{CARD_PACK_MAX_STOCK} quotidiens + {account.cardPackStock.giftedPacks} offerts)</option>)}
             </select>
           </label>
           <button type="button" onClick={() => grantPacks()} disabled={isGrantingPacks || !rows.length || !onGrantPacks} style={styles.primaryButton}>
             {isGrantingPacks ? "Ajout..." : packGiftTargetId === "ALL" ? "Donner à tout le monde" : "Donner au joueur"}
           </button>
         </div>
-        <p style={styles.mutedSmall}>Les packs sont ajoutés au stock actuel, avec une limite de {CARD_PACK_MAX_STOCK} packs disponibles par compte.</p>
+        <p style={styles.mutedSmall}>Les packs offerts s’ajoutent séparément au cycle quotidien : ils ne sont pas limités à {CARD_PACK_MAX_STOCK} et n’empêchent pas la régénération des packs journaliers.</p>
       </Card>
       <Card title="Donner des AREKCOINS" icon="🪙">
         <div style={styles.resultsInfo}>
