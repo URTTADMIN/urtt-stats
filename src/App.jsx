@@ -6369,9 +6369,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <p style={styles.kicker}>CATALOGUE · BASE COMPLÈTE</p>
           <h1 style={styles.cardLabTitle}>Catalogue URTT TCG</h1>
         </div>
-        <div style={styles.cardCollectionSummary}>
-          <span style={styles.cardCollectionSummaryBadge}>{pokedexOwnedCount}/{pokedexCards.length} obtenues</span>
-        </div>
+
       </header>}
       {cardsView === "pokedex" && <section style={styles.cardCollectionPanel}>
         <div style={styles.cardCollectionHeader}>
@@ -6379,13 +6377,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
             <p style={styles.kicker}>Saisons · Championnats · Raretés</p>
             <h2 style={styles.cardLabStageTitle}>Toutes les cartes</h2>
           </div>
-          <div style={styles.cardCollectionSummary}>
-            {CARD_COLLECTION_VISIBLE_RARITIES.map((rarity) => (
-              <span key={rarity.id} style={{ ...styles.cardCollectionSummaryBadge, borderColor: rarity.color, color: rarity.color }}>
-                {rarity.id} · {pokedexCards.filter((card) => card.rarity?.id === rarity.id && card.owned).length}/{pokedexCards.filter((card) => card.rarity?.id === rarity.id).length}
-              </span>
-            ))}
-          </div>
+
         </div>
         <div className="urtt-tcg-filter-toolbar" style={styles.cardCollectionToolbar}>
           <label style={styles.label}>
@@ -6395,29 +6387,29 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par type</span>
             <select value={collectionTypeFilter} onChange={(event) => setCollectionTypeFilter(event.target.value)} style={styles.resultsSelect}>
-              <option value="ALL">Toutes les cartes ({pokedexSeasonFilteredCards.length})</option>
-              <option value="DRIVER">Pilotes ({pokedexSeasonFilteredCards.filter((card) => !["team", "special"].includes(card.cardType)).length})</option>
-              <option value="TEAM">Écuries ({pokedexSeasonFilteredCards.filter((card) => card.cardType === "team").length})</option>
+              <option value="ALL">Toutes les cartes</option>
+              <option value="DRIVER">Pilotes</option>
+              <option value="TEAM">Écuries</option>
             </select>
           </label>
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par championnat</span>
             <select value={collectionCategoryFilter} onChange={(event) => { setCollectionCategoryFilter(event.target.value); setCollectionSeasonFilter("ALL"); }} style={styles.resultsSelect}>
-              <option value="ALL">Tous les championnats ({pokedexCards.length})</option>
-              {pokedexCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.label} ({category.count})</option>)}
+              <option value="ALL">Tous les championnats</option>
+              {pokedexCategoryOptions.map((category) => <option key={category.id} value={category.id}>{category.label}</option>)}
             </select>
           </label>
           <label style={styles.label}>
             <span style={styles.labelText}>Filtrer par saison</span>
             <select value={collectionSeasonFilter} onChange={(event) => setCollectionSeasonFilter(event.target.value)} style={styles.resultsSelect}>
-              <option value="ALL">Toutes les saisons ({pokedexCategoryFilteredCards.length})</option>
-              {pokedexSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.id === "SPECIAL" ? "Spécial" : seasonName(season.id)} ({season.count})</option>)}
+              <option value="ALL">Toutes les saisons</option>
+              {pokedexSeasonOptions.map((season) => <option key={season.id} value={season.id}>{season.id === "SPECIAL" ? "Spécial" : seasonName(season.id)}</option>)}
             </select>
           </label>
           <div className="urtt-tcg-filter-group" style={styles.cardRarityFilterGroup}>
             <span style={styles.labelText}>Filtrer par rareté</span>
             <div style={styles.cardRarityFilterRow}>
-              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {pokedexSearchFilteredCards.length}</button>
+              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes</button>
               {[...CARD_COLLECTION_VISIBLE_RARITIES].reverse().map((rarity) => (
                 <button
                   key={rarity.id}
@@ -6431,7 +6423,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
                     boxShadow: collectionRarityFilter === rarity.id ? `0 0 22px ${rarity.color}44` : "none",
                   }}
                 >
-                  {rarity.id} · {pokedexRarityCounts[rarity.id] || 0}
+                  {rarity.id}
                 </button>
               ))}
             </div>
