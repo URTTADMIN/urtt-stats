@@ -6375,7 +6375,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
         <div style={styles.cardCollectionHeader}>
           <div>
             <p style={styles.kicker}>Saisons · Championnats · Raretés</p>
-            <h2 style={styles.cardLabStageTitle}>Toutes les cartes</h2>
+            <h2 style={styles.cardLabStageTitle}>Toutes les cartes <span style={styles.mutedSmall}>({pokedexCards.length} au total)</span></h2>
           </div>
 
         </div>
