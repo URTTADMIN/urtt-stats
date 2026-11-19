@@ -6409,7 +6409,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
           <div className="urtt-tcg-filter-group" style={styles.cardRarityFilterGroup}>
             <span style={styles.labelText}>Filtrer par rareté</span>
             <div style={styles.cardRarityFilterRow}>
-              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes</button>
+              <button type="button" onClick={() => setCollectionRarityFilter("ALL")} style={{ ...styles.cardRarityFilterButton, ...(collectionRarityFilter === "ALL" ? styles.cardRarityFilterButtonActive : {}) }}>Toutes · {pokedexCards.length} cartes</button>
               {[...CARD_COLLECTION_VISIBLE_RARITIES].reverse().map((rarity) => (
                 <button
                   key={rarity.id}
