@@ -6055,9 +6055,34 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     : Number(packStock.generatedToday) >= CARD_PACK_MAX_STOCK
       ? `Limite du jour atteinte · prochain pack dans ${formatCardPackWait(nextPackInMs)}`
       : `+1 pack dans ${formatCardPackWait(nextPackInMs)}`;
-  const openPack = () => {
-    if (isPurchasingPackRef.current) return;
-    const refreshedStock = normalizeCardPackStock(packStock);
+  const openPack = async () => {
+    if (isPurchasingPackRef.current || isOpeningPack) return;
+    isPurchasingPackRef.current = true;
+    let refreshedStock = normalizeCardPackStock(packStock);
+    if (playerCardAccountId) {
+      try {
+        const { data, error } = await supabase
+          .from("player_accounts")
+          .select("card_pack_stock")
+          .eq("id", playerCardAccountId)
+          .maybeSingle();
+        if (error || !data) {
+          setCardSyncStatus("Impossible de vérifier le stock de packs. Réessaie avant d’ouvrir un pack.");
+          return;
+        }
+        refreshedStock = normalizeCardPackStock(data.card_pack_stock);
+        setPackStock(refreshedStock);
+        writeStoredCardPackStock(refreshedStock, playerCardAccountId);
+      } catch (error) {
+        console.error("Erreur vérification stock de packs:", error);
+        setCardSyncStatus("Impossible de vérifier le stock de packs. Réessaie avant d’ouvrir un pack.");
+        return;
+      } finally {
+        isPurchasingPackRef.current = false;
+      }
+    } else {
+      isPurchasingPackRef.current = false;
+    }
     const canOpenLegendary = refreshedStock.purchasedLegendaryPacks > 0 && legendaryCardPool.length >= 5;
     const usesLegendaryPack = canOpenLegendary;
     if ((!usesLegendaryPack && packCardLibrary.length < 5) || getAvailableCardPackCount(refreshedStock) <= 0) {
