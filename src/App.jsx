@@ -62,7 +62,7 @@ const CARD_PACK_LEGENDARY_SL_CHANCE = 0.02;
 const CARD_PACK_LEGENDARY_DROP_CHANCE = 1 / 1_000_000;
 const CARD_PACK_SHOP_OPTIONS = [
   { id: "urtt", name: "Pack URTT TCG", description: "5 cartes de la collection URTT actuelle.", image: "/card-pack-urtt.png", price: CARD_PACK_PURCHASE_PRICE, available: true, packType: "standard" },
-  { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties · 2 % de chance de SL par carte.", image: "/card-pack-urtt.png", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
+  { id: "legendary", name: "Pack Légendaire", description: "5 cartes L garanties.", image: "/card-pack-urtt.png", price: CARD_PACK_LEGENDARY_PRICE, available: true, packType: "legendary" },
 ];
 const CARD_PACK_REGEN_MS = 2 * 60 * 60 * 1000;
 const CARD_PACK_TIME_ZONE = "Europe/Paris";
