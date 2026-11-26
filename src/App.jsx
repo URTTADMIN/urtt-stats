@@ -6058,11 +6058,10 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const legendaryPackAvailable = Number(packStock.purchasedLegendaryPacks) > 0 && legendaryCardPool.length >= 5;
   useEffect(() => {
     if (!isLegendaryPackIntro) return undefined;
-    const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timeout = window.setTimeout(() => {
       setIsLegendaryPackIntro(false);
       setShowPackModal(true);
-    }, reducedMotion ? 2200 : 3200);
+    }, 700);
     return () => window.clearTimeout(timeout);
   }, [isLegendaryPackIntro]);
   useEffect(() => {
@@ -6789,21 +6788,17 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack 
 
 function LegendaryPackIntroModal({ onSkip }) {
   return (
-    <div className="legendary-pack-opening-screen" role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
-      <div className="legendary-pack-confetti" aria-hidden="true">{Array.from({ length: 32 }, (_, index) => <span key={index} style={{ "--confetti-left": `${(index * 37) % 100}%`, "--confetti-delay": `-${(index * 173) % 2400}ms`, "--confetti-duration": `${2200 + (index % 5) * 320}ms`, "--confetti-angle": `${(index * 47) % 360}deg` }} />)}</div>
-      <div className="legendary-pack-stage" aria-hidden="true">
-        <div className="legendary-pack-sigil" />
-        <div className="legendary-pack-shockwave" />
-        <div className="legendary-pack-lightning" />
-        <img className="legendary-pack-intro-image" src="/card-pack-legendary-transparent.svg" alt="" />
+    <div className="urtt-mobile-dialog-overlay" style={styles.cardPackModalOverlay} role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
+      <div className="urtt-mobile-dialog" style={styles.cardPackModal} onMouseDown={(event) => event.stopPropagation()}>
+        <div style={styles.cardPackModalHeader}>
+          <div><p style={styles.kicker}>ÉDITION LÉGENDAIRE</p><h2 id="legendary-pack-intro-title" style={styles.cardPackModalTitle}>Les 5 légendaires t’attendent</h2><p style={styles.mutedSmall}>Ton pack est prêt à être révélé.</p></div>
+          <button type="button" onClick={onSkip} style={styles.secondaryButton}>Continuer</button>
+        </div>
+        <div style={{ ...styles.cardPackModalStage, display: "grid", placeItems: "center", minHeight: 220 }}>
+          <img src="/card-pack-legendary-transparent.svg" alt="Pack légendaire URTT TCG" style={{ width: "min(300px, 70vw)", maxHeight: 230, objectFit: "contain" }} />
+        </div>
+        <div style={styles.cardPackModalFooter}><button type="button" onClick={onSkip} style={styles.cardPlayerPrimary}>Révéler les 5 cartes</button></div>
       </div>
-      <div className="legendary-pack-opening-copy">
-        <p className="legendary-pack-opening-kicker">ÉDITION LÉGENDAIRE</p>
-        <h2 id="legendary-pack-intro-title">Les 5 légendaires t’attendent</h2>
-        <p>Le sceau doré se brise…</p>
-        <div className="legendary-pack-charge-dots" aria-hidden="true"><span /><span /><span /><span /><span /></div>
-      </div>
-      <button type="button" className="legendary-pack-skip" onClick={onSkip}>Passer l’animation</button>
     </div>
   );
 }
