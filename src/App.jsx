@@ -705,7 +705,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS, specialCards: [], tcgEnabledEditions: null };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS, specialCards: [], tcgEnabledEditions: CARD_COLLECTION_CATEGORY_IDS.flatMap((categoryId) => CARD_COLLECTION_SEASON_IDS.map((seasonId) => `${categoryId}:${seasonId}`)) };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
