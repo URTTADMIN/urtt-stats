@@ -6062,7 +6062,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     const timeout = window.setTimeout(() => {
       setIsLegendaryPackIntro(false);
       setShowPackModal(true);
-    }, reducedMotion ? 350 : 2700);
+    }, reducedMotion ? 2200 : 3200);
     return () => window.clearTimeout(timeout);
   }, [isLegendaryPackIntro]);
   useEffect(() => {
