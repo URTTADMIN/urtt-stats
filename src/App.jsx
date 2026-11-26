@@ -6789,19 +6789,21 @@ function PackOpeningModal({ pack, revealedCount, isOpeningPack, isLegendaryPack 
 
 function LegendaryPackIntroModal({ onSkip }) {
   return (
-    <div className="urtt-mobile-dialog-overlay" style={{ ...styles.cardPackModalOverlay, ...styles.legendaryPackIntroOverlay }} role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
-      <div className="legendary-pack-confetti" aria-hidden="true">{Array.from({ length: 32 }, (_, index) => <span key={index} style={{ "--confetti-left": `${(index * 37) % 100}%`, "--confetti-delay": `${-((index * 173) % 2400)}ms`, "--confetti-duration": `${2200 + (index % 5) * 320}ms`, "--confetti-angle": `${(index * 47) % 360}deg` }} />)}</div>
-      <div className="legendary-pack-intro urtt-mobile-intro-card" style={styles.legendaryPackIntroCard}>
-        <div className="legendary-pack-energy" aria-hidden="true"><span /><span /><span /></div>
-        <div className="legendary-pack-orbit" aria-hidden="true" />
-        <div className="legendary-pack-burst" aria-hidden="true" />
-        <img className="legendary-pack-intro-image" src="/card-pack-legendary-transparent.svg" alt="Pack légendaire URTT TCG en cours d’ouverture" style={styles.legendaryPackIntroImage} />
-        <div className="legendary-pack-charge-dots" aria-hidden="true"><span /><span /><span /><span /><span /></div>
-        <p style={styles.legendaryPackKicker}>ÉDITION LÉGENDAIRE</p>
-        <h2 id="legendary-pack-intro-title" style={styles.legendaryPackIntroTitle}>Les 5 légendaires t’attendent</h2>
-        <p style={styles.legendaryPackIntroText}>Le sceau doré se brise…</p>
-        <button type="button" onClick={onSkip} style={styles.legendaryPackSkipButton}>Passer l’animation</button>
+    <div className="legendary-pack-opening-screen" role="dialog" aria-modal="true" aria-labelledby="legendary-pack-intro-title">
+      <div className="legendary-pack-confetti" aria-hidden="true">{Array.from({ length: 32 }, (_, index) => <span key={index} style={{ "--confetti-left": `${(index * 37) % 100}%`, "--confetti-delay": `-${(index * 173) % 2400}ms`, "--confetti-duration": `${2200 + (index % 5) * 320}ms`, "--confetti-angle": `${(index * 47) % 360}deg` }} />)}</div>
+      <div className="legendary-pack-stage" aria-hidden="true">
+        <div className="legendary-pack-sigil" />
+        <div className="legendary-pack-shockwave" />
+        <div className="legendary-pack-lightning" />
+        <img className="legendary-pack-intro-image" src="/card-pack-legendary-transparent.svg" alt="" />
       </div>
+      <div className="legendary-pack-opening-copy">
+        <p className="legendary-pack-opening-kicker">ÉDITION LÉGENDAIRE</p>
+        <h2 id="legendary-pack-intro-title">Les 5 légendaires t’attendent</h2>
+        <p>Le sceau doré se brise…</p>
+        <div className="legendary-pack-charge-dots" aria-hidden="true"><span /><span /><span /><span /><span /></div>
+      </div>
+      <button type="button" className="legendary-pack-skip" onClick={onSkip}>Passer l’animation</button>
     </div>
   );
 }
