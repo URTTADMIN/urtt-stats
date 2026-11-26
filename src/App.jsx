@@ -54,7 +54,7 @@ const CARD_COLLECTION_CATEGORY_ID = "F1";
 const CARD_COLLECTION_CATEGORY_IDS = ["F1", "FE"];
 const CARD_COLLECTION_EVENT_IDS = ["LEMANS24", "INDY300"];
 const CARD_COLLECTION_SPECIAL_CATEGORY_ID = "SPECIAL";
-const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 17 }, (_, index) => `S${index + 1}`);
+const CARD_COLLECTION_SEASON_IDS = Array.from({ length: 18 }, (_, index) => `S${index + 1}`);
 const CARD_PACK_MAX_STOCK = 10;
 const CARD_PACK_PURCHASE_PRICE = 250;
 const CARD_PACK_LEGENDARY_PRICE = 10_000;
