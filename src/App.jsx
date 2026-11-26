@@ -705,7 +705,7 @@ const emptySpecialEdition = { eventType: "LEMANS24", editionLabel: "", name: "",
 const emptyOffSeasonEntry = { eventType: "LEMANS24", seasonId: "S16", driverId: "", teamId: "", qualifyingPosition: "", racePosition: "" };
 const emptyDevelopmentForm = { teamId: "", seasonId: "S16", categoryId: "F1", round: 1, speed: 0, acceleration: 0, grip: 0, turbo: 0, turboEnabled: false, level: 0, driverOne: "", driverTwo: "", teamValues: {} };
 const emptyPermissionForm = createEmptyPermissionForm();
-const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS, specialCards: [] };
+const defaultSiteSettings = { publicDevelopmentEnabled: true, publicPages: DEFAULT_PUBLIC_PAGE_VISIBILITY, thanksNames: ["LORDEN", "Thibaut", "Etienne"], thanksText: "", cardLabSettings: DEFAULT_CARD_LAB_SETTINGS, specialCards: [], tcgEnabledEditions: null };
 const DEVELOPMENT_COEFFICIENTS = {
   F1: { speed: 1.6, acceleration: 0.71, grip: 0.69, turbo: 0 },
   FE: { speed: 1.3, acceleration: 0.6, grip: 0.54, turbo: 0.56 },
@@ -5398,7 +5398,7 @@ function PublicSite({ selectedCategoryId, setSelectedCategoryId, selectedSeasonI
           )}
           <main className="urtt-public-main" style={styles.publicMain}>
         {isTgcCardsPage && (hasCardLabAccess
-          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} specialCards={siteSettings.specialCards} embedded />
+          ? <CardRarityLab drivers={cardLabDrivers} standingsBySeason={cardLabStandingsBySeason} standingsByCategory={cardLabStandingsByCategory} teamStandingsByCategory={cardLabTeamStandingsByCategory} offSeasonEntries={offSeasonEntries} allDrivers={allDrivers} teams={teams} seasonId={normalizeCardLabSettings(cardLabSettings).seasonId} categoryId={CARD_COLLECTION_CATEGORY_ID} initialView={activePublicPage === "tgc-collection" ? "collection" : activePublicPage === "tgc-pokedex" ? "pokedex" : "opening"} playerProfile={playerProfile} playerAccounts={playerAccounts} onSavePlayerTcgState={onSavePlayerTcgState} marketAccessAllowed={canUseTcgMarket(playerProfile, adminUser)} specialCards={siteSettings.specialCards} tcgEnabledEditions={siteSettings.tcgEnabledEditions} seasonOptions={seasonOptions} embedded />
           : <CardLabAccessGate playerProfile={playerProfile} onPlayerLogin={onPlayerLogin} onPlayerSignup={onPlayerSignup} onPlayerLogout={onPlayerLogout} isSavingPlayerAccount={isSavingPlayerAccount} embedded />)}
         {activePublicPage === "home" && <HomePage countdownRaces={countdownRaces} calendarEvents={calendarEvents} selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} publicCategoryTheme={publicCategoryTheme} leaderDriver={leaderDriver} leaderTeam={leaderTeam} races={races} raceLibrary={raceLibrary} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} teams={teams} drivers={allDrivers} developmentEntries={developmentEntries} onNavigate={(pageId) => requestPublicNavigation(() => setPublicPage(pageId))} thanksNames={siteSettings.thanksNames} thanksText={siteSettings.thanksText} />}
         {activePublicPage === "standings" && <StandingsPage selectedSeasonId={selectedSeasonId} selectedCategoryId={selectedCategoryId} leaderDriver={leaderDriver} leaderTeam={leaderTeam} seasonOnlyDrivers={seasonOnlyDrivers} seasonOnlyTeams={seasonOnlyTeams} races={races} raceResults={raceResults} allDrivers={allDrivers} teams={teams} onDriverClick={handleStandingsDriverClick} />}
@@ -5659,6 +5659,22 @@ function getCollectionGroupKey(card = {}) {
   ].join("|");
 }
 
+function getTcgEditionKey(categoryId, seasonId) {
+  return `${normalizeCategoryId(categoryId)}:${normalizeSeasonId(seasonId)}`;
+}
+
+function getTcgSeasonIds(seasonOptions = getSeasonOptions()) {
+  const optionIds = (seasonOptions || []).map((season) => normalizeSeasonId(typeof season === "string" ? season : season?.id)).filter(Boolean);
+  return Array.from(new Set([...CARD_COLLECTION_SEASON_IDS, ...optionIds]))
+    .sort((a, b) => getSeasonNumber(a) - getSeasonNumber(b) || a.localeCompare(b));
+}
+
+function getEnabledTcgEditionIds(value, seasonOptions = getSeasonOptions()) {
+  if (Array.isArray(value)) return new Set(value.map((item) => String(item || "").trim()).filter(Boolean));
+  return new Set(CARD_COLLECTION_CATEGORY_IDS.flatMap((categoryId) =>
+    getTcgSeasonIds(seasonOptions).map((seasonId) => getTcgEditionKey(categoryId, seasonId))));
+}
+
 function buildOffSeasonCard(entry, position, eventType, teams = [], drivers = [], rarities = CARD_RARITY_PRESETS) {
   const rarity = getSeasonCardRarityForPosition(position, rarities);
   if (!rarity) return null;
@@ -5776,7 +5792,7 @@ function drawLegendaryCardPack(cards, specialLegendaryCards = [], count = 5) {
   return selected.sort((a, b) => (CARD_RARITY_ORDER[a.rarity?.id] ?? 0) - (CARD_RARITY_ORDER[b.rarity?.id] ?? 0) || a.position - b.position);
 }
 
-function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, marketAccessAllowed = false, embedded = false, specialCards = [] }) {
+function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCategory = {}, teamStandingsByCategory = {}, offSeasonEntries = [], allDrivers = [], teams = [], seasonId = "S1", categoryId = CARD_COLLECTION_CATEGORY_ID, initialView = "opening", playerProfile = null, playerAccounts = [], onSavePlayerTcgState, marketAccessAllowed = false, embedded = false, specialCards = [], tcgEnabledEditions = null, seasonOptions = [] }) {
   const rarities = CARD_RARITY_PRESETS;
   const [cardsView, setCardsView] = useState(["collection", "pokedex"].includes(initialView) ? initialView : "opening");
   const [collectionCategoryFilter, setCollectionCategoryFilter] = useState("ALL");
@@ -5788,16 +5804,21 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
   const [selectedDuplicateKeys, setSelectedDuplicateKeys] = useState([]);
   const [isDestroyingDuplicates, setIsDestroyingDuplicates] = useState(false);
   const [duplicateDestroyStatus, setDuplicateDestroyStatus] = useState("");
+  const tcgSeasonIds = useMemo(() => getTcgSeasonIds(seasonOptions?.length ? seasonOptions : getSeasonOptions()), [seasonOptions]);
+  const enabledTcgEditionIds = useMemo(() => getEnabledTcgEditionIds(tcgEnabledEditions, tcgSeasonIds), [tcgEnabledEditions, tcgSeasonIds]);
   const normalCardLibrary = useMemo(() => {
     const categoryStandings = Object.keys(standingsByCategory || {}).length ? standingsByCategory : { [categoryId]: standingsBySeason };
+    const activeSeasonIds = (cardCategoryId) => tcgSeasonIds.filter((id) => enabledTcgEditionIds.has(getTcgEditionKey(cardCategoryId, id)));
     const collection = [
-      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonCardCollection(categoryStandings[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, teams, rarities)),
-      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonTeamCardCollection(teamStandingsByCategory[cardCategoryId] || {}, CARD_COLLECTION_SEASON_IDS, cardCategoryId, rarities)),
+      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonCardCollection(categoryStandings[cardCategoryId] || {}, activeSeasonIds(cardCategoryId), cardCategoryId, teams, rarities)),
+      ...CARD_COLLECTION_CATEGORY_IDS.flatMap((cardCategoryId) => buildSeasonTeamCardCollection(teamStandingsByCategory[cardCategoryId] || {}, activeSeasonIds(cardCategoryId), cardCategoryId, rarities)),
       ...buildOffSeasonCardCollection(offSeasonEntries, teams, allDrivers, CARD_COLLECTION_EVENT_IDS, rarities),
     ];
     if (collection.length) return collection;
-    return drivers.length ? buildSeasonCardEdition(drivers, seasonId, categoryId, teams, rarities) : [];
-  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities]);
+    return drivers.length && enabledTcgEditionIds.has(getTcgEditionKey(categoryId, seasonId))
+      ? buildSeasonCardEdition(drivers, seasonId, categoryId, teams, rarities)
+      : [];
+  }, [drivers, standingsBySeason, standingsByCategory, teamStandingsByCategory, offSeasonEntries, allDrivers, teams, seasonId, categoryId, rarities, tcgSeasonIds, enabledTcgEditionIds]);
   const specialCardLibrary = useMemo(() => buildSpecialCardCollection(rarities, specialCards), [rarities, specialCards]);
   const cardLibrary = useMemo(() => [...normalCardLibrary, ...specialCardLibrary], [normalCardLibrary, specialCardLibrary]);
   const packCardLibrary = useMemo(() => normalCardLibrary.length >= 5 ? [...normalCardLibrary, ...specialCardLibrary] : [], [normalCardLibrary, specialCardLibrary]);
@@ -5860,7 +5881,7 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     ...counts,
     [card.rarity.id]: (counts[card.rarity.id] || 0) + 1,
   }), {}), [searchFilteredCollectionCards]);
-  const collectionSeasonOptions = CARD_COLLECTION_SEASON_IDS
+  const collectionSeasonOptions = tcgSeasonIds
     .map((id) => ({ id, count: categoryFilteredCollectionCards.filter((card) => normalizeSeasonId(card.seasonId) === id).length }))
     .filter((season) => season.count > 0);
   const collectionCategoryOptions = [...CARD_COLLECTION_CATEGORY_IDS, ...CARD_COLLECTION_EVENT_IDS]
@@ -5868,14 +5889,14 @@ function CardRarityLab({ drivers = [], standingsBySeason = {}, standingsByCatego
     .filter((category) => category.count > 0);
   const pokedexCards = useMemo(() => {
     const grouped = new Map();
-    cardLibrary.forEach((card) => {
+    [...cardLibrary, ...ownedCards].forEach((card) => {
       const key = getCollectionGroupKey(card);
       if (!grouped.has(key)) grouped.set(key, { ...card, collectionGroupKey: key, owned: ownedCardKeys.has(key) });
     });
     return Array.from(grouped.values())
       .filter((card) => card.rarity?.id !== "SL" || card.owned)
       .sort((a, b) => (CARD_RARITY_ORDER[b.rarity?.id] ?? -1) - (CARD_RARITY_ORDER[a.rarity?.id] ?? -1) || normalizeCategoryId(a.categoryId).localeCompare(normalizeCategoryId(b.categoryId)) || getSeasonNumber(a.seasonId) - getSeasonNumber(b.seasonId) || a.position - b.position || a.name.localeCompare(b.name));
-  }, [cardLibrary, ownedCardKeys]);
+  }, [cardLibrary, ownedCards, ownedCardKeys]);
   const pokedexCategoryFilteredCards = collectionCategoryFilter === "ALL"
     ? pokedexCards
     : pokedexCards.filter((card) => normalizeCategoryId(card.categoryId) === normalizeCategoryId(collectionCategoryFilter));
@@ -9660,6 +9681,15 @@ function SeasonCardsAdminPanel({
   const cardSettings = normalizeCardLabSettings(siteSettings.cardLabSettings);
   const specialCards = normalizeSpecialCards(siteSettings.specialCards);
   const cardSeasonId = cardSettings.seasonId;
+  const editionSeasonOptions = seasonOptions?.length ? seasonOptions : getSeasonOptions();
+  const enabledEditionIds = getEnabledTcgEditionIds(siteSettings.tcgEnabledEditions, editionSeasonOptions);
+  const toggleTcgEdition = (categoryId, seasonId) => {
+    const key = getTcgEditionKey(categoryId, seasonId);
+    const next = new Set(enabledEditionIds);
+    if (next.has(key)) next.delete(key);
+    else next.add(key);
+    onUpdateSetting?.("tcgEnabledEditions", Array.from(next));
+  };
   const [specialCardForm, setSpecialCardForm] = useState(EMPTY_SPECIAL_CARD_FORM);
   const [editingSpecialCardId, setEditingSpecialCardId] = useState("");
   const [isUploadingSpecialCardImage, setIsUploadingSpecialCardImage] = useState(false);
@@ -9845,6 +9875,34 @@ function SeasonCardsAdminPanel({
 
   return (
     <div style={styles.section}>
+      <Card title="Éditions intégrées au TCG" icon="🎴">
+        <div style={{ overflowX: "auto", border: "1px solid rgba(255,255,255,.1)", borderRadius: 12 }}>
+          <table style={{ width: "100%", minWidth: 420, borderCollapse: "collapse", textAlign: "left" }}>
+            <thead style={{ background: "#111827" }}>
+              <tr>
+                <th style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,.14)" }}>Saison</th>
+                {CARD_COLLECTION_CATEGORY_IDS.map((categoryId) => <th key={categoryId} style={{ padding: "10px 12px", borderBottom: "1px solid rgba(255,255,255,.14)" }}>{getCardCategoryLabel(categoryId)}</th>)}
+              </tr>
+            </thead>
+            <tbody>
+              {getTcgSeasonIds(editionSeasonOptions).map((seasonId) => (
+                <tr key={seasonId}>
+                  <td style={{ padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,.07)", fontWeight: 700 }}>{seasonName(seasonId)}</td>
+                  {CARD_COLLECTION_CATEGORY_IDS.map((categoryId) => {
+                    const enabled = enabledEditionIds.has(getTcgEditionKey(categoryId, seasonId));
+                    return <td key={categoryId} style={{ padding: "9px 12px", borderBottom: "1px solid rgba(255,255,255,.07)" }}>
+                      <label style={{ display: "inline-flex", alignItems: "center", gap: 8, cursor: isSaving ? "wait" : "pointer" }}>
+                        <input type="checkbox" checked={enabled} disabled={isSaving || !onUpdateSetting} onChange={() => toggleTcgEdition(categoryId, seasonId)} />
+                        <span>{enabled ? "Intégrée" : "En attente"}</span>
+                      </label>
+                    </td>;
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
       <Card title="Cartes du catalogue par pilote" icon="📊">
         <div style={styles.stack}>
           <div style={{ ...styles.resultsInfo, alignItems: "center" }}>
