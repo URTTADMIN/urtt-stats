@@ -4150,19 +4150,20 @@ export default function URTTAdminPanel() {
       teamId: championTeam?.id || "",
       constructorDriverIds: championTeam ? saveConstructorDriverIds : [],
     };
-    const existingTitle = seasonTitles.find((title) => normalizeSeasonId(title.seasonId) === normalizeSeasonId(payload.seasonId) && normalizeCategoryId(title.categoryId) === normalizeCategoryId(payload.categoryId));
     const seasonTitlePayload = mapSeasonTitleToDb(payload);
-    const createRequest = (dbPayload) => existingTitle
-      ? supabase.from("season_titles").update(dbPayload).eq("id", existingTitle.id).select().single()
-      : supabase.from("season_titles").insert(dbPayload).select().single();
+    const saveRequest = (dbPayload) => supabase
+      .from("season_titles")
+      .upsert(dbPayload, { onConflict: "season_id,category_id" })
+      .select()
+      .single();
 
     setIsSaving(true);
-    let { data, error } = await createRequest(seasonTitlePayload);
+    let { data, error } = await saveRequest(seasonTitlePayload);
     const missingConstructorDriversColumn = error && "constructor_driver_ids" in seasonTitlePayload && (error.code === "42703" || error.code === "PGRST204" || String(error.message || "").includes("constructor_driver_ids"));
     if (missingConstructorDriversColumn) {
       const fallbackPayload = { ...seasonTitlePayload };
       delete fallbackPayload.constructor_driver_ids;
-      ({ data, error } = await createRequest(fallbackPayload));
+      ({ data, error } = await saveRequest(fallbackPayload));
     }
     setIsSaving(false);
 
