@@ -2937,10 +2937,11 @@ export default function URTTAdminPanel() {
           errors: results.map((result, index) => result.error ? { table: keys[index].replace(/Data$/, ""), code: result.error.code, message: result.error.message } : null).filter(Boolean),
         };
       } else {
-        const [publicResponse, raceResultsResponse, settingsResult] = await Promise.all([
+        const [publicResponse, raceResultsResponse, settingsResult, seasonTitlesResult] = await Promise.all([
           fetch("/api/public-data", { headers: { Accept: "application/json" } }),
           fetch("/api/race-results", { headers: { Accept: "application/json" } }),
           supabase.from("site_settings").select("*"),
+          supabase.from("season_titles").select("id,season_id,category_id,driver_id,team_id,constructor_driver_ids").order("season_id", { ascending: true }),
         ]);
         const [publicPayload, raceResultsPayload] = await Promise.all([publicResponse.json(), raceResultsResponse.json()]);
         publicData = {
@@ -2950,8 +2951,12 @@ export default function URTTAdminPanel() {
           errors: [...(publicPayload.errors || []), ...(raceResultsPayload.errors || [])],
         };
         publicData.siteSettingsData = settingsResult.data || [];
+        publicData.seasonTitlesData = seasonTitlesResult.data || [];
         if (settingsResult.error) {
           publicData.errors = [...(publicData.errors || []), { table: "site_settings", code: settingsResult.error.code, message: settingsResult.error.message }];
+        }
+        if (seasonTitlesResult.error) {
+          publicData.errors = [...(publicData.errors || []), { table: "season_titles", code: seasonTitlesResult.error.code, message: seasonTitlesResult.error.message }];
         }
         if (!publicResponse.ok || !raceResultsResponse.ok) {
           throw new Error(publicData.errors?.map((error) => `${error.table}: ${error.message}`).join(" · ") || publicData.error || "Impossible de charger les données publiques.");
